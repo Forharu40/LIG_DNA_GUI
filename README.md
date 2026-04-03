@@ -8,8 +8,9 @@ WPF + Material Design 기반의 EO / IR 운용 GUI 프로토타입입니다.
 
 - 상단: EO / IR 듀얼 화면
 - 중앙 스왑 버튼: 큰 화면과 작은 화면의 카메라 위치 교체
+- EO 창: 현재는 노트북 카메라 입력을 사용해 GUI 동작을 검증
 - 하단 좌측: VLM 결과값 출력창
-- 하단 중앙: 명령 입력창
+- 하단 중앙: 실시간 시스템 로그 창
 - 하단 우측: 기능 제어 버튼 및 상태 패널
 
 ### 기능 제어 항목
@@ -51,8 +52,15 @@ WPF + Material Design 기반의 EO / IR 운용 GUI 프로토타입입니다.
 | motor | 모터 on/off 요청 | 모터 상태 | `bool` |
 | tracking | 추적 on/off 요청 | 추적 상태 | `bool` |
 | 밝기 / 대조비 | 슬라이더 값 | 렌더러 표시 파라미터 | `double (0~100)` |
-| 명령 입력 | 운용자 텍스트 명령 | 명령 결과, 로그 | `string` |
+| 시스템 로그 | 버튼 이벤트, 장비 상태, 카메라 상태 | 시간순 로그 목록 | `string`, `JSON` |
 | VLM 결과 출력 | 탐지/추적 이벤트 묶음 | 자연어 요약 결과 | `JSON`, `string` |
+
+### 비행체 오버레이 표시 계획
+
+- EO / IR 화면 위에 채움 없는 빨간색 사각형 박스를 그림
+- 사각형 바로 옆에 빨간 텍스트로 탐지된 객체 이름을 표기
+- 현재 GUI에는 이 구조를 위한 오버레이 레이어가 포함되어 있으며,
+  추후 detector / tracker 결과를 연결하면 실시간으로 갱신 가능
 
 ### 권장 메시지 형식
 
@@ -114,8 +122,9 @@ WPF + Material Design 기반의 EO / IR 운용 GUI 프로토타입입니다.
 
 - Top: dual EO / IR video area
 - Center swap button: switches which feed is shown in the large viewport
+- EO pane: currently uses the laptop webcam for GUI verification
 - Bottom left: VLM result output
-- Bottom center: command input
+- Bottom center: realtime system log
 - Bottom right: function controls and status panel
 
 ### Control Features
@@ -157,8 +166,14 @@ WPF + Material Design 기반의 EO / IR 운용 GUI 프로토타입입니다.
 | Motor | Motor toggle request | Motor state | `bool` |
 | Tracking | Tracking toggle request | Tracking state | `bool` |
 | Brightness / Contrast | Slider value | Renderer display parameter | `double (0~100)` |
-| Command input | Operator text command | Command result, log | `string` |
+| System log | Button events, device status, camera status | Time-ordered log list | `string`, `JSON` |
 | VLM result output | Detection/tracking event bundle | Natural-language summary | `JSON`, `string` |
+
+### Aircraft Overlay Plan
+
+- Draw unfilled red bounding boxes on EO / IR video panes
+- Show the recognized object name as red text right next to each box
+- The current GUI already contains overlay layers for this future detector / tracker integration
 
 ### Recommended Message Formats
 
