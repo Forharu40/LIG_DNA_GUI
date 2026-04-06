@@ -5,8 +5,8 @@ using BroadcastControl.App.ViewModels;
 namespace BroadcastControl.App;
 
 /// <summary>
-/// 메인 윈도우는 화면 초기화와 외부 장치 연결만 담당한다.
-/// 카메라 프레임은 서비스에서 받고, 상태 반영은 뷰모델에 위임한다.
+/// 메인 윈도우는 화면 초기화와 카메라 연결만 담당한다.
+/// 실제 상태와 데이터 반영은 MainViewModel에 위임한다.
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -21,7 +21,7 @@ public partial class MainWindow : Window
         _webcamCaptureService = new WebcamCaptureService();
         DataContext = _viewModel;
 
-        // 창이 열릴 때 현재 모니터 작업 영역 기준으로 크기를 잡는다.
+        // 창이 열릴 때 화면 크기를 맞추고 카메라 연결을 시작한다.
         Loaded += OnLoaded;
         Closed += OnClosed;
     }
@@ -43,8 +43,8 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 현재 사용 중인 모니터의 작업 영역을 기준으로 창 크기를 정한다.
-    /// 고정 픽셀 값 대신 화면 비율로 계산해 노트북과 외부 모니터 모두에 대응한다.
+    /// 현재 사용 중인 모니터의 작업 영역을 기준으로 창 크기를 잡는다.
+    /// 고정 해상도 대신 비율 기반으로 계산해서 노트북과 외부 모니터 모두에 대응한다.
     /// </summary>
     private void ApplyResponsiveWindowSize()
     {
