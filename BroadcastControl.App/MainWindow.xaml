@@ -1,540 +1,296 @@
 <Window x:Class="BroadcastControl.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d"
         Title="LIG DNA GUI"
-        MinWidth="1220"
-        MinHeight="760"
+        MinWidth="900"
+        MinHeight="560"
         WindowStartupLocation="CenterScreen"
         Background="#FF0D1117">
-    <Grid Margin="16">
-        <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="1.06*" />
-            <ColumnDefinition Width="1*" />
-        </Grid.ColumnDefinitions>
+    <Window.Resources>
+        <!-- 반복되는 버튼 속성은 스타일로 묶어 창 크기 변경 시에도 일관된 비율로 보이게 한다. -->
+        <Style x:Key="ControlButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+            <Setter Property="Height" Value="44" />
+            <Setter Property="Padding" Value="8" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="PanelTitle" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="18" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+        <Style x:Key="StatusText" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="#FFD9E4EF" />
+            <Setter Property="FontSize" Value="17" />
+        </Style>
+        <Style x:Key="SectionHeader" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontSize" Value="13" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+    </Window.Resources>
 
-        <!-- 좌측: EO 메인 화면과 우측 상단 IR 인셋을 보여준다. -->
-        <Border Grid.Column="0"
-                Margin="0,0,12,0"
-                Background="{StaticResource PanelBrush}"
-                BorderBrush="{StaticResource PanelBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="18">
-            <Grid ClipToBounds="True">
-                <Rectangle Fill="#FF111821" />
+    <!-- 기준 해상도 전체를 Viewbox로 감싸서 창을 줄이면 모든 패널과 버튼이 같은 비율로 줄어든다. -->
+    <Viewbox Margin="10" Stretch="Uniform" StretchDirection="Both">
+        <Grid Width="1280" Height="760">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.08*" />
+                <ColumnDefinition Width="1*" />
+            </Grid.ColumnDefinitions>
 
-                <!-- EO 메인 영상은 전자 줌을 적용할 때 영상 내부만 확대한다. -->
-                <Image Source="{Binding LargeFeedImage}"
-                       Stretch="UniformToFill"
-                       RenderTransformOrigin="0.5,0.5">
-                    <Image.RenderTransform>
-                        <ScaleTransform ScaleX="{Binding LargeFeedScale}"
-                                        ScaleY="{Binding LargeFeedScale}" />
-                    </Image.RenderTransform>
-                </Image>
+            <!-- 좌측: EO 메인 화면과 IR 인셋 -->
+            <Border Grid.Column="0" Margin="0,0,12,0" Background="{StaticResource PanelBrush}"
+                    BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" CornerRadius="18">
+                <Grid ClipToBounds="True">
+                    <Rectangle Fill="#FF111821" />
+                    <!-- Uniform은 카메라 원본을 중앙 기준으로 보여준다. 전자 Zoom은 이 영상 내부에만 적용된다. -->
+                    <Image Source="{Binding LargeFeedImage}" Stretch="Uniform"
+                           HorizontalAlignment="Center" VerticalAlignment="Center"
+                           RenderTransformOrigin="0.5,0.5">
+                        <Image.RenderTransform>
+                            <ScaleTransform ScaleX="{Binding LargeFeedScale}" ScaleY="{Binding LargeFeedScale}" />
+                        </Image.RenderTransform>
+                    </Image>
+                    <Rectangle Margin="14" Fill="#10161F2A" Stroke="#FF334050" StrokeThickness="1.5"
+                               RadiusX="14" RadiusY="14" />
+                    <StackPanel Margin="20" VerticalAlignment="Bottom">
+                        <TextBlock Foreground="White" FontSize="28" FontWeight="Bold" Text="{Binding LargeFeedTitle}" />
+                        <TextBlock Margin="0,4,0,0" Foreground="#FFD5DEE8" FontSize="14" Text="{Binding LargeFeedSubtitle}" />
+                    </StackPanel>
+                    <!-- 추후 탐지 박스와 라벨을 그릴 오버레이 레이어다. -->
+                    <Canvas IsHitTestVisible="False" />
 
-                <Rectangle Margin="14"
-                           Fill="#10161F2A"
-                           Stroke="#FF334050"
-                           StrokeThickness="1.5"
-                           RadiusX="14"
-                           RadiusY="14" />
-
-                <StackPanel Margin="20"
-                            VerticalAlignment="Bottom">
-                    <TextBlock Foreground="White"
-                               FontSize="28"
-                               FontWeight="Bold"
-                               Text="{Binding LargeFeedTitle}" />
-                    <TextBlock Margin="0,4,0,0"
-                               Foreground="#FFD5DEE8"
-                               FontSize="14"
-                               Text="{Binding LargeFeedSubtitle}" />
-                </StackPanel>
-
-                <!-- 추후 비행체 탐지 박스와 라벨을 그릴 오버레이 레이어다. -->
-                <Canvas IsHitTestVisible="False" />
-
-                <!-- 작은 화면을 클릭하면 EO/IR 표시 위치를 스왑한다. -->
-                <Button Width="164"
-                        Height="216"
-                        Margin="0,18,18,0"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Top"
-                        Command="{Binding SwapFeedsCommand}"
-                        Background="Transparent"
-                        BorderThickness="0"
-                        Cursor="Hand"
-                        Padding="0"
-                        ToolTip="클릭하여 EO/IR 화면 위치를 교체합니다.">
-                    <Border Background="#FF151920"
-                            BorderBrush="#FF334050"
-                            BorderThickness="2"
-                            CornerRadius="10">
-                        <Grid ClipToBounds="True">
-                            <Image Source="{Binding InsetFeedImage}"
-                                   Stretch="UniformToFill" />
-                            <Rectangle Margin="10"
-                                       Fill="#161E2834"
-                                       Stroke="#FF3D4958"
-                                       StrokeThickness="1"
-                                       RadiusX="10"
-                                       RadiusY="10" />
-                            <Border Margin="10"
-                                    Padding="8,4"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Top"
-                                    Background="#CC121923"
-                                    CornerRadius="8">
-                                <TextBlock Foreground="White"
-                                           FontSize="17"
-                                           FontWeight="Bold"
-                                           Text="{Binding InsetFeedTitle}" />
-                            </Border>
-                            <TextBlock Margin="12,0,12,12"
-                                       VerticalAlignment="Bottom"
-                                       Foreground="#FFC3D0DF"
-                                       FontSize="11"
-                                       TextAlignment="Center"
-                                       TextWrapping="Wrap"
-                                       Text="{Binding InsetFeedSubtitle}" />
-                        </Grid>
-                    </Border>
-                </Button>
-            </Grid>
-        </Border>
-
-        <!-- 우측: 상단 정보 패널과 하단 기능 제어 패널 -->
-        <Grid Grid.Column="1">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="0.47*" />
-                <RowDefinition Height="0.53*" />
-            </Grid.RowDefinitions>
-
-            <!-- 상단 정보 영역 -->
-            <Grid Grid.Row="0"
-                  Margin="0,0,0,12">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="1.04*" />
-                    <ColumnDefinition Width="0.96*" />
-                </Grid.ColumnDefinitions>
-
-                <!-- VLM 결과와 시스템 상태를 한 번에 보는 통합 패널 -->
-                <Border Grid.Column="0"
-                        Margin="0,0,12,0"
-                        Padding="12"
-                        Background="{StaticResource PanelBrush}"
-                        BorderBrush="{StaticResource PanelBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="18">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Foreground="White"
-                                   FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Text="VLM 출력값 / 실시간 시스템 현황" />
-
-                        <!-- 상태 정보는 작은 글씨로 밀도 있게 정리해 한 번에 보이도록 한다. -->
-                        <UniformGrid Grid.Row="1"
-                                     Margin="0,10,0,10"
-                                     Columns="2">
-                            <TextBlock Foreground="#FFD9E4EF" FontSize="11" Text="{Binding PowerStatusText}" />
-                            <TextBlock Foreground="#FFD9E4EF" FontSize="11" Text="{Binding CurrentModeStatus}" />
-                            <TextBlock Foreground="#FFD9E4EF" FontSize="11" Text="{Binding ZoomStatusText}" />
-                            <TextBlock Foreground="#FFD9E4EF" FontSize="11" Text="{Binding ElectronicZoomStatus}" />
-                            <TextBlock Foreground="#FFD9E4EF" FontSize="11" Text="{Binding MotorPanStatusText}" />
-                            <TextBlock Foreground="#FFD9E4EF" FontSize="11" Text="{Binding MotorTiltStatusText}" />
-                            <TextBlock Foreground="#FFD9E4EF" FontSize="11" Text="{Binding TrackingTargetText}" />
-                            <TextBlock Foreground="#FFD9E4EF" FontSize="11" Text="{Binding CurrentDetectionStatus}" />
-                            <TextBlock Foreground="#FFD9E4EF" FontSize="11" Text="{Binding BrightnessText}" />
-                            <TextBlock Foreground="#FFD9E4EF" FontSize="11" Text="{Binding ContrastText}" />
-                        </UniformGrid>
-
-                        <ListBox Grid.Row="2"
-                                 ItemsSource="{Binding VlmResults}"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <DockPanel Margin="0,0,0,6">
-                                        <TextBlock Width="60"
-                                                   Foreground="{StaticResource WarningBrush}"
-                                                   FontSize="11"
-                                                   Text="{Binding Time}" />
-                                        <TextBlock Width="66"
-                                                   Foreground="{StaticResource AccentBrush}"
-                                                   FontSize="11"
-                                                   Text="{Binding Category}" />
-                                        <TextBlock Foreground="White"
-                                                   FontSize="11"
-                                                   TextWrapping="Wrap"
-                                                   Text="{Binding Message}" />
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
-                </Border>
-
-                <!-- 실시간 시스템 변경 로그는 별도 패널로 분리한다. -->
-                <Border Grid.Column="1"
-                        Padding="12"
-                        Background="{StaticResource PanelBrush}"
-                        BorderBrush="{StaticResource PanelBorderBrush}"
-                        BorderThickness="1"
-                        CornerRadius="18">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <TextBlock Foreground="White"
-                                   FontSize="16"
-                                   FontWeight="SemiBold"
-                                   Text="실시간 시스템 변경 로그" />
-
-                        <ListBox Grid.Row="1"
-                                 Margin="0,10,0,0"
-                                 ItemsSource="{Binding SystemChangeLogs}"
-                                 Background="Transparent"
-                                 BorderThickness="0"
-                                 ScrollViewer.VerticalScrollBarVisibility="Auto">
-                            <ListBox.ItemTemplate>
-                                <DataTemplate>
-                                    <DockPanel Margin="0,0,0,6">
-                                        <TextBlock Width="60"
-                                                   Foreground="{StaticResource WarningBrush}"
-                                                   FontSize="11"
-                                                   Text="{Binding Time}" />
-                                        <TextBlock Width="60"
-                                                   Foreground="#FF8AB4FF"
-                                                   FontSize="11"
-                                                   Text="{Binding Category}" />
-                                        <TextBlock Foreground="White"
-                                                   FontSize="11"
-                                                   TextWrapping="Wrap"
-                                                   Text="{Binding Message}" />
-                                    </DockPanel>
-                                </DataTemplate>
-                            </ListBox.ItemTemplate>
-                        </ListBox>
-                    </Grid>
-                </Border>
-            </Grid>
-
-            <!-- 하단 기능 제어 영역 -->
-            <Border Grid.Row="1"
-                    Padding="14"
-                    Background="{StaticResource PanelBrush}"
-                    BorderBrush="{StaticResource PanelBorderBrush}"
-                    BorderThickness="1"
-                    CornerRadius="18">
-                <Grid>
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="1*" />
-                        <ColumnDefinition Width="1*" />
-                    </Grid.ColumnDefinitions>
-
-                    <!-- 좌측 제어: 전원, 모드, 전자 줌 -->
-                    <Grid Grid.Column="0"
-                          Margin="0,0,10,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                        </Grid.RowDefinitions>
-
-                        <Button Grid.Row="0"
-                                MinHeight="62"
-                                Padding="14"
-                                Command="{Binding TogglePowerCommand}"
-                                Style="{StaticResource MaterialDesignOutlinedButton}"
-                                FontSize="18"
-                                FontWeight="SemiBold"
-                                Content="시스템 전원 on/off" />
-
-                        <Border Grid.Row="1"
-                                Margin="0,14,0,0"
-                                Padding="12,8"
-                                Background="#FF121923"
-                                BorderBrush="#FF27303C"
-                                BorderThickness="1"
-                                CornerRadius="12">
-                            <TextBlock Foreground="White"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       Text="시스템 모드 변경" />
+                    <!-- 작은 화면 클릭 시 EO/IR 화면을 스왑한다. -->
+                    <Button Width="164" Height="216" Margin="0,18,18,0" HorizontalAlignment="Right"
+                            VerticalAlignment="Top" Command="{Binding SwapFeedsCommand}" Background="Transparent"
+                            BorderThickness="0" Cursor="Hand" Padding="0" ToolTip="EO/IR 화면 위치 교체">
+                        <Border Background="#FF151920" BorderBrush="#FF334050" BorderThickness="2" CornerRadius="10">
+                            <Grid ClipToBounds="True">
+                                <Image Source="{Binding InsetFeedImage}" Stretch="Uniform"
+                                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Rectangle Margin="10" Fill="#161E2834" Stroke="#FF3D4958"
+                                           StrokeThickness="1" RadiusX="10" RadiusY="10" />
+                                <Border Margin="10" Padding="8,4" HorizontalAlignment="Left" VerticalAlignment="Top"
+                                        Background="#CC121923" CornerRadius="8">
+                                    <TextBlock Foreground="White" FontSize="17" FontWeight="Bold"
+                                               Text="{Binding InsetFeedTitle}" />
+                                </Border>
+                                <TextBlock Margin="12,0,12,12" VerticalAlignment="Bottom" Foreground="#FFC3D0DF"
+                                           FontSize="11" TextAlignment="Center" TextWrapping="Wrap"
+                                           Text="{Binding InsetFeedSubtitle}" />
+                            </Grid>
                         </Border>
-
-                        <UniformGrid Grid.Row="2"
-                                     Margin="0,10,0,0"
-                                     Columns="3">
-                            <Button Margin="0,0,8,0"
-                                    MinHeight="60"
-                                    Padding="10"
-                                    Command="{Binding SelectModeCommand}"
-                                    CommandParameter="기체 고정"
-                                    IsEnabled="{Binding CanUseModeButtons}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    FontSize="15"
-                                    FontWeight="SemiBold"
-                                    Content="기체 고정" />
-                            <Button Margin="0,0,8,0"
-                                    MinHeight="60"
-                                    Padding="10"
-                                    Command="{Binding SelectModeCommand}"
-                                    CommandParameter="자동"
-                                    IsEnabled="{Binding CanUseModeButtons}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    FontSize="15"
-                                    FontWeight="SemiBold"
-                                    Content="자동" />
-                            <Button MinHeight="60"
-                                    Padding="10"
-                                    Command="{Binding SelectModeCommand}"
-                                    CommandParameter="수동"
-                                    IsEnabled="{Binding CanUseModeButtons}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    FontSize="15"
-                                    FontWeight="SemiBold"
-                                    Content="수동" />
-                        </UniformGrid>
-
-                        <Border Grid.Row="3"
-                                Margin="0,16,0,0"
-                                Padding="12,8"
-                                Background="#FF121923"
-                                BorderBrush="#FF27303C"
-                                BorderThickness="1"
-                                CornerRadius="12">
-                            <TextBlock Foreground="White"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       Text="전자 Zoom 제어" />
-                        </Border>
-
-                        <StackPanel Grid.Row="4"
-                                    Margin="0,10,0,0">
-                            <Button MinHeight="60"
-                                    Padding="12"
-                                    Command="{Binding ToggleElectronicZoomCommand}"
-                                    IsEnabled="{Binding CanUseDisplayControls}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    FontSize="17"
-                                    FontWeight="SemiBold"
-                                    Content="ZOOM on/off" />
-
-                            <UniformGrid Margin="0,10,0,0"
-                                         Columns="2">
-                                <Button Margin="0,0,8,0"
-                                        MinHeight="60"
-                                        Padding="12"
-                                        Command="{Binding DecreaseZoomCommand}"
-                                        IsEnabled="{Binding CanUseZoomStepControls}"
-                                        Style="{StaticResource MaterialDesignOutlinedButton}"
-                                        FontSize="16"
-                                        FontWeight="SemiBold"
-                                        Content="ZOOM -" />
-                                <Button MinHeight="60"
-                                        Padding="12"
-                                        Command="{Binding IncreaseZoomCommand}"
-                                        IsEnabled="{Binding CanUseZoomStepControls}"
-                                        Style="{StaticResource MaterialDesignOutlinedButton}"
-                                        FontSize="16"
-                                        FontWeight="SemiBold"
-                                        Content="ZOOM +" />
-                            </UniformGrid>
-                        </StackPanel>
-                    </Grid>
-
-                    <!-- 우측 제어: 모터, 탐지체, 밝기/대조비 -->
-                    <Grid Grid.Column="1"
-                          Margin="10,0,0,0">
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="Auto" />
-                            <RowDefinition Height="*" />
-                        </Grid.RowDefinitions>
-
-                        <Border Grid.Row="0"
-                                Padding="12,8"
-                                Background="#FF121923"
-                                BorderBrush="#FF27303C"
-                                BorderThickness="1"
-                                CornerRadius="12">
-                            <TextBlock Foreground="White"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       Text="모터 방향 조정" />
-                        </Border>
-
-                        <UniformGrid Grid.Row="1"
-                                     Margin="0,10,0,0"
-                                     Columns="2">
-                            <Button Margin="0,0,8,0"
-                                    MinHeight="62"
-                                    Padding="12"
-                                    Command="{Binding MoveMotorLeftCommand}"
-                                    IsEnabled="{Binding CanUseMotorControls}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    FontSize="17"
-                                    FontWeight="SemiBold"
-                                    Content="좌 조정" />
-                            <Button MinHeight="62"
-                                    Padding="12"
-                                    Command="{Binding MoveMotorRightCommand}"
-                                    IsEnabled="{Binding CanUseMotorControls}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    FontSize="17"
-                                    FontWeight="SemiBold"
-                                    Content="우 조정" />
-                        </UniformGrid>
-
-                        <UniformGrid Grid.Row="2"
-                                     Margin="0,10,0,0"
-                                     Columns="2">
-                            <Button Margin="0,0,8,0"
-                                    MinHeight="62"
-                                    Padding="12"
-                                    Command="{Binding MoveMotorUpCommand}"
-                                    IsEnabled="{Binding CanUseMotorControls}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    FontSize="17"
-                                    FontWeight="SemiBold"
-                                    Content="상 조정" />
-                            <Button MinHeight="62"
-                                    Padding="12"
-                                    Command="{Binding MoveMotorDownCommand}"
-                                    IsEnabled="{Binding CanUseMotorControls}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    FontSize="17"
-                                    FontWeight="SemiBold"
-                                    Content="하 조정" />
-                        </UniformGrid>
-
-                        <Border Grid.Row="3"
-                                Margin="0,16,0,0"
-                                Padding="12,8"
-                                Background="#FF121923"
-                                BorderBrush="#FF27303C"
-                                BorderThickness="1"
-                                CornerRadius="12">
-                            <TextBlock Foreground="White"
-                                       FontSize="15"
-                                       FontWeight="SemiBold"
-                                       Text="탐지체 변경" />
-                        </Border>
-
-                        <StackPanel Grid.Row="4"
-                                    Margin="0,10,0,0">
-                            <Button MinHeight="56"
-                                    Padding="12"
-                                    Command="{Binding SelectDetectionCategoryCommand}"
-                                    CommandParameter="복합"
-                                    IsEnabled="{Binding CanUseDetectionControls}"
-                                    Style="{StaticResource MaterialDesignOutlinedButton}"
-                                    FontSize="16"
-                                    FontWeight="SemiBold"
-                                    Content="복합" />
-
-                            <UniformGrid Margin="0,10,0,0"
-                                         Columns="2">
-                                <Button Margin="0,0,8,0"
-                                        MinHeight="56"
-                                        Padding="12"
-                                        Command="{Binding SelectDetectionCategoryCommand}"
-                                        CommandParameter="고정익"
-                                        IsEnabled="{Binding CanUseDetectionControls}"
-                                        Style="{StaticResource MaterialDesignOutlinedButton}"
-                                        FontSize="16"
-                                        FontWeight="SemiBold"
-                                        Content="고정익" />
-                                <Button MinHeight="56"
-                                        Padding="12"
-                                        Command="{Binding SelectDetectionCategoryCommand}"
-                                        CommandParameter="회전익"
-                                        IsEnabled="{Binding CanUseDetectionControls}"
-                                        Style="{StaticResource MaterialDesignOutlinedButton}"
-                                        FontSize="16"
-                                        FontWeight="SemiBold"
-                                        Content="회전익" />
-                            </UniformGrid>
-
-                            <UniformGrid Margin="0,10,0,0"
-                                         Columns="2">
-                                <Button Margin="0,0,8,0"
-                                        MinHeight="56"
-                                        Padding="12"
-                                        Command="{Binding SelectDetectionCategoryCommand}"
-                                        CommandParameter="드론"
-                                        IsEnabled="{Binding CanUseDetectionControls}"
-                                        Style="{StaticResource MaterialDesignOutlinedButton}"
-                                        FontSize="16"
-                                        FontWeight="SemiBold"
-                                        Content="드론" />
-                                <Button MinHeight="56"
-                                        Padding="12"
-                                        Command="{Binding SelectDetectionCategoryCommand}"
-                                        CommandParameter="사람"
-                                        IsEnabled="{Binding CanUseDetectionControls}"
-                                        Style="{StaticResource MaterialDesignOutlinedButton}"
-                                        FontSize="16"
-                                        FontWeight="SemiBold"
-                                        Content="사람" />
-                            </UniformGrid>
-
-                            <Border Margin="0,12,0,0"
-                                    Padding="12"
-                                    Background="#FF121923"
-                                    BorderBrush="#FF27303C"
-                                    BorderThickness="1"
-                                    CornerRadius="12">
-                                <StackPanel>
-                                    <TextBlock Foreground="White"
-                                               FontSize="13"
-                                               Text="카메라 밝기" />
-                                    <Slider Margin="0,8,0,0"
-                                            Minimum="0"
-                                            Maximum="100"
-                                            Value="{Binding Brightness, UpdateSourceTrigger=PropertyChanged}"
-                                            IsEnabled="{Binding CanUseDisplayControls}" />
-                                </StackPanel>
-                            </Border>
-
-                            <Border Margin="0,10,0,0"
-                                    Padding="12"
-                                    Background="#FF121923"
-                                    BorderBrush="#FF27303C"
-                                    BorderThickness="1"
-                                    CornerRadius="12">
-                                <StackPanel>
-                                    <TextBlock Foreground="White"
-                                               FontSize="13"
-                                               Text="화면 대조비" />
-                                    <Slider Margin="0,8,0,0"
-                                            Minimum="0"
-                                            Maximum="100"
-                                            Value="{Binding Contrast, UpdateSourceTrigger=PropertyChanged}"
-                                            IsEnabled="{Binding CanUseDisplayControls}" />
-                                </StackPanel>
-                            </Border>
-                        </StackPanel>
-                    </Grid>
+                    </Button>
                 </Grid>
             </Border>
+
+            <!-- 우측: 상태/로그/VLM과 기능 제어 -->
+            <Grid Grid.Column="1">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="0.47*" />
+                    <RowDefinition Height="0.53*" />
+                </Grid.RowDefinitions>
+
+                <Grid Grid.Row="0" Margin="0,0,0,12">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="1.02*" />
+                        <ColumnDefinition Width="0.98*" />
+                    </Grid.ColumnDefinitions>
+
+                    <!-- 시스템 현황은 VLM과 분리해 한 패널 전체를 사용한다. -->
+                    <Border Grid.Column="0" Margin="0,0,12,0" Padding="16" Background="{StaticResource PanelBrush}"
+                            BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" CornerRadius="18">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Style="{StaticResource PanelTitle}" FontSize="20" Text="실시간 시스템 현황" />
+                            <UniformGrid Grid.Row="1" Margin="0,16,0,0" Columns="1">
+                                <TextBlock Style="{StaticResource StatusText}" Text="{Binding PowerStatusText}" />
+                                <TextBlock Style="{StaticResource StatusText}" Text="{Binding CurrentModeStatus}" />
+                                <TextBlock Style="{StaticResource StatusText}" Text="{Binding ZoomStatusText}" />
+                                <TextBlock Style="{StaticResource StatusText}" Text="{Binding ElectronicZoomStatus}" />
+                                <TextBlock Style="{StaticResource StatusText}" Text="{Binding MotorPanStatusText}" />
+                                <TextBlock Style="{StaticResource StatusText}" Text="{Binding MotorTiltStatusText}" />
+                                <TextBlock Style="{StaticResource StatusText}" Text="{Binding TrackingTargetText}" />
+                                <TextBlock Style="{StaticResource StatusText}" Text="{Binding CurrentDetectionStatus}" />
+                                <TextBlock Style="{StaticResource StatusText}" Text="{Binding BrightnessText}" />
+                                <TextBlock Style="{StaticResource StatusText}" Text="{Binding ContrastText}" />
+                            </UniformGrid>
+                        </Grid>
+                    </Border>
+
+                    <!-- 오른쪽 정보 패널은 위쪽 로그, 아래쪽 VLM으로 나눈다. -->
+                    <Grid Grid.Column="1">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="1*" />
+                            <RowDefinition Height="1*" />
+                        </Grid.RowDefinitions>
+                        <Border Grid.Row="0" Margin="0,0,0,6" Padding="12" Background="{StaticResource PanelBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" CornerRadius="18">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Style="{StaticResource PanelTitle}" FontSize="17" Text="실시간 시스템 변경 로그" />
+                                <ListBox Grid.Row="1" Margin="0,8,0,0" ItemsSource="{Binding SystemChangeLogs}"
+                                         Background="Transparent" BorderThickness="0"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,0,0,5">
+                                                <TextBlock Width="58" Foreground="{StaticResource WarningBrush}" FontSize="11" Text="{Binding Time}" />
+                                                <TextBlock Width="58" Foreground="#FF8AB4FF" FontSize="11" Text="{Binding Category}" />
+                                                <TextBlock Foreground="White" FontSize="11" TextWrapping="Wrap" Text="{Binding Message}" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+                        </Border>
+                        <Border Grid.Row="1" Margin="0,6,0,0" Padding="12" Background="{StaticResource PanelBrush}"
+                                BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" CornerRadius="18">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Style="{StaticResource PanelTitle}" FontSize="17" Text="VLM 출력값" />
+                                <ListBox Grid.Row="1" Margin="0,8,0,0" ItemsSource="{Binding VlmResults}"
+                                         Background="Transparent" BorderThickness="0"
+                                         ScrollViewer.VerticalScrollBarVisibility="Auto">
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <DockPanel Margin="0,0,0,5">
+                                                <TextBlock Width="58" Foreground="{StaticResource WarningBrush}" FontSize="11" Text="{Binding Time}" />
+                                                <TextBlock Width="58" Foreground="{StaticResource AccentBrush}" FontSize="11" Text="{Binding Category}" />
+                                                <TextBlock Foreground="White" FontSize="11" TextWrapping="Wrap" Text="{Binding Message}" />
+                                            </DockPanel>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+
+                <!-- 하단 기능 제어 영역 -->
+                <Border Grid.Row="1" Padding="12" Background="{StaticResource PanelBrush}"
+                        BorderBrush="{StaticResource PanelBorderBrush}" BorderThickness="1" CornerRadius="18">
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="1*" />
+                            <ColumnDefinition Width="1*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Grid Grid.Column="0" Margin="0,0,8,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <Button Grid.Row="0" Height="46" FontSize="15" Command="{Binding TogglePowerCommand}"
+                                    Style="{StaticResource ControlButton}" Content="시스템 전원 on/off" />
+                            <Border Grid.Row="1" Margin="0,10,0,0" Padding="10,6" Background="#FF121923"
+                                    BorderBrush="#FF27303C" BorderThickness="1" CornerRadius="10">
+                                <TextBlock Style="{StaticResource SectionHeader}" Text="시스템 모드 변경" />
+                            </Border>
+                            <UniformGrid Grid.Row="2" Margin="0,8,0,0" Columns="3">
+                                <Button Margin="0,0,6,0" Command="{Binding SelectModeCommand}" CommandParameter="기체 고정"
+                                        IsEnabled="{Binding CanUseModeButtons}" Style="{StaticResource ControlButton}" FontSize="13" Content="기체 고정" />
+                                <Button Margin="0,0,6,0" Command="{Binding SelectModeCommand}" CommandParameter="자동"
+                                        IsEnabled="{Binding CanUseModeButtons}" Style="{StaticResource ControlButton}" FontSize="13" Content="자동" />
+                                <Button Command="{Binding SelectModeCommand}" CommandParameter="수동"
+                                        IsEnabled="{Binding CanUseModeButtons}" Style="{StaticResource ControlButton}" FontSize="13" Content="수동" />
+                            </UniformGrid>
+                            <Border Grid.Row="3" Margin="0,12,0,0" Padding="10,6" Background="#FF121923"
+                                    BorderBrush="#FF27303C" BorderThickness="1" CornerRadius="10">
+                                <TextBlock Style="{StaticResource SectionHeader}" Text="전자 Zoom 제어" />
+                            </Border>
+                            <Button Grid.Row="4" Margin="0,8,0,0" Command="{Binding ToggleElectronicZoomCommand}"
+                                    IsEnabled="{Binding CanUseDisplayControls}" Style="{StaticResource ControlButton}" Content="ZOOM on/off" />
+                            <UniformGrid Grid.Row="5" Margin="0,8,0,0" Columns="2">
+                                <Button Margin="0,0,6,0" Command="{Binding DecreaseZoomCommand}" IsEnabled="{Binding CanUseZoomStepControls}"
+                                        Style="{StaticResource ControlButton}" Content="ZOOM -" />
+                                <Button Command="{Binding IncreaseZoomCommand}" IsEnabled="{Binding CanUseZoomStepControls}"
+                                        Style="{StaticResource ControlButton}" Content="ZOOM +" />
+                            </UniformGrid>
+                        </Grid>
+
+                        <Grid Grid.Column="1" Margin="8,0,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Border Grid.Row="0" Padding="10,6" Background="#FF121923" BorderBrush="#FF27303C" BorderThickness="1" CornerRadius="10">
+                                <TextBlock Style="{StaticResource SectionHeader}" Text="모터 방향 조정" />
+                            </Border>
+                            <UniformGrid Grid.Row="1" Margin="0,8,0,0" Columns="2">
+                                <Button Margin="0,0,6,0" Command="{Binding MoveMotorLeftCommand}" IsEnabled="{Binding CanUseMotorControls}"
+                                        Style="{StaticResource ControlButton}" Content="좌 조정" />
+                                <Button Command="{Binding MoveMotorRightCommand}" IsEnabled="{Binding CanUseMotorControls}"
+                                        Style="{StaticResource ControlButton}" Content="우 조정" />
+                            </UniformGrid>
+                            <UniformGrid Grid.Row="2" Margin="0,8,0,0" Columns="2">
+                                <Button Margin="0,0,6,0" Command="{Binding MoveMotorUpCommand}" IsEnabled="{Binding CanUseMotorControls}"
+                                        Style="{StaticResource ControlButton}" Content="상 조정" />
+                                <Button Command="{Binding MoveMotorDownCommand}" IsEnabled="{Binding CanUseMotorControls}"
+                                        Style="{StaticResource ControlButton}" Content="하 조정" />
+                            </UniformGrid>
+                            <Border Grid.Row="3" Margin="0,10,0,0" Padding="10,6" Background="#FF121923" BorderBrush="#FF27303C" BorderThickness="1" CornerRadius="10">
+                                <TextBlock Style="{StaticResource SectionHeader}" Text="탐지체 변경" />
+                            </Border>
+                            <Button Grid.Row="4" Margin="0,8,0,0" Command="{Binding SelectDetectionCategoryCommand}" CommandParameter="복합"
+                                    IsEnabled="{Binding CanUseDetectionControls}" Style="{StaticResource ControlButton}" Content="복합" />
+                            <UniformGrid Grid.Row="5" Margin="0,8,0,0" Columns="2">
+                                <Button Margin="0,0,6,0" Command="{Binding SelectDetectionCategoryCommand}" CommandParameter="고정익"
+                                        IsEnabled="{Binding CanUseDetectionControls}" Style="{StaticResource ControlButton}" Content="고정익" />
+                                <Button Command="{Binding SelectDetectionCategoryCommand}" CommandParameter="회전익"
+                                        IsEnabled="{Binding CanUseDetectionControls}" Style="{StaticResource ControlButton}" Content="회전익" />
+                            </UniformGrid>
+                            <UniformGrid Grid.Row="6" Margin="0,8,0,0" Columns="2">
+                                <Button Margin="0,0,6,0" Command="{Binding SelectDetectionCategoryCommand}" CommandParameter="드론"
+                                        IsEnabled="{Binding CanUseDetectionControls}" Style="{StaticResource ControlButton}" Content="드론" />
+                                <Button Command="{Binding SelectDetectionCategoryCommand}" CommandParameter="사람"
+                                        IsEnabled="{Binding CanUseDetectionControls}" Style="{StaticResource ControlButton}" Content="사람" />
+                            </UniformGrid>
+                            <Grid Grid.Row="7" Margin="0,10,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Border Grid.Row="0" Padding="10,7" Background="#FF121923" BorderBrush="#FF27303C" BorderThickness="1" CornerRadius="10">
+                                    <StackPanel>
+                                        <TextBlock Foreground="White" FontSize="12" Text="카메라 밝기" />
+                                        <Slider Margin="0,3,0,0" Minimum="0" Maximum="100"
+                                                Value="{Binding Brightness, UpdateSourceTrigger=PropertyChanged}"
+                                                IsEnabled="{Binding CanUseDisplayControls}" />
+                                    </StackPanel>
+                                </Border>
+                                <Border Grid.Row="1" Margin="0,8,0,0" Padding="10,7" Background="#FF121923" BorderBrush="#FF27303C" BorderThickness="1" CornerRadius="10">
+                                    <StackPanel>
+                                        <TextBlock Foreground="White" FontSize="12" Text="화면 대조비" />
+                                        <Slider Margin="0,3,0,0" Minimum="0" Maximum="100"
+                                                Value="{Binding Contrast, UpdateSourceTrigger=PropertyChanged}"
+                                                IsEnabled="{Binding CanUseDisplayControls}" />
+                                    </StackPanel>
+                                </Border>
+                            </Grid>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
         </Grid>
-    </Grid>
+    </Viewbox>
 </Window>

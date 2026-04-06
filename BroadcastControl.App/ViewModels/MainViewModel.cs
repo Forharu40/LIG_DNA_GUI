@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
+using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using BroadcastControl.App.Infrastructure;
@@ -16,6 +17,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
     // EO 화면이 큰 화면인지, IR 화면이 큰 화면인지 관리한다.
     private bool _isEoPrimary = true;
 
+    // IR 실제 입력이 붙기 전에도 작은 화면이 빈 화면처럼 보이지 않도록 임시 화면을 사용한다.
+    private readonly ImageSource _irPlaceholderFrame = CreateIrPlaceholderFrame();
+
     // 시스템 전원과 전자 줌 사용 여부를 저장한다.
     private bool _isSystemPoweredOn = true;
     private bool _isElectronicZoomEnabled;
@@ -29,7 +33,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private int _motorTilt;
 
     // 자동 모드에서 표시할 추적 대상을 저장한다.
-    private string _trackingTarget = "FW-01";
+    private readonly string _trackingTarget = "FW-01";
 
     // 전자 줌은 큰 화면 내부 영상 배율만 변경한다.
     private double _zoomLevel = 1.0;
@@ -43,7 +47,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
-        // 상단 통합 패널에 표시할 VLM 결과 예시 데이터다.
+        // VLM 결과 패널에 표시할 예시 데이터다.
         VlmResults = new ObservableCollection<VlmResultItem>
         {
             new("10:05:00", "VLM", "북동측 500m 지점에서 소형 비행체 3개체를 식별했습니다."),
@@ -109,9 +113,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string IrSubtitle => "IR 카메라 연결 예정";
 
-    public ImageSource? LargeFeedImage => _isEoPrimary ? _eoFrame : null;
+    public ImageSource? LargeFeedImage => _isEoPrimary ? _eoFrame : _irPlaceholderFrame;
 
-    public ImageSource? InsetFeedImage => _isEoPrimary ? null : _eoFrame;
+    public ImageSource? InsetFeedImage => _isEoPrimary ? _irPlaceholderFrame : _eoFrame;
 
     public string LargeFeedTitle => _isEoPrimary ? EoTitle : IrTitle;
 
@@ -398,7 +402,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             "자동" => _trackingTarget,
             "수동" => "수동 관측 중",
-            _ => "고정 대기"
+            _ => "고정 대기",
         };
     }
 
@@ -431,6 +435,39 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             relayCommand.RaiseCanExecuteChanged();
         }
+    }
+
+    private static ImageSource CreateIrPlaceholderFrame()
+    {
+        // 실제 IR 카메라 입력이 연결되기 전까지 화면이 비어 보이지 않도록 열영상 느낌의 임시 프레임을 그린다.
+        var group = new DrawingGroup();
+        using (var drawingContext = group.Open())
+        {
+            var background = new LinearGradientBrush(
+                Color.FromRgb(18, 24, 32),
+                Color.FromRgb(54, 26, 18),
+                new Point(0, 0),
+                new Point(1, 1));
+
+            drawingContext.DrawRectangle(background, null, new Rect(0, 0, 320, 240));
+            drawingContext.DrawEllipse(new SolidColorBrush(Color.FromArgb(120, 255, 108, 54)), null, new Point(220, 92), 46, 30);
+            drawingContext.DrawEllipse(new SolidColorBrush(Color.FromArgb(70, 255, 190, 82)), null, new Point(112, 156), 68, 24);
+
+            var gridPen = new Pen(new SolidColorBrush(Color.FromArgb(42, 255, 255, 255)), 1);
+            for (var x = 0; x <= 320; x += 40)
+            {
+                drawingContext.DrawLine(gridPen, new Point(x, 0), new Point(x, 240));
+            }
+
+            for (var y = 0; y <= 240; y += 40)
+            {
+                drawingContext.DrawLine(gridPen, new Point(0, y), new Point(320, y));
+            }
+        }
+
+        var image = new DrawingImage(group);
+        image.Freeze();
+        return image;
     }
 
     private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
