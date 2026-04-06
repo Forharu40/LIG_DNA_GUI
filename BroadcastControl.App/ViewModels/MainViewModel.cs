@@ -1,7 +1,6 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
-using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using BroadcastControl.App.Infrastructure;
@@ -9,55 +8,69 @@ using BroadcastControl.App.Infrastructure;
 namespace BroadcastControl.App.ViewModels;
 
 /// <summary>
-/// 메인 대시보드의 화면 상태와 버튼 동작을 관리한다.
-/// 실제 장비가 연결되면 이 뷰모델이 장비 상태와 분석 결과를 받아 화면에 반영한다.
+/// 메인 화면의 표시 상태와 버튼 활성 조건을 관리한다.
+/// 실제 장비가 연결되면 이 ViewModel이 장비 상태와 분석 결과를 받아 화면에 반영한다.
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged
 {
-    private bool _isPoweredOn = true;
-    private bool _isMotorEnabled = true;
-    private bool _isTrackingEnabled = true;
+    // EO 화면이 큰 화면인지, IR 화면이 큰 화면인지 관리한다.
+    private bool _isEoPrimary = true;
+
+    // 시스템 전원과 전자 줌 사용 여부를 저장한다.
+    private bool _isSystemPoweredOn = true;
     private bool _isElectronicZoomEnabled;
 
-    private int _modeIndex = 2;
-    private int _detectionCategoryIndex = 0;
+    // 현재 제어 모드와 탐지 분류를 보관한다.
+    private string _currentMode = "수동";
+    private string _currentDetectionCategory = "복합";
+
+    // 모터 좌우/상하 위치를 각도 단위로 기록한다.
+    private int _motorPan;
+    private int _motorTilt;
+
+    // 자동 모드에서 표시할 추적 대상을 저장한다.
+    private string _trackingTarget = "FW-01";
+
+    // 전자 줌은 큰 화면 내부 영상 배율만 변경한다.
     private double _zoomLevel = 1.0;
+
+    // 밝기와 대조비는 0~100 범위 값으로 관리한다.
     private double _brightness = 52;
     private double _contrast = 58;
 
+    // 코드 비하인드에서 전달받은 EO 카메라 프레임을 저장한다.
     private ImageSource? _eoFrame;
-
-    private readonly string[] _modes = ["기체 고정", "수동", "추적"];
-    private readonly string[] _detectionCategories = ["복합", "고정익", "회전익", "드론", "사람"];
 
     public MainViewModel()
     {
-        // VLM 결과 패널에 표시할 더미 결과다.
+        // 상단 통합 패널에 표시할 VLM 결과 예시 데이터다.
         VlmResults = new ObservableCollection<VlmResultItem>
         {
-            new("10:05:00", "VLM", "북동측 500m 지점에서 소형 비행체 복수 개체가 식별되었습니다."),
-            new("10:05:04", "TRACK", "주요 표적은 북동측에서 남서측 방향으로 접근 중입니다."),
-            new("10:05:08", "ANALYSIS", "현재 추적 우선순위는 FW-01로 유지됩니다."),
+            new("10:05:00", "VLM", "북동측 500m 지점에서 소형 비행체 3개체를 식별했습니다."),
+            new("10:05:03", "TRACK", "주요 관측 대상 FW-01이 동쪽에서 남동쪽 방향으로 이동 중입니다."),
+            new("10:05:08", "ANALYSIS", "현재 우선 탐지 분류는 복합이며 드론과 회전익 개체가 혼재합니다."),
+            new("10:05:10", "SYS", "EO 입력과 VLM 분석 파이프라인이 정상 대기 상태입니다."),
         };
 
-        // 실시간 시스템 변경 로그 창에 표시할 로그다.
+        // 시스템 변경 로그는 최신 로그가 위로 오도록 관리한다.
         SystemChangeLogs = new ObservableCollection<SystemLogItem>
         {
             new("10:05:00", "SYSTEM", "GUI 초기화가 완료되었습니다."),
-            new("10:05:01", "VIDEO", "EO 카메라 연결을 시도하는 중입니다."),
+            new("10:05:01", "VIDEO", "EO 카메라 연결을 준비 중입니다."),
         };
 
-        // 버튼 동작은 기능별로 분리해 두면 나중에 실제 장비 API 연결이 쉽다.
+        // 화면과 장비 제어 기능을 목적별 명령으로 분리한다.
+        SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         TogglePowerCommand = new RelayCommand(_ => TogglePower());
-        ToggleMotorCommand = new RelayCommand(_ => ToggleMotor());
-        ToggleTrackingCommand = new RelayCommand(_ => ToggleTracking());
-        CycleModeCommand = new RelayCommand(_ => CycleMode());
         SelectModeCommand = new RelayCommand(SelectMode);
-        CycleDetectionCommand = new RelayCommand(_ => CycleDetectionCategory());
-        SelectDetectionCategoryCommand = new RelayCommand(SelectDetectionCategory);
-        ToggleElectronicZoomCommand = new RelayCommand(_ => ToggleElectronicZoom());
-        IncreaseZoomCommand = new RelayCommand(_ => IncreaseZoom(), _ => IsElectronicZoomEnabled);
-        DecreaseZoomCommand = new RelayCommand(_ => DecreaseZoom(), _ => IsElectronicZoomEnabled);
+        SelectDetectionCategoryCommand = new RelayCommand(SelectDetectionCategory, _ => CanUseDetectionControls);
+        ToggleElectronicZoomCommand = new RelayCommand(_ => ToggleElectronicZoom(), _ => CanUseDisplayControls);
+        IncreaseZoomCommand = new RelayCommand(_ => ChangeZoom(+0.2), _ => CanUseZoomStepControls);
+        DecreaseZoomCommand = new RelayCommand(_ => ChangeZoom(-0.2), _ => CanUseZoomStepControls);
+        MoveMotorLeftCommand = new RelayCommand(_ => MoveMotor(-5, 0), _ => CanUseMotorControls);
+        MoveMotorRightCommand = new RelayCommand(_ => MoveMotor(+5, 0), _ => CanUseMotorControls);
+        MoveMotorUpCommand = new RelayCommand(_ => MoveMotor(0, +5), _ => CanUseMotorControls);
+        MoveMotorDownCommand = new RelayCommand(_ => MoveMotor(0, -5), _ => CanUseMotorControls);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -66,17 +79,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public ObservableCollection<SystemLogItem> SystemChangeLogs { get; }
 
+    public ICommand SwapFeedsCommand { get; }
+
     public ICommand TogglePowerCommand { get; }
 
-    public ICommand ToggleMotorCommand { get; }
-
-    public ICommand ToggleTrackingCommand { get; }
-
-    public ICommand CycleModeCommand { get; }
-
     public ICommand SelectModeCommand { get; }
-
-    public ICommand CycleDetectionCommand { get; }
 
     public ICommand SelectDetectionCategoryCommand { get; }
 
@@ -86,41 +93,97 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public ICommand DecreaseZoomCommand { get; }
 
+    public ICommand MoveMotorLeftCommand { get; }
+
+    public ICommand MoveMotorRightCommand { get; }
+
+    public ICommand MoveMotorUpCommand { get; }
+
+    public ICommand MoveMotorDownCommand { get; }
+
     public string EoTitle => "EO 화면";
 
     public string IrTitle => "IR 화면";
 
-    public string EoSubtitle => "실험용 노트북 카메라 입력";
+    public string EoSubtitle => "노트북 카메라 입력";
 
-    public string IrSubtitle => "IR 입력 또는 향후 열상 카메라 자리";
+    public string IrSubtitle => "IR 카메라 연결 예정";
 
-    public ImageSource? EoFeedImage => _eoFrame;
+    public ImageSource? LargeFeedImage => _isEoPrimary ? _eoFrame : null;
 
-    public string CurrentMode => _modes[_modeIndex];
+    public ImageSource? InsetFeedImage => _isEoPrimary ? null : _eoFrame;
 
-    public string CurrentModeStatus => $"현재 모드: {CurrentMode}";
+    public string LargeFeedTitle => _isEoPrimary ? EoTitle : IrTitle;
 
-    public string CurrentDetectionCategory => _detectionCategories[_detectionCategoryIndex];
+    public string InsetFeedTitle => _isEoPrimary ? IrTitle : EoTitle;
 
-    public string CurrentDetectionStatus => $"현재 탐지 대상: {CurrentDetectionCategory}";
+    public string LargeFeedSubtitle => _isEoPrimary ? EoSubtitle : IrSubtitle;
 
-    public string PowerStatus => _isPoweredOn ? "ON" : "OFF";
+    public string InsetFeedSubtitle => _isEoPrimary ? IrSubtitle : EoSubtitle;
+
+    public string PowerStatus => _isSystemPoweredOn ? "ON" : "OFF";
 
     public string PowerStatusText => $"시스템 전원: {PowerStatus}";
 
-    public string MotorStatus => _isMotorEnabled ? "ON" : "OFF";
+    public string CurrentMode
+    {
+        get => _currentMode;
+        private set
+        {
+            if (SetProperty(ref _currentMode, value))
+            {
+                OnPropertyChanged(nameof(CurrentModeStatus));
+                OnPropertyChanged(nameof(TrackingTargetText));
+                OnPropertyChanged(nameof(CanUseModeButtons));
+                OnPropertyChanged(nameof(CanUseDetectionControls));
+                OnPropertyChanged(nameof(CanUseDisplayControls));
+                OnPropertyChanged(nameof(CanUseMotorControls));
+                OnPropertyChanged(nameof(CanUseZoomStepControls));
+                RaiseAllCommandStates();
+            }
+        }
+    }
 
-    public string MotorStatusText => $"모터 상태: {MotorStatus}";
+    public string CurrentModeStatus => $"시스템 모드: {CurrentMode}";
 
-    public string TrackingStatus => _isTrackingEnabled ? "ON" : "OFF";
+    public string CurrentDetectionCategory
+    {
+        get => _currentDetectionCategory;
+        private set
+        {
+            if (SetProperty(ref _currentDetectionCategory, value))
+            {
+                OnPropertyChanged(nameof(CurrentDetectionStatus));
+            }
+        }
+    }
 
-    public string TrackingStatusText => $"트래킹 상태: {TrackingStatus}";
+    public string CurrentDetectionStatus => $"탐지 분류: {CurrentDetectionCategory}";
 
-    public string ZoomLevelText => $"{_zoomLevel:0.0}x";
+    public string ZoomStatusText => $"Zoom 배율: {ZoomLevelText}";
 
-    public string ElectronicZoomStatus => IsElectronicZoomEnabled ? $"전자 Zoom 활성 / {ZoomLevelText}" : "전자 Zoom 비활성";
+    public string ZoomLevelText => $"x{_zoomLevel:0.0}";
 
-    // 전자 줌은 EO 창 안의 영상에만 적용한다.
+    public string MotorPanStatusText => $"모터 좌/우: {_motorPan}도";
+
+    public string MotorTiltStatusText => $"모터 상/하: {_motorTilt}도";
+
+    public string TrackingTargetText => $"관측 대상: {GetTrackingTargetStatus()}";
+
+    public string BrightnessText => $"화면 밝기: {Brightness:0}%";
+
+    public string ContrastText => $"화면 대조비: {Contrast:0}%";
+
+    public bool CanUseModeButtons => _isSystemPoweredOn;
+
+    public bool CanUseDetectionControls => _isSystemPoweredOn && CurrentMode != "자동";
+
+    public bool CanUseDisplayControls => _isSystemPoweredOn && CurrentMode != "자동";
+
+    public bool CanUseMotorControls => _isSystemPoweredOn && CurrentMode == "수동";
+
+    public bool CanUseZoomStepControls => CanUseDisplayControls && IsElectronicZoomEnabled;
+
     public double LargeFeedScale => _isElectronicZoomEnabled ? _zoomLevel : 1.0;
 
     public bool IsElectronicZoomEnabled
@@ -132,10 +195,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(ElectronicZoomStatus));
                 OnPropertyChanged(nameof(LargeFeedScale));
-                RaiseZoomCommands();
+                OnPropertyChanged(nameof(CanUseZoomStepControls));
+                RaiseAllCommandStates();
             }
         }
     }
+
+    public string ElectronicZoomStatus => IsElectronicZoomEnabled
+        ? $"전자 Zoom: ON / {ZoomLevelText}"
+        : "전자 Zoom: OFF";
 
     public double Brightness
     {
@@ -163,129 +231,175 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string BrightnessText => $"카메라 밝기: {Brightness:0}%";
-
-    public string ContrastText => $"화면 대조비: {Contrast:0}%";
-
     /// <summary>
-    /// 카메라 서비스에서 새 EO 프레임이 들어오면 화면에 반영한다.
+    /// 카메라 서비스에서 EO 프레임을 전달받아 화면에 반영한다.
     /// </summary>
     public void UpdateEoFrame(ImageSource? frame)
     {
         _eoFrame = frame;
-        OnPropertyChanged(nameof(EoFeedImage));
+        OnPropertyChanged(nameof(LargeFeedImage));
+        OnPropertyChanged(nameof(InsetFeedImage));
     }
 
     /// <summary>
-    /// 외부 서비스 또는 버튼 동작에서 발생한 로그를 시스템 변경 로그에 추가한다.
+    /// UI 또는 장비 이벤트에서 발생한 상태 메시지를 로그 패널에 추가한다.
     /// </summary>
     public void AppendSystemLog(string category, string message)
     {
         SystemChangeLogs.Insert(0, new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), category, message));
     }
 
+    private void SwapFeeds()
+    {
+        _isEoPrimary = !_isEoPrimary;
+        OnPropertyChanged(nameof(LargeFeedImage));
+        OnPropertyChanged(nameof(InsetFeedImage));
+        OnPropertyChanged(nameof(LargeFeedTitle));
+        OnPropertyChanged(nameof(InsetFeedTitle));
+        OnPropertyChanged(nameof(LargeFeedSubtitle));
+        OnPropertyChanged(nameof(InsetFeedSubtitle));
+
+        AppendSystemLog("VIDEO", $"{LargeFeedTitle}이(가) 메인 화면으로 전환되었습니다.");
+    }
+
     private void TogglePower()
     {
-        _isPoweredOn = !_isPoweredOn;
+        _isSystemPoweredOn = !_isSystemPoweredOn;
+
+        if (!_isSystemPoweredOn)
+        {
+            // 시스템이 꺼지면 모든 가변 기능을 기본 상태로 정리한다.
+            IsElectronicZoomEnabled = false;
+            _zoomLevel = 1.0;
+            _motorPan = 0;
+            _motorTilt = 0;
+            OnPropertyChanged(nameof(ZoomLevelText));
+            OnPropertyChanged(nameof(ZoomStatusText));
+            OnPropertyChanged(nameof(LargeFeedScale));
+            OnPropertyChanged(nameof(MotorPanStatusText));
+            OnPropertyChanged(nameof(MotorTiltStatusText));
+            OnPropertyChanged(nameof(TrackingTargetText));
+        }
+
         OnPropertyChanged(nameof(PowerStatus));
         OnPropertyChanged(nameof(PowerStatusText));
+        OnPropertyChanged(nameof(CanUseModeButtons));
+        OnPropertyChanged(nameof(CanUseDetectionControls));
+        OnPropertyChanged(nameof(CanUseDisplayControls));
+        OnPropertyChanged(nameof(CanUseMotorControls));
+        OnPropertyChanged(nameof(CanUseZoomStepControls));
+        RaiseAllCommandStates();
+
         AppendSystemLog("POWER", $"시스템 전원 상태가 {PowerStatus}로 변경되었습니다.");
-    }
-
-    private void ToggleMotor()
-    {
-        _isMotorEnabled = !_isMotorEnabled;
-        OnPropertyChanged(nameof(MotorStatus));
-        OnPropertyChanged(nameof(MotorStatusText));
-        AppendSystemLog("MOTOR", $"모터 상태가 {MotorStatus}로 변경되었습니다.");
-    }
-
-    private void ToggleTracking()
-    {
-        _isTrackingEnabled = !_isTrackingEnabled;
-        OnPropertyChanged(nameof(TrackingStatus));
-        OnPropertyChanged(nameof(TrackingStatusText));
-        AppendSystemLog("TRACK", $"트래킹 상태가 {TrackingStatus}로 변경되었습니다.");
-    }
-
-    private void CycleMode()
-    {
-        _modeIndex = (_modeIndex + 1) % _modes.Length;
-        OnPropertyChanged(nameof(CurrentMode));
-        OnPropertyChanged(nameof(CurrentModeStatus));
-        AppendSystemLog("MODE", $"시스템 모드가 {CurrentMode}로 변경되었습니다.");
     }
 
     private void SelectMode(object? parameter)
     {
-        if (parameter is not string mode)
+        if (!_isSystemPoweredOn || parameter is not string mode)
         {
             return;
         }
 
-        var index = Array.IndexOf(_modes, mode);
-        if (index < 0)
+        CurrentMode = mode;
+
+        // 자동 모드에서는 조작 버튼을 잠그므로 전자 줌도 함께 해제한다.
+        if (CurrentMode == "자동")
         {
-            return;
+            IsElectronicZoomEnabled = false;
+            _zoomLevel = 1.0;
+            OnPropertyChanged(nameof(ZoomLevelText));
+            OnPropertyChanged(nameof(ZoomStatusText));
+            OnPropertyChanged(nameof(LargeFeedScale));
         }
 
-        _modeIndex = index;
-        OnPropertyChanged(nameof(CurrentMode));
-        OnPropertyChanged(nameof(CurrentModeStatus));
-        AppendSystemLog("MODE", $"시스템 모드가 {CurrentMode}로 직접 선택되었습니다.");
-    }
-
-    private void CycleDetectionCategory()
-    {
-        _detectionCategoryIndex = (_detectionCategoryIndex + 1) % _detectionCategories.Length;
-        OnPropertyChanged(nameof(CurrentDetectionCategory));
-        OnPropertyChanged(nameof(CurrentDetectionStatus));
-        AppendSystemLog("DETECT", $"탐지 대상이 {CurrentDetectionCategory}로 변경되었습니다.");
+        AppendSystemLog("MODE", $"시스템 모드가 {CurrentMode}로 변경되었습니다.");
     }
 
     private void SelectDetectionCategory(object? parameter)
     {
-        if (parameter is not string category)
+        if (!CanUseDetectionControls || parameter is not string category)
         {
             return;
         }
 
-        var index = Array.IndexOf(_detectionCategories, category);
-        if (index < 0)
-        {
-            return;
-        }
-
-        _detectionCategoryIndex = index;
-        OnPropertyChanged(nameof(CurrentDetectionCategory));
-        OnPropertyChanged(nameof(CurrentDetectionStatus));
-        AppendSystemLog("DETECT", $"탐지 대상이 {CurrentDetectionCategory}로 직접 선택되었습니다.");
+        CurrentDetectionCategory = category;
+        AppendSystemLog("DETECT", $"탐지 분류가 {CurrentDetectionCategory}로 변경되었습니다.");
     }
 
     private void ToggleElectronicZoom()
     {
+        if (!CanUseDisplayControls)
+        {
+            return;
+        }
+
         IsElectronicZoomEnabled = !IsElectronicZoomEnabled;
+
+        if (!IsElectronicZoomEnabled)
+        {
+            _zoomLevel = 1.0;
+            OnPropertyChanged(nameof(ZoomLevelText));
+            OnPropertyChanged(nameof(ZoomStatusText));
+            OnPropertyChanged(nameof(LargeFeedScale));
+        }
+
         AppendSystemLog("ZOOM", IsElectronicZoomEnabled
-            ? $"전자 Zoom 이 활성화되었습니다. 현재 배율은 {ZoomLevelText}입니다."
-            : "전자 Zoom 이 비활성화되었습니다.");
+            ? $"전자 Zoom이 활성화되었습니다. 현재 배율은 {ZoomLevelText}입니다."
+            : "전자 Zoom이 비활성화되었습니다.");
     }
 
-    private void IncreaseZoom()
+    private void ChangeZoom(double delta)
     {
-        _zoomLevel = Math.Min(3.0, _zoomLevel + 0.2);
+        if (!CanUseZoomStepControls)
+        {
+            return;
+        }
+
+        _zoomLevel = Math.Clamp(_zoomLevel + delta, 1.0, 3.0);
         OnPropertyChanged(nameof(ZoomLevelText));
+        OnPropertyChanged(nameof(ZoomStatusText));
         OnPropertyChanged(nameof(ElectronicZoomStatus));
         OnPropertyChanged(nameof(LargeFeedScale));
-        AppendSystemLog("ZOOM", $"전자 Zoom 배율이 {ZoomLevelText}로 증가했습니다.");
+        AppendSystemLog("ZOOM", $"전자 Zoom 배율이 {ZoomLevelText}로 변경되었습니다.");
     }
 
-    private void DecreaseZoom()
+    private void MoveMotor(int panDelta, int tiltDelta)
     {
-        _zoomLevel = Math.Max(1.0, _zoomLevel - 0.2);
-        OnPropertyChanged(nameof(ZoomLevelText));
-        OnPropertyChanged(nameof(ElectronicZoomStatus));
-        OnPropertyChanged(nameof(LargeFeedScale));
-        AppendSystemLog("ZOOM", $"전자 Zoom 배율이 {ZoomLevelText}로 감소했습니다.");
+        if (!CanUseMotorControls)
+        {
+            return;
+        }
+
+        _motorPan = Math.Clamp(_motorPan + panDelta, -90, 90);
+        _motorTilt = Math.Clamp(_motorTilt + tiltDelta, -45, 45);
+
+        OnPropertyChanged(nameof(MotorPanStatusText));
+        OnPropertyChanged(nameof(MotorTiltStatusText));
+
+        if (panDelta != 0)
+        {
+            AppendSystemLog("MOTOR", $"모터 좌/우 위치가 {_motorPan}도로 변경되었습니다.");
+        }
+
+        if (tiltDelta != 0)
+        {
+            AppendSystemLog("MOTOR", $"모터 상/하 위치가 {_motorTilt}도로 변경되었습니다.");
+        }
+    }
+
+    private string GetTrackingTargetStatus()
+    {
+        if (!_isSystemPoweredOn)
+        {
+            return "시스템 OFF";
+        }
+
+        return CurrentMode switch
+        {
+            "자동" => _trackingTarget,
+            "수동" => "수동 관측 중",
+            _ => "고정 대기"
+        };
     }
 
     private void AddOrReplaceSystemMessage(string category, string message)
@@ -299,16 +413,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
         AppendSystemLog(category, message);
     }
 
-    private void RaiseZoomCommands()
+    private void RaiseAllCommandStates()
     {
-        if (IncreaseZoomCommand is RelayCommand increaseCommand)
-        {
-            increaseCommand.RaiseCanExecuteChanged();
-        }
+        RaiseCommand(SelectDetectionCategoryCommand);
+        RaiseCommand(ToggleElectronicZoomCommand);
+        RaiseCommand(IncreaseZoomCommand);
+        RaiseCommand(DecreaseZoomCommand);
+        RaiseCommand(MoveMotorLeftCommand);
+        RaiseCommand(MoveMotorRightCommand);
+        RaiseCommand(MoveMotorUpCommand);
+        RaiseCommand(MoveMotorDownCommand);
+    }
 
-        if (DecreaseZoomCommand is RelayCommand decreaseCommand)
+    private static void RaiseCommand(ICommand command)
+    {
+        if (command is RelayCommand relayCommand)
         {
-            decreaseCommand.RaiseCanExecuteChanged();
+            relayCommand.RaiseCanExecuteChanged();
         }
     }
 
@@ -331,11 +452,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 }
 
 /// <summary>
-/// VLM 결과 패널에 한 줄씩 표시할 결과 데이터다.
+/// VLM 출력값 패널에 표시할 결과 데이터다.
 /// </summary>
 public sealed record VlmResultItem(string Time, string Category, string Message);
 
 /// <summary>
-/// 실시간 시스템 변경 로그 패널에 표시할 로그 데이터다.
+/// 시스템 변경 로그 패널에 표시할 로그 데이터다.
 /// </summary>
 public sealed record SystemLogItem(string Time, string Category, string Message);
