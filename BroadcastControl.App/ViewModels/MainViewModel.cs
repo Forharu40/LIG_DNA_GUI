@@ -127,7 +127,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string PowerButtonText => IsSystemPoweredOn ? "전원 ON" : "전원 OFF";
+    // 상단 전원 버튼은 상태 표시가 아니라 프로그램 종료 버튼으로 사용한다.
+    public string PowerButtonText => "전원 종료";
 
     public string SystemPowerText => $"시스템 전원: {(IsSystemPoweredOn ? "ON" : "OFF")}";
 
@@ -354,18 +355,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void TogglePower()
     {
-        IsSystemPoweredOn = !IsSystemPoweredOn;
-
-        if (!IsSystemPoweredOn)
-        {
-            ZoomLevel = 1.0;
-            _motorPan = 0;
-            _motorTilt = 0;
-            OnPropertyChanged(nameof(MotorPanText));
-            OnPropertyChanged(nameof(MotorTiltText));
-        }
-
-        AppendImportantLog(IsSystemPoweredOn ? "시스템 전원이 켜졌습니다." : "시스템 전원이 꺼졌습니다.");
+        // 전원 버튼을 누르면 운용 콘솔을 즉시 종료한다.
+        Application.Current?.Shutdown();
     }
 
     private void SetMode(object? parameter)
