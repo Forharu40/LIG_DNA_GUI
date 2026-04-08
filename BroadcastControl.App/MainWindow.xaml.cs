@@ -1,17 +1,21 @@
 using System.Windows;
+using System.Windows.Input;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels;
 
 namespace BroadcastControl.App;
 
 /// <summary>
-/// 메인 윈도우는 화면 초기화와 카메라 연결만 담당한다.
-/// 실제 상태와 데이터 반영은 MainViewModel에 위임한다.
+/// 메인 윈도우는 전체화면 초기화, 웹캠 연결, 확대 화면 드래그 입력만 담당한다.
+/// 실제 상태와 화면 데이터는 MainViewModel에서 관리한다.
 /// </summary>
 public partial class MainWindow : Window
 {
     private readonly MainViewModel _viewModel;
     private readonly WebcamCaptureService _webcamCaptureService;
+
+    private bool _isDraggingZoom;
+    private Point _lastZoomDragPoint;
 
     public MainWindow()
     {
@@ -21,40 +25,69 @@ public partial class MainWindow : Window
         _webcamCaptureService = new WebcamCaptureService();
         DataContext = _viewModel;
 
-        // 창이 열릴 때 화면 크기를 맞추고 카메라 연결을 시작한다.
         Loaded += OnLoaded;
         Closed += OnClosed;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        ApplyResponsiveWindowSize();
+        // 전체화면 콘솔 형태로 시작한다.
+        WindowState = WindowState.Maximized;
 
         _webcamCaptureService.FrameReady += OnFrameReady;
+        _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
 
         if (_webcamCaptureService.Start())
         {
-            _viewModel.AppendSystemLog("VIDEO", "노트북 카메라가 EO 화면에 연결되었습니다.");
+            _viewModel.AppendImportantLog("노트북 카메라가 EO 화면에 연결되었습니다.");
         }
         else
         {
-            _viewModel.AppendSystemLog("VIDEO", "노트북 카메라 연결에 실패했습니다. 장치 점유 상태를 확인하세요.");
+            _viewModel.AppendImportantLog("노트북 카메라 연결에 실패했습니다.");
         }
     }
 
-    /// <summary>
-    /// 현재 사용 중인 모니터의 작업 영역을 기준으로 창 크기를 잡는다.
-    /// 고정 해상도 대신 비율 기반으로 계산해서 노트북과 외부 모니터 모두에 대응한다.
-    /// </summary>
-    private void ApplyResponsiveWindowSize()
+    private void CameraViewport_OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
-        var workArea = SystemParameters.WorkArea;
+        _viewModel.UpdateViewportSize(e.NewSize.Width, e.NewSize.Height);
+    }
 
-        Width = Math.Max(MinWidth, workArea.Width * 0.94);
-        Height = Math.Max(MinHeight, workArea.Height * 0.92);
+    private void CameraViewport_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (!_viewModel.ShowZoomMiniMap)
+        {
+            return;
+        }
 
-        Left = workArea.Left + Math.Max(0, (workArea.Width - Width) / 2);
-        Top = workArea.Top + Math.Max(0, (workArea.Height - Height) / 2);
+        _isDraggingZoom = true;
+        _lastZoomDragPoint = e.GetPosition(CameraViewport);
+        CameraViewport.CaptureMouse();
+    }
+
+    private void CameraViewport_OnMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_isDraggingZoom)
+        {
+            return;
+        }
+
+        var currentPoint = e.GetPosition(CameraViewport);
+        var delta = currentPoint - _lastZoomDragPoint;
+        _lastZoomDragPoint = currentPoint;
+
+        // 드래그 방향으로 확대 화면이 움직이도록 오프셋을 갱신한다.
+        _viewModel.PanZoom(delta.X, delta.Y);
+    }
+
+    private void CameraViewport_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (!_isDraggingZoom)
+        {
+            return;
+        }
+
+        _isDraggingZoom = false;
+        CameraViewport.ReleaseMouseCapture();
     }
 
     private void OnFrameReady(System.Windows.Media.Imaging.BitmapSource frame)
