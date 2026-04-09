@@ -3,40 +3,42 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Imaging;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels;
 
 namespace BroadcastControl.App;
 
 /// <summary>
-/// 메인 창의 "화면과 장치 사이 연결"을 담당한다.
-/// 
-/// ViewModel은 상태와 명령을 관리하고,
-/// MainWindow는 실제 WPF 컨트롤 이벤트와 카메라 서비스 같은 외부 객체를 연결한다.
-/// 즉, 이 파일은
-/// - 웹캠 시작/종료
-/// - 줌 드래그/휠 입력
-/// - 녹화 시작/종료 연동
+/// MainWindow는 ViewModel과 실제 입력/출력 서비스 사이를 연결하는 조정자 역할을 한다.
+/// 화면 배치 자체는 XAML이 담당하고, 여기서는 다음 흐름을 연결한다.
+/// - EO UDP 영상 수신 시작/종료
+/// - IR 임시 노트북 카메라 시작/종료
+/// - 전자 줌 드래그/휠 입력
+/// - 수동 녹화 시작/종료
 /// - 설정창 열림/닫힘 애니메이션
-/// 같은 UI-실행 계층의 접점을 맡는다.
 /// </summary>
 public partial class MainWindow : Window
 {
     /// <summary>
     /// 설정창이 닫혀 있을 때 화면 오른쪽 바깥으로 얼마나 밀려나 있을지 정의한다.
-    /// 값이 클수록 더 멀리 숨어 있다가 들어온다.
     /// </summary>
     private const double SettingsDrawerClosedOffset = 320;
 
     /// <summary>
-    /// 화면 상태, 버튼 명령, 표시용 텍스트를 관리하는 ViewModel이다.
+    /// 화면 상태, 버튼 명령, 텍스트, 줌 값을 관리하는 ViewModel이다.
     /// </summary>
     private readonly MainViewModel _viewModel;
 
     /// <summary>
-    /// 실제 노트북 카메라 프레임을 읽고, 밝기/대조비/녹화까지 처리하는 서비스이다.
+    /// 외부 EO 카메라가 보내는 UDP 패킷을 받아 프레임으로 복원하는 서비스이다.
     /// </summary>
-    private readonly WebcamCaptureService _webcamCaptureService;
+    private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
+
+    /// <summary>
+    /// 임시 IR 화면으로 쓸 노트북 카메라 프레임을 읽는 서비스이다.
+    /// </summary>
+    private readonly WebcamCaptureService _irWebcamCaptureService;
 
     /// <summary>
     /// 전자 줌 상태에서 마우스로 화면을 끌고 있는지 여부를 기억한다.
@@ -44,16 +46,23 @@ public partial class MainWindow : Window
     private bool _isDraggingZoom;
 
     /// <summary>
-    /// 마지막 드래그 좌표를 저장해서 다음 이동량(delta)을 계산한다.
+    /// 마지막 드래그 좌표를 기억해 다음 이동량(delta)을 계산한다.
     /// </summary>
     private Point _lastZoomDragPoint;
+
+    /// <summary>
+    /// 첫 프레임 수신 로그를 한 번만 남기기 위한 플래그이다.
+    /// </summary>
+    private bool _hasReceivedEoFrame;
+    private bool _hasReceivedIrFrame;
 
     public MainWindow()
     {
         InitializeComponent();
 
         _viewModel = new MainViewModel();
-        _webcamCaptureService = new WebcamCaptureService();
+        _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
+        _irWebcamCaptureService = new WebcamCaptureService();
         DataContext = _viewModel;
 
         Loaded += OnLoaded;
@@ -61,51 +70,59 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 창이 실제로 화면에 올라온 뒤 초기화가 끝나는 지점이다.
-    /// 이 시점에 카메라 서비스와 화면 이벤트를 연결한다.
+    /// 창이 실제로 화면에 표시될 때 입력 서비스 연결과 초기 상태 동기화를 수행한다.
     /// </summary>
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Maximized;
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        _webcamCaptureService.FrameReady += OnFrameReady;
+        _eoUdpCaptureService.FrameReady += OnEoFrameReady;
+        _irWebcamCaptureService.FrameReady += OnIrFrameReady;
 
-        // ViewModel의 시작값을 그대로 카메라 서비스에도 반영해서
-        // UI 숫자와 실제 영상 보정값이 일치하도록 만든다.
-        _webcamCaptureService.SetBrightness(_viewModel.Brightness);
-        _webcamCaptureService.SetContrast(_viewModel.Contrast);
+        // 상단 밝기/대조비 슬라이더는 EO 외부 영상에 적용된다.
+        _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
+        _eoUdpCaptureService.SetContrast(_viewModel.Contrast);
 
-        // 현재 EO 화면의 실제 표시 크기를 ViewModel과 녹화 서비스에 전달한다.
+        // 현재 EO 화면의 실제 표시 크기를 ViewModel과 EO 녹화 서비스에 전달한다.
         _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
         UpdateRecordingViewportState();
 
-        // 설정창은 초기 로딩 순간에도 열림/닫힘 상태와 위치가 일치해야 한다.
+        // 설정창은 초기 로딩 순간에도 위치와 열림 상태가 맞아야 한다.
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
 
-        if (_webcamCaptureService.Start())
+        if (_eoUdpCaptureService.Start())
         {
-            _viewModel.AppendImportantLog("노트북 카메라가 EO 화면에 연결되었습니다.");
+            _viewModel.AppendImportantLog($"EO UDP 수신 대기 중입니다. 포트: {_eoUdpCaptureService.ListeningPort}");
         }
         else
         {
-            _viewModel.AppendImportantLog("노트북 카메라 연결에 실패했습니다.");
+            _viewModel.AppendImportantLog("EO UDP 수신 소켓 생성에 실패했습니다.");
+        }
+
+        if (_irWebcamCaptureService.Start())
+        {
+            _viewModel.AppendImportantLog("노트북 카메라가 IR 화면에 임시 연결되었습니다.");
+        }
+        else
+        {
+            _viewModel.AppendImportantLog("노트북 카메라를 IR 화면에 연결하지 못했습니다.");
         }
     }
 
     /// <summary>
-    /// ViewModel 속성이 바뀔 때 화면 밖 장치 서비스나 애니메이션과 연결해야 하는 항목을 처리한다.
+    /// ViewModel 값이 바뀔 때 실제 서비스와 애니메이션이 따라가야 하는 항목을 처리한다.
     /// </summary>
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         switch (e.PropertyName)
         {
             case nameof(MainViewModel.Brightness):
-                _webcamCaptureService.SetBrightness(_viewModel.Brightness);
+                _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
                 break;
 
             case nameof(MainViewModel.Contrast):
-                _webcamCaptureService.SetContrast(_viewModel.Contrast);
+                _eoUdpCaptureService.SetContrast(_viewModel.Contrast);
                 break;
 
             case nameof(MainViewModel.IsManualRecordingEnabled):
@@ -125,8 +142,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// EO 메인 화면 크기가 바뀌면 줌 이동 범위와 녹화 구도를 다시 계산해야 한다.
-    /// 창 크기를 조절하거나 모니터가 바뀌었을 때 이 메서드가 호출된다.
+    /// EO 메인 화면 크기가 바뀌면 전자 줌 이동 범위와 녹화 구도를 다시 계산한다.
     /// </summary>
     private void CameraViewport_OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
@@ -135,8 +151,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 확대 상태에서 마우스 왼쪽 버튼을 누르면 화면 이동(패닝) 시작으로 간주한다.
-    /// 줌이 꺼진 상태에서는 드래그할 필요가 없으므로 무시한다.
+    /// 전자 줌이 켜져 있을 때만 드래그 패닝을 시작한다.
     /// </summary>
     private void CameraViewport_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -151,7 +166,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 확대 상태에서 마우스를 드래그하면 EO 화면 내부에서 확대된 위치를 이동한다.
+    /// 드래그 중에는 EO 화면 안에서 확대된 시야를 이동시킨다.
     /// </summary>
     private void CameraViewport_OnMouseMove(object sender, MouseEventArgs e)
     {
@@ -168,8 +183,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 수동 모드에서 EO 화면 위에 마우스가 있을 때 휠을 굴리면 전자 줌 배율을 조절한다.
-    /// 슬라이더를 직접 움직이는 것과 같은 로직으로 동작한다.
+    /// 수동 모드일 때 EO 화면 위에서 마우스 휠로 전자 줌 배율을 조절한다.
     /// </summary>
     private void CameraViewport_OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
@@ -183,7 +197,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 드래그가 끝났음을 알리고 마우스 캡처를 해제한다.
+    /// 드래그를 끝내고 마우스 캡처를 해제한다.
     /// </summary>
     private void CameraViewport_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
@@ -197,22 +211,41 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 카메라 서비스에서 새 프레임이 도착했을 때 ViewModel에 전달한다.
-    /// 실제 EO 화면 바인딩은 ViewModel 속성을 통해 갱신된다.
+    /// EO UDP 프레임이 도착하면 메인 EO 화면에 반영한다.
+    /// 첫 프레임 수신 시 로그를 한 번 남겨 연결 여부를 쉽게 확인할 수 있게 한다.
     /// </summary>
-    private void OnFrameReady(System.Windows.Media.Imaging.BitmapSource frame)
+    private void OnEoFrameReady(BitmapSource frame)
     {
+        if (!_hasReceivedEoFrame)
+        {
+            _hasReceivedEoFrame = true;
+            _viewModel.AppendImportantLog("EO UDP 카메라 첫 프레임을 수신했습니다.");
+        }
+
         _viewModel.UpdateEoFrame(frame);
     }
 
     /// <summary>
-    /// 녹화 서비스에도 현재 화면의 줌/이동 상태를 알려준다.
-    /// 이렇게 해야 저장되는 영상이 원본 전체가 아니라,
-    /// 사용자가 실제로 보고 있는 줌 화면과 같은 구도로 기록된다.
+    /// 노트북 카메라 프레임을 임시 IR 화면에 반영한다.
+    /// </summary>
+    private void OnIrFrameReady(BitmapSource frame)
+    {
+        if (!_hasReceivedIrFrame)
+        {
+            _hasReceivedIrFrame = true;
+            _viewModel.AppendImportantLog("IR 임시 카메라 첫 프레임을 수신했습니다.");
+        }
+
+        _viewModel.UpdateIrFrame(frame);
+    }
+
+    /// <summary>
+    /// EO 화면에 보이는 전자 줌/패닝 상태를 녹화 서비스에 전달한다.
+    /// 그래야 저장되는 영상도 현재 운용자가 보는 구도와 같아진다.
     /// </summary>
     private void UpdateRecordingViewportState()
     {
-        _webcamCaptureService.UpdateViewportTransform(
+        _eoUdpCaptureService.UpdateViewportTransform(
             _viewModel.ZoomLevel,
             _viewModel.ZoomTransformX,
             _viewModel.ZoomTransformY,
@@ -221,19 +254,18 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// ViewModel의 수동 녹화 상태가 바뀌면 실제 파일 녹화도 함께 시작/종료한다.
-    /// 저장 위치는 현재 테스트 용도에 맞게 바탕화면으로 고정되어 있다.
+    /// ViewModel의 수동 녹화 상태가 바뀌면 EO 서비스의 실제 녹화 시작/종료를 처리한다.
     /// </summary>
     private void HandleManualRecordingStateChanged()
     {
         if (_viewModel.IsManualRecordingEnabled)
         {
-            var filePath = _webcamCaptureService.StartRecordingToDesktop();
+            var filePath = _eoUdpCaptureService.StartRecordingToDesktop();
             _viewModel.AppendImportantLog($"수동 녹화를 시작했습니다: {System.IO.Path.GetFileName(filePath)}");
             return;
         }
 
-        var savedPath = _webcamCaptureService.StopRecording();
+        var savedPath = _eoUdpCaptureService.StopRecording();
         if (!string.IsNullOrWhiteSpace(savedPath))
         {
             _viewModel.AppendImportantLog($"영상이 저장되었습니다: {System.IO.Path.GetFileName(savedPath)}");
@@ -242,7 +274,6 @@ public partial class MainWindow : Window
 
     /// <summary>
     /// 설정창 바깥 어두운 배경을 클릭하면 설정창을 닫는다.
-    /// 사용자가 "밖을 눌러 닫는" 자연스러운 상호작용을 기대할 수 있게 한다.
     /// </summary>
     private void SettingsBackdrop_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -253,9 +284,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 설정창을 직접 애니메이션해서 열고 닫는다.
-    /// 기본 DrawerHost보다 더 가볍게 동작하도록
-    /// 투명도와 X축 이동만 사용해서 부드럽게 처리한다.
+    /// 설정창을 직접 페이드+슬라이드 애니메이션으로 열고 닫는다.
     /// </summary>
     private void AnimateSettingsDrawer(bool isOpen, bool animate)
     {
@@ -321,13 +350,14 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 창이 닫힐 때 이벤트 연결과 장치 자원을 정리한다.
-    /// 카메라 장치를 해제하지 않으면 다음 실행에서 장치 점유 문제가 생길 수 있다.
+    /// 창 종료 시 이벤트와 입력 장치를 모두 정리한다.
     /// </summary>
     private void OnClosed(object? sender, EventArgs e)
     {
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
-        _webcamCaptureService.FrameReady -= OnFrameReady;
-        _webcamCaptureService.Dispose();
+        _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
+        _irWebcamCaptureService.FrameReady -= OnIrFrameReady;
+        _eoUdpCaptureService.Dispose();
+        _irWebcamCaptureService.Dispose();
     }
 }

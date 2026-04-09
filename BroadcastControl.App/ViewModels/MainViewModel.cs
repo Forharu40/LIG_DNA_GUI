@@ -50,8 +50,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private int _motorPan;
     private int _motorTilt;
 
+    // EO는 외부 UDP 카메라 영상, IR은 임시로 노트북 카메라 영상을 받는다.
+    // 아직 프레임이 들어오지 않았을 때를 대비해 EO/IR 각각 기본 안내 이미지를 준비해 둔다.
     private ImageSource? _eoFrame;
-    private readonly ImageSource _irPlaceholderFrame = CreateIrPlaceholderFrame();
+    private ImageSource? _irFrame;
+    private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame("EO UDP", Color.FromRgb(51, 94, 160));
+    private readonly ImageSource _irPlaceholderFrame = CreateCameraPlaceholderFrame("IR TEMP", Color.FromRgb(192, 109, 40));
 
     public MainViewModel()
     {
@@ -283,13 +287,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string IrTitle => "IR cam";
 
-    public string EoSubtitle => "노트북 카메라 입력";
+    public string EoSubtitle => "외부 UDP 카메라 입력";
 
-    public string IrSubtitle => "IR 입력 연결 예정";
+    public string IrSubtitle => "노트북 카메라 임시 입력";
 
-    public ImageSource? LargeFeedImage => _isEoPrimary ? _eoFrame : _irPlaceholderFrame;
+    public ImageSource? LargeFeedImage => _isEoPrimary
+        ? _eoFrame ?? _eoPlaceholderFrame
+        : _irFrame ?? _irPlaceholderFrame;
 
-    public ImageSource? InsetFeedImage => _isEoPrimary ? _irPlaceholderFrame : _eoFrame;
+    public ImageSource? InsetFeedImage => _isEoPrimary
+        ? _irFrame ?? _irPlaceholderFrame
+        : _eoFrame ?? _eoPlaceholderFrame;
 
     public string LargeFeedTitle => _isEoPrimary ? EoTitle : IrTitle;
 
@@ -411,6 +419,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public void UpdateEoFrame(ImageSource? frame)
     {
         _eoFrame = frame;
+        OnPropertyChanged(nameof(LargeFeedImage));
+        OnPropertyChanged(nameof(InsetFeedImage));
+    }
+
+    /// <summary>
+    /// 임시 IR 화면으로 쓰는 노트북 카메라 프레임을 반영한다.
+    /// EO/IR 스왑 상태에 따라 작은 화면 또는 큰 화면에 즉시 반영된다.
+    /// </summary>
+    public void UpdateIrFrame(ImageSource? frame)
+    {
+        _irFrame = frame;
         OnPropertyChanged(nameof(LargeFeedImage));
         OnPropertyChanged(nameof(InsetFeedImage));
     }
@@ -717,9 +736,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
     /// 실제 IR 장치가 아직 연결되지 않았을 때 대신 보여 줄 플레이스홀더 이미지를 생성한다.
     /// 덕분에 UI 테스트 단계에서도 IR 인셋이 비어 보이지 않는다.
     /// </summary>
-    private static ImageSource CreateIrPlaceholderFrame()
+    private static ImageSource CreateCameraPlaceholderFrame(string label, Color accentColor)
     {
-        // 실제 IR 카메라 입력 전에도 화면이 비어 보이지 않도록 임시 열화상 프레임을 만든다.
+        // 실제 입력이 아직 들어오지 않는 동안에도 어느 카메라가 어느 자리에 올 예정인지
+        // 운용자가 한눈에 알 수 있도록 간단한 안내용 플레이스홀더 프레임을 만든다.
         var group = new DrawingGroup();
         using (var dc = group.Open())
         {
@@ -730,7 +750,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 new Point(1, 1));
 
             dc.DrawRectangle(background, null, new Rect(0, 0, 320, 240));
-            dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(160, 255, 134, 52)), null, new Point(220, 92), 46, 32);
+            dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(180, accentColor.R, accentColor.G, accentColor.B)), null, new Point(220, 92), 46, 32);
             dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(120, 255, 208, 90)), null, new Point(112, 152), 64, 22);
 
             var gridPen = new Pen(new SolidColorBrush(Color.FromArgb(36, 255, 255, 255)), 1);
@@ -743,6 +763,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
             {
                 dc.DrawLine(gridPen, new Point(0, y), new Point(320, y));
             }
+
+            var textBrush = new SolidColorBrush(Color.FromRgb(240, 243, 248));
+            textBrush.Freeze();
+            var typeface = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+            var formattedText = new FormattedText(
+                label,
+                System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                30,
+                textBrush,
+                1.0);
+            dc.DrawText(formattedText, new Point(22, 20));
         }
 
         var image = new DrawingImage(group);
