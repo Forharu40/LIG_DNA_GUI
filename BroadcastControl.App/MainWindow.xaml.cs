@@ -1,6 +1,8 @@
 using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Animation;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels;
 
@@ -12,6 +14,7 @@ namespace BroadcastControl.App;
 /// </summary>
 public partial class MainWindow : Window
 {
+    private const double SettingsDrawerClosedOffset = 320;
     private readonly MainViewModel _viewModel;
     private readonly WebcamCaptureService _webcamCaptureService;
 
@@ -43,6 +46,7 @@ public partial class MainWindow : Window
 
         _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
         UpdateRecordingViewportState();
+        AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
 
         if (_webcamCaptureService.Start())
         {
@@ -72,6 +76,9 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.ZoomTransformX):
             case nameof(MainViewModel.ZoomTransformY):
                 UpdateRecordingViewportState();
+                break;
+            case nameof(MainViewModel.IsSettingsOpen):
+                AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: true);
                 break;
         }
     }
@@ -168,6 +175,80 @@ public partial class MainWindow : Window
         {
             _viewModel.AppendImportantLog($"영상이 저장되었습니다: {System.IO.Path.GetFileName(savedPath)}");
         }
+    }
+
+    private void SettingsBackdrop_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_viewModel.IsSettingsOpen)
+        {
+            _viewModel.IsSettingsOpen = false;
+        }
+    }
+
+    /// <summary>
+    /// 설정창을 직접 애니메이션해서 더 가볍고 부드럽게 열고 닫는다.
+    /// </summary>
+    private void AnimateSettingsDrawer(bool isOpen, bool animate)
+    {
+        if (!animate)
+        {
+            SettingsBackdrop.Visibility = isOpen ? Visibility.Visible : Visibility.Collapsed;
+            SettingsBackdrop.IsHitTestVisible = isOpen;
+            SettingsBackdrop.Opacity = isOpen ? 1.0 : 0.0;
+
+            SettingsDrawer.Visibility = isOpen ? Visibility.Visible : Visibility.Collapsed;
+            SettingsDrawer.Opacity = isOpen ? 1.0 : 0.0;
+            SettingsDrawerTransform.X = isOpen ? 0 : SettingsDrawerClosedOffset;
+            return;
+        }
+
+        var duration = TimeSpan.FromMilliseconds(isOpen ? 220 : 170);
+        var easing = new CubicEase
+        {
+            EasingMode = isOpen ? EasingMode.EaseOut : EasingMode.EaseIn
+        };
+
+        if (isOpen)
+        {
+            SettingsBackdrop.Visibility = Visibility.Visible;
+            SettingsBackdrop.IsHitTestVisible = true;
+            SettingsDrawer.Visibility = Visibility.Visible;
+        }
+
+        var backdropAnimation = new DoubleAnimation
+        {
+            To = isOpen ? 1.0 : 0.0,
+            Duration = duration,
+            EasingFunction = easing
+        };
+
+        var drawerOpacityAnimation = new DoubleAnimation
+        {
+            To = isOpen ? 1.0 : 0.0,
+            Duration = duration,
+            EasingFunction = easing
+        };
+
+        var drawerSlideAnimation = new DoubleAnimation
+        {
+            To = isOpen ? 0 : SettingsDrawerClosedOffset,
+            Duration = duration,
+            EasingFunction = easing
+        };
+
+        if (!isOpen)
+        {
+            drawerSlideAnimation.Completed += (_, _) =>
+            {
+                SettingsBackdrop.Visibility = Visibility.Collapsed;
+                SettingsBackdrop.IsHitTestVisible = false;
+                SettingsDrawer.Visibility = Visibility.Collapsed;
+            };
+        }
+
+        SettingsBackdrop.BeginAnimation(OpacityProperty, backdropAnimation, HandoffBehavior.SnapshotAndReplace);
+        SettingsDrawer.BeginAnimation(OpacityProperty, drawerOpacityAnimation, HandoffBehavior.SnapshotAndReplace);
+        SettingsDrawerTransform.BeginAnimation(TranslateTransform.XProperty, drawerSlideAnimation, HandoffBehavior.SnapshotAndReplace);
     }
 
     private void OnClosed(object? sender, EventArgs e)

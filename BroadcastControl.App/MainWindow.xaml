@@ -6,7 +6,9 @@
         WindowState="Maximized"
         WindowStyle="None"
         ResizeMode="NoResize"
-        Background="{DynamicResource WindowBackgroundBrush}">
+        Background="{DynamicResource WindowBackgroundBrush}"
+        UseLayoutRounding="True"
+        SnapsToDevicePixels="True">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
@@ -21,6 +23,12 @@
                           ShadowDepth="0"
                           Opacity="0.18"
                           Color="#B3000000" />
+
+        <DropShadowEffect x:Key="DrawerShadow"
+                          BlurRadius="14"
+                          ShadowDepth="0"
+                          Opacity="0.12"
+                          Color="#80000000" />
 
         <Style x:Key="GlassCardBorder" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
@@ -122,86 +130,7 @@
         </Style>
     </Window.Resources>
 
-    <materialDesign:DrawerHost IsRightDrawerOpen="{Binding IsSettingsOpen}">
-        <materialDesign:DrawerHost.RightDrawerContent>
-            <Border Width="280"
-                    Background="{DynamicResource DrawerBrush}"
-                    BorderBrush="{DynamicResource DrawerBorderBrush}"
-                    BorderThickness="1,0,0,0"
-                    Padding="22"
-                    Effect="{StaticResource SoftPanelShadow}">
-                <Grid>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                    </Grid.RowDefinitions>
-
-                    <TextBlock Text="설정창"
-                               FontSize="24"
-                               FontWeight="Bold"
-                               Foreground="{DynamicResource DrawerTextBrush}" />
-
-                    <Border Grid.Row="1"
-                            Margin="0,18,0,14"
-                            BorderBrush="{DynamicResource DrawerBorderBrush}"
-                            BorderThickness="0,0,0,3">
-                        <TextBlock Margin="0,0,0,10"
-                                   Text="주 탐지체 변경"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource DrawerTextBrush}" />
-                    </Border>
-
-                    <ItemsControl Grid.Row="2"
-                                  ItemsSource="{Binding PrimaryTargets}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Button Margin="0,0,0,10"
-                                        Command="{Binding DataContext.SelectPrimaryTargetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                        CommandParameter="{Binding}"
-                                        Style="{StaticResource SettingsActionButton}"
-                                        Content="{Binding}" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
-
-                    <Border Grid.Row="3"
-                            Margin="0,8,0,12"
-                            BorderBrush="{DynamicResource DrawerBorderBrush}"
-                            BorderThickness="0,1,0,0">
-                        <TextBlock Margin="0,12,0,0"
-                                   Text="테마 변경"
-                                   FontSize="18"
-                                   FontWeight="SemiBold"
-                                   Foreground="{DynamicResource DrawerTextBrush}" />
-                    </Border>
-
-                    <Grid Grid.Row="4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0"
-                                Margin="0,0,8,0"
-                                Command="{Binding SetThemeCommand}"
-                                CommandParameter="Dark"
-                                Opacity="{Binding DarkThemeButtonOpacity}"
-                                Style="{StaticResource SettingsActionButton}"
-                                Content="어두운 테마" />
-                        <Button Grid.Column="1"
-                                Command="{Binding SetThemeCommand}"
-                                CommandParameter="Light"
-                                Opacity="{Binding LightThemeButtonOpacity}"
-                                Style="{StaticResource SettingsActionButton}"
-                                Content="밝은 테마" />
-                    </Grid>
-                </Grid>
-            </Border>
-        </materialDesign:DrawerHost.RightDrawerContent>
-
+    <Grid x:Name="RootLayout">
         <Grid Margin="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="66" />
@@ -677,5 +606,106 @@
                 </Grid>
             </Grid>
         </Grid>
-    </materialDesign:DrawerHost>
+
+        <Rectangle x:Name="SettingsBackdrop"
+                   Fill="#22000000"
+                   Opacity="0"
+                   Visibility="Collapsed"
+                   IsHitTestVisible="False"
+                   Panel.ZIndex="20"
+                   MouseLeftButtonDown="SettingsBackdrop_OnMouseLeftButtonDown" />
+
+        <Border x:Name="SettingsDrawer"
+                Width="280"
+                Margin="0,12,12,12"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Stretch"
+                Background="{DynamicResource DrawerBrush}"
+                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                BorderThickness="1"
+                Padding="22"
+                Effect="{StaticResource DrawerShadow}"
+                UseLayoutRounding="True"
+                SnapsToDevicePixels="True"
+                Opacity="0"
+                Visibility="Collapsed"
+                Panel.ZIndex="21">
+            <Border.RenderTransform>
+                <!-- 기본 위치는 화면 오른쪽 바깥으로 두고, 열릴 때 안쪽으로 부드럽게 이동시킨다. -->
+                <TranslateTransform x:Name="SettingsDrawerTransform" X="320" />
+            </Border.RenderTransform>
+            <Border.CacheMode>
+                <BitmapCache RenderAtScale="1" />
+            </Border.CacheMode>
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="설정창"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource DrawerTextBrush}" />
+
+                <Border Grid.Row="1"
+                        Margin="0,18,0,14"
+                        BorderBrush="{DynamicResource DrawerBorderBrush}"
+                        BorderThickness="0,0,0,3">
+                    <TextBlock Margin="0,0,0,10"
+                               Text="주 탐지체 변경"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource DrawerTextBrush}" />
+                </Border>
+
+                <ItemsControl Grid.Row="2"
+                              ItemsSource="{Binding PrimaryTargets}">
+                    <ItemsControl.ItemTemplate>
+                        <DataTemplate>
+                            <Button Margin="0,0,0,10"
+                                    Command="{Binding DataContext.SelectPrimaryTargetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding}" />
+                        </DataTemplate>
+                    </ItemsControl.ItemTemplate>
+                </ItemsControl>
+
+                <Border Grid.Row="3"
+                        Margin="0,8,0,12"
+                        BorderBrush="{DynamicResource DrawerBorderBrush}"
+                        BorderThickness="0,1,0,0">
+                    <TextBlock Margin="0,12,0,0"
+                               Text="테마 변경"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource DrawerTextBrush}" />
+                </Border>
+
+                <Grid Grid.Row="4">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Button Grid.Column="0"
+                            Margin="0,0,8,0"
+                            Command="{Binding SetThemeCommand}"
+                            CommandParameter="Dark"
+                            Opacity="{Binding DarkThemeButtonOpacity}"
+                            Style="{StaticResource SettingsActionButton}"
+                            Content="어두운 테마" />
+                    <Button Grid.Column="1"
+                            Command="{Binding SetThemeCommand}"
+                            CommandParameter="Light"
+                            Opacity="{Binding LightThemeButtonOpacity}"
+                            Style="{StaticResource SettingsActionButton}"
+                            Content="밝은 테마" />
+                </Grid>
+            </Grid>
+        </Border>
+    </Grid>
 </Window>
