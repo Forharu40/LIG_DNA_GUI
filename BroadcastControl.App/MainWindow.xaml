@@ -436,9 +436,10 @@
                                 Background="Transparent"
                                 BorderThickness="0"
                                 Padding="0">
-                            <Border Background="{DynamicResource SurfaceAltBrush}"
-                                    BorderBrush="{DynamicResource PanelBorderBrush}"
-                                    BorderThickness="1"
+                            <!-- IR 인셋은 영상만 보이도록 내부 배경과 테두리를 모두 제거한다. -->
+                            <Border Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="0"
                                     CornerRadius="12">
                                 <Grid ClipToBounds="True">
                                     <Image Source="{Binding InsetFeedImage}"
