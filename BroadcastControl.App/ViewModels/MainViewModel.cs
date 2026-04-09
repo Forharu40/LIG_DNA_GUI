@@ -9,8 +9,8 @@ using BroadcastControl.App.Infrastructure;
 namespace BroadcastControl.App.ViewModels;
 
 /// <summary>
-/// 메인 화면의 표시 상태, 모드 상태, 위험 등급, 설정 패널 상태를 한 곳에서 관리한다.
-/// 실제 장비와 VLM이 연결되면 같은 ViewModel에 실시간 값을 주입해 그대로 확장할 수 있다.
+/// 메인 화면의 상태, 모드, 위험 등급, 설정 패널, 줌/팬 값을 한 곳에서 관리한다.
+/// 실제 장비와 VLM이 연결되면 이 ViewModel에 실시간 값을 넣어 같은 화면 구조를 유지할 수 있다.
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged
 {
@@ -21,30 +21,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private static readonly SolidColorBrush MediumThreatBrush = CreateBrush(0xFF, 0xC1, 0x45);
     private static readonly SolidColorBrush HighThreatBrush = CreateBrush(0xFF, 0x6B, 0x6B);
 
-    // EO 화면이 메인 화면인지 여부를 저장한다.
     private bool _isEoPrimary = true;
-
-    // 우측 설정 패널 열림 상태를 저장한다.
     private bool _isSettingsOpen;
-
-    // 현재 카메라 운용 상태를 저장한다.
     private bool _isSystemPoweredOn = true;
     private string _currentMode = "수동";
-    private string _selectedPrimaryTarget = "비행체";
-    private string _currentThreatLevel = "높음";
-
-    // 상단바와 카메라 패널에서 사용할 표시값이다.
+    private string _selectedPrimaryTarget = "복합";
+    private string _currentThreatLevel = "낮음";
     private double _brightness = 58;
     private double _contrast = 52;
     private double _zoomLevel = 1.0;
-
-    // 확대된 EO 화면을 드래그할 때 사용할 팬 오프셋과 뷰포트 크기다.
     private double _zoomPanX;
     private double _zoomPanY;
     private double _viewportWidth = 1;
     private double _viewportHeight = 1;
-
-    // 수동 모드에서 모터 방향 값을 상태창에 표시하기 위해 유지한다.
     private int _motorPan;
     private int _motorTilt;
 
@@ -55,30 +44,34 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         AnalysisItems = new ObservableCollection<AnalysisItem>
         {
-            new("10:05:00", "북동측 500m 구간에서 복합 비행체 패턴이 감지되었습니다."),
-            new("10:05:03", "현재 주 탐색체는 비행체이며 우선 감시 상태를 유지합니다."),
-            new("10:05:05", "EO 입력 기준 이동 밀도가 상승해 위험 등급을 높음으로 유지합니다."),
+            new("10:05:00", "시스템 초기화 단계에서는 기본 위험 등급을 낮음으로 유지합니다."),
+            new("10:05:03", "현재 주 탐지체는 복합이며 운용자가 탐지 조건을 조정할 수 있습니다."),
+            new("10:05:05", "VLM 고위험 분석 결과가 들어오기 전까지 경보 단계는 상승하지 않습니다."),
         };
 
         SystemLogs = new ObservableCollection<SystemLogItem>
         {
             new("10:05:00", "시스템 전원이 켜졌습니다."),
             new("10:05:02", "카메라 제어 모드가 수동으로 설정되었습니다."),
-            new("10:05:04", "현재 위험 등급이 높음으로 평가되었습니다."),
+            new("10:05:04", "초기 위험 등급은 낮음으로 설정되었습니다."),
         };
 
         PrimaryTargets = new ReadOnlyCollection<string>(new[]
         {
-            "비행체",
-            "비군사 표적(오탐 유발 요소)",
+            "복합",
+            "공중 무기체계",
+            "육상 무기체계",
+            "해상 무기체계",
             "통신 장비",
-            "자주포 및 견인포",
+            "비군사 표적",
         });
 
         TogglePowerCommand = new RelayCommand(_ => TogglePower());
         SetModeCommand = new RelayCommand(SetMode, _ => IsSystemPoweredOn);
         ToggleSettingsCommand = new RelayCommand(_ => IsSettingsOpen = !IsSettingsOpen);
         SelectPrimaryTargetCommand = new RelayCommand(SelectPrimaryTarget, _ => IsSystemPoweredOn);
+        ResetBrightnessCommand = new RelayCommand(_ => Brightness = 50, _ => IsSystemPoweredOn);
+        ResetContrastCommand = new RelayCommand(_ => Contrast = 50, _ => IsSystemPoweredOn);
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         MoveMotorCommand = new RelayCommand(MoveMotor, _ => CanUseMotorControls);
     }
@@ -99,6 +92,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public ICommand SelectPrimaryTargetCommand { get; }
 
+    public ICommand ResetBrightnessCommand { get; }
+
+    public ICommand ResetContrastCommand { get; }
+
     public ICommand SwapFeedsCommand { get; }
 
     public ICommand MoveMotorCommand { get; }
@@ -116,15 +113,15 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (SetProperty(ref _isSystemPoweredOn, value))
             {
+                OnPropertyChanged(nameof(IsManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
                 OnPropertyChanged(nameof(CanUseZoomControls));
-                OnPropertyChanged(nameof(IsManualMode));
                 RaiseAllCommandStates();
             }
         }
     }
 
-    // 상단 전원 버튼은 시스템 종료 버튼으로 사용한다.
+    // 상단 전원 버튼은 프로그램 종료 버튼으로 사용한다.
     public string PowerButtonText => "전원 종료";
 
     public string CurrentMode
@@ -138,6 +135,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(IsManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
                 OnPropertyChanged(nameof(CanUseZoomControls));
+                OnPropertyChanged(nameof(ShowZoomMiniMap));
                 RaiseAllCommandStates();
             }
         }
@@ -145,11 +143,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string CurrentModeText => $"카메라 모드: {CurrentMode}";
 
-    public bool IsManualMode => CurrentMode == "수동";
+    public bool IsManualMode => IsSystemPoweredOn && CurrentMode == "수동";
 
-    public bool CanUseMotorControls => IsSystemPoweredOn && IsManualMode;
+    public bool CanUseMotorControls => IsManualMode;
 
-    public bool CanUseZoomControls => IsSystemPoweredOn && IsManualMode;
+    public bool CanUseZoomControls => IsManualMode;
 
     public string CurrentThreatLevel
     {
@@ -329,7 +327,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 확대 상태에서 마우스 드래그로 화면 위치를 옮긴다.
+    /// 확대 상태에서 마우스 드래그로 화면 위치를 이동한다.
     /// </summary>
     public void PanZoom(double deltaX, double deltaY)
     {
@@ -354,7 +352,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void TogglePower()
     {
-        // 위험 등급이 높음이면 운용 중인 프로그램을 종료할 수 없게 막는다.
+        // 위험 등급이 높음이면 운용 중인 프로그램을 종료하지 못하게 막는다.
         if (CurrentThreatLevel == "높음")
         {
             AppendImportantLog("위험 등급이 높음 상태여서 프로그램을 종료할 수 없습니다.");
@@ -392,18 +390,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        var previousThreat = CurrentThreatLevel;
         SelectedPrimaryTarget = target;
-        CurrentThreatLevel = MapThreatLevel(target);
-
         AnalysisItems.Insert(0, new AnalysisItem(DateTime.Now.ToString("HH:mm:ss"), $"주 탐지체가 {SelectedPrimaryTarget}으로 변경되었습니다."));
         TrimCollection(AnalysisItems, 10);
-
         AppendImportantLog($"주 탐지체가 {SelectedPrimaryTarget}으로 변경되었습니다.");
-        if (previousThreat != CurrentThreatLevel)
-        {
-            AppendImportantLog($"위험 등급이 {CurrentThreatLevel}으로 변경되었습니다.");
-        }
     }
 
     private void SwapFeeds()
@@ -470,6 +460,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     {
         RaiseCommand(SetModeCommand);
         RaiseCommand(SelectPrimaryTargetCommand);
+        RaiseCommand(ResetBrightnessCommand);
+        RaiseCommand(ResetContrastCommand);
         RaiseCommand(MoveMotorCommand);
     }
 
@@ -480,13 +472,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
             relayCommand.RaiseCanExecuteChanged();
         }
     }
-
-    private static string MapThreatLevel(string target) => target switch
-    {
-        "비군사 표적(오탐 유발 요소)" => "낮음",
-        "통신 장비" => "중간",
-        _ => "높음",
-    };
 
     private static void TrimCollection<T>(ObservableCollection<T> collection, int maxCount)
     {

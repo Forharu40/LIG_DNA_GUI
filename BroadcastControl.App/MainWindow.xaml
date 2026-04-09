@@ -17,6 +17,23 @@
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
 
+        <Style x:Key="TopBarSmallButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+            <Setter Property="Height" Value="24" />
+            <Setter Property="Padding" Value="8,2" />
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- 상단바 슬라이더는 Thumb와 트랙이 조금 더 작게 보이도록 축소한다. -->
+        <Style x:Key="TopBarCompactSlider" TargetType="Slider">
+            <Setter Property="Height" Value="16" />
+            <Setter Property="LayoutTransform">
+                <Setter.Value>
+                    <ScaleTransform ScaleX="0.82" ScaleY="0.82" />
+                </Setter.Value>
+            </Setter>
+        </Style>
+
         <Style x:Key="ArrowButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
             <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="44" />
@@ -67,8 +84,8 @@
                                   ItemsSource="{Binding PrimaryTargets}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
-                                <Button Margin="0,0,0,12"
-                                        Height="48"
+                                <Button Margin="0,0,0,10"
+                                        Height="40"
                                         Padding="12,8"
                                         Command="{Binding DataContext.SelectPrimaryTargetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}"
@@ -76,7 +93,7 @@
                                         BorderThickness="2"
                                         Background="White"
                                         Foreground="#FF111111"
-                                        FontSize="16"
+                                        FontSize="14"
                                         FontWeight="SemiBold"
                                         Content="{Binding}" />
                             </DataTemplate>
@@ -104,8 +121,8 @@
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="160" />
-                        <ColumnDefinition Width="160" />
+                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="120" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
@@ -141,27 +158,33 @@
                             Content="수동" />
 
                     <StackPanel Grid.Column="4"
-                                Margin="0,0,10,0"
+                                Margin="0,0,8,0"
                                 VerticalAlignment="Center">
-                        <TextBlock Foreground="White"
-                                   FontSize="11"
-                                   Text="{Binding BrightnessText}" />
-                        <Slider Height="18"
+                        <!-- 버튼을 누르면 밝기가 기본값 50%로 즉시 복귀한다. -->
+                        <Button HorizontalAlignment="Left"
+                                Command="{Binding ResetBrightnessCommand}"
+                                Style="{StaticResource TopBarSmallButton}"
+                                Content="{Binding BrightnessText}" />
+                        <Slider Margin="0,2,0,0"
                                 Minimum="0"
                                 Maximum="100"
+                                Style="{StaticResource TopBarCompactSlider}"
                                 Value="{Binding Brightness, UpdateSourceTrigger=PropertyChanged}"
                                 IsEnabled="{Binding IsSystemPoweredOn}" />
                     </StackPanel>
 
                     <StackPanel Grid.Column="5"
-                                Margin="0,0,10,0"
+                                Margin="0,0,8,0"
                                 VerticalAlignment="Center">
-                        <TextBlock Foreground="White"
-                                   FontSize="11"
-                                   Text="{Binding ContrastText}" />
-                        <Slider Height="18"
+                        <!-- 버튼을 누르면 대조비가 기본값 50%로 즉시 복귀한다. -->
+                        <Button HorizontalAlignment="Left"
+                                Command="{Binding ResetContrastCommand}"
+                                Style="{StaticResource TopBarSmallButton}"
+                                Content="{Binding ContrastText}" />
+                        <Slider Margin="0,2,0,0"
                                 Minimum="0"
                                 Maximum="100"
+                                Style="{StaticResource TopBarCompactSlider}"
                                 Value="{Binding Contrast, UpdateSourceTrigger=PropertyChanged}"
                                 IsEnabled="{Binding IsSystemPoweredOn}" />
                     </StackPanel>
@@ -236,7 +259,7 @@
 
                         <Border Width="140"
                                 Height="98"
-                                Margin="18,0,0,88"
+                                Margin="28,0,0,20"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Bottom"
                                 Background="#CC0F1620"
@@ -358,7 +381,7 @@
                         </Grid>
 
                         <!-- 자동 모드에서는 전자 줌을 숨기고, 수동 모드에서만 표시한다. -->
-                        <Border Margin="220,0,220,18"
+                        <Border Margin="182,0,220,18"
                                 Padding="16,12"
                                 HorizontalAlignment="Stretch"
                                 VerticalAlignment="Bottom"
