@@ -16,6 +16,10 @@ namespace BroadcastControl.App.ViewModels;
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged
 {
+    /// <summary>
+    /// 메인 화면의 상태를 한 곳에서 관리하는 ViewModel이다.
+    /// 모드, 위험 등급, 밝기/대조비, 전자 줌, 로그, 테마 버튼 상태까지 모두 이 클래스에 모여 있다.
+    /// </summary>
     // 전자 줌 미니맵은 이전보다 아주 조금만 키워서 현재 시야를 읽기 쉽게 만든다.
     private const double MiniMapWidth = 130;
     private const double MiniMapHeight = 74;
@@ -46,11 +50,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private int _motorPan;
     private int _motorTilt;
 
+    // EO는 외부 UDP 카메라 영상, IR은 임시로 노트북 카메라 영상을 받는다.
+    // 아직 프레임이 들어오지 않았을 때를 대비해 EO/IR 각각 기본 안내 이미지를 준비해 둔다.
     private ImageSource? _eoFrame;
-    private readonly ImageSource _irPlaceholderFrame = CreateIrPlaceholderFrame();
+    private ImageSource? _irFrame;
+    private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame("EO UDP", Color.FromRgb(51, 94, 160));
+    private readonly ImageSource _irPlaceholderFrame = CreateCameraPlaceholderFrame("IR TEMP", Color.FromRgb(192, 109, 40));
 
     public MainViewModel()
     {
+        // 앱이 이미 어떤 테마로 실행 중인지 확인해 설정창 버튼 상태를 맞춘다.
         if (Application.Current is App app)
         {
             _currentThemeMode = app.CurrentThemeMode;
@@ -80,6 +89,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             "비군사 표적",
         });
 
+        // 화면의 모든 버튼은 Command 바인딩으로 연결되므로, 생성자에서 한 번에 등록한다.
         TogglePowerCommand = new RelayCommand(_ => TogglePower());
         SetModeCommand = new RelayCommand(SetMode, _ => IsSystemPoweredOn);
         ToggleSettingsCommand = new RelayCommand(_ => IsSettingsOpen = !IsSettingsOpen);
@@ -277,13 +287,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string IrTitle => "IR cam";
 
-    public string EoSubtitle => "노트북 카메라 입력";
+    public string EoSubtitle => "외부 UDP 카메라 입력";
 
-    public string IrSubtitle => "IR 입력 연결 예정";
+    public string IrSubtitle => "노트북 카메라 임시 입력";
 
-    public ImageSource? LargeFeedImage => _isEoPrimary ? _eoFrame : _irPlaceholderFrame;
+    public ImageSource? LargeFeedImage => _isEoPrimary
+        ? _eoFrame ?? _eoPlaceholderFrame
+        : _irFrame ?? _irPlaceholderFrame;
 
-    public ImageSource? InsetFeedImage => _isEoPrimary ? _irPlaceholderFrame : _eoFrame;
+    public ImageSource? InsetFeedImage => _isEoPrimary
+        ? _irFrame ?? _irPlaceholderFrame
+        : _eoFrame ?? _eoPlaceholderFrame;
 
     public string LargeFeedTitle => _isEoPrimary ? EoTitle : IrTitle;
 
@@ -298,6 +312,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _brightness;
         set
         {
+            // 슬라이더 값이 바뀌면 화면에 표시되는 텍스트도 바로 함께 갱신한다.
             if (SetProperty(ref _brightness, value))
             {
                 OnPropertyChanged(nameof(BrightnessText));
@@ -312,6 +327,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _contrast;
         set
         {
+            // 대조비 역시 숫자 표시와 실제 영상 보정이 같은 값을 바라보게 유지한다.
             if (SetProperty(ref _contrast, value))
             {
                 OnPropertyChanged(nameof(ContrastText));
@@ -326,9 +342,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _zoomLevel;
         set
         {
+            // 전자 줌은 과도하게 확대되지 않도록 1.0~4.0 범위로 제한한다.
             var clamped = Math.Clamp(value, 1.0, 4.0);
             if (SetProperty(ref _zoomLevel, clamped))
             {
+                // 기본 배율로 돌아오면 화면 이동값도 의미가 없어지므로 중심으로 복귀시킨다.
                 if (_zoomLevel <= 1.0)
                 {
                     _zoomPanX = 0;
@@ -406,6 +424,17 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
+    /// 임시 IR 화면으로 쓰는 노트북 카메라 프레임을 반영한다.
+    /// EO/IR 스왑 상태에 따라 작은 화면 또는 큰 화면에 즉시 반영된다.
+    /// </summary>
+    public void UpdateIrFrame(ImageSource? frame)
+    {
+        _irFrame = frame;
+        OnPropertyChanged(nameof(LargeFeedImage));
+        OnPropertyChanged(nameof(InsetFeedImage));
+    }
+
+    /// <summary>
     /// 카메라 뷰포트 크기를 받아 확대 이동 한계를 다시 계산한다.
     /// </summary>
     public void UpdateViewportSize(double width, double height)
@@ -450,6 +479,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public void AppendImportantLog(string message)
     {
+        // 가장 최근 로그가 위에 오도록 맨 앞에 넣는다.
         SystemLogs.Insert(0, new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), message));
         TrimCollection(SystemLogs, 8);
     }
@@ -484,6 +514,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// 상단 전원 종료 버튼의 실제 동작이다.
+    /// 위험 등급이 높음인 상태에서는 실수로 프로그램을 닫지 못하게 막는다.
+    /// </summary>
     private void TogglePower()
     {
         // 위험 등급이 높음이면 운용 중인 프로그램을 종료하지 못하게 막는다.
@@ -496,6 +530,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         Application.Current?.Shutdown();
     }
 
+    /// <summary>
+    /// 자동/수동 모드를 전환한다.
+    /// 자동 모드로 돌아가면 수동 녹화, 모터 값, 줌 배율 같은 수동 전용 상태를 초기화한다.
+    /// </summary>
     private void SetMode(object? parameter)
     {
         if (!IsSystemPoweredOn || parameter is not string mode)
@@ -528,6 +566,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         AppendImportantLog($"카메라 제어 모드가 {CurrentMode}으로 전환되었습니다.");
     }
 
+    /// <summary>
+    /// 수동 녹화 버튼을 눌렀을 때 상태를 반전시킨다.
+    /// 실제 파일 저장 시작/종료는 MainWindow가 서비스와 연결해서 처리한다.
+    /// </summary>
     private void ToggleManualRecording()
     {
         if (!IsManualMode)
@@ -558,6 +600,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         AppendImportantLog($"테마가 {(nextTheme == AppThemeMode.Dark ? "어두운 테마" : "밝은 테마")}로 변경되었습니다.");
     }
 
+    /// <summary>
+    /// 설정창에서 주 탐지체를 선택했을 때 현재 선택 상태를 갱신한다.
+    /// 위험 등급은 여기서 바꾸지 않고, 이후 VLM 분석 결과가 들어올 때만 바뀌게 둔다.
+    /// </summary>
     private void SelectPrimaryTarget(object? parameter)
     {
         if (!IsSystemPoweredOn || parameter is not string target)
@@ -569,6 +615,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         AppendImportantLog($"주 탐지체가 {SelectedPrimaryTarget}으로 변경되었습니다.");
     }
 
+    /// <summary>
+    /// EO/IR 메인 화면과 작은 인셋 화면을 서로 교체한다.
+    /// 사용자는 작은 화면을 눌러 원하는 영상을 크게 볼 수 있다.
+    /// </summary>
     private void SwapFeeds()
     {
         _isEoPrimary = !_isEoPrimary;
@@ -582,6 +632,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         AppendImportantLog($"{LargeFeedTitle}이(가) 메인 화면으로 전환되었습니다.");
     }
 
+    /// <summary>
+    /// 수동 모드에서 모터 방향 버튼을 누를 때 좌우/상하 각도를 조금씩 변경한다.
+    /// 현재는 UI 시뮬레이션 값이지만, 이후 실제 모터 제어 명령으로 연결할 수 있다.
+    /// </summary>
     private void MoveMotor(object? parameter)
     {
         if (!CanUseMotorControls || parameter is not string direction)
@@ -609,6 +663,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(MotorTiltText));
     }
 
+    /// <summary>
+    /// 현재 줌 이동 값이 허용 범위를 넘지 않도록 보정한다.
+    /// 화면 크기나 줌 배율이 바뀐 뒤에는 항상 이 정리가 필요하다.
+    /// </summary>
     private void ClampZoomPan()
     {
         _zoomPanX = Math.Clamp(_zoomPanX, -GetMaxPanX(), GetMaxPanX());
@@ -621,6 +679,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private double GetMaxPanY() => (_viewportHeight * (ZoomLevel - 1)) / 2;
 
+    /// <summary>
+    /// 전자 줌 미니맵 사각형의 크기와 위치를 다시 계산하도록 UI에 알린다.
+    /// </summary>
     private void UpdateMiniMapViewport()
     {
         OnPropertyChanged(nameof(MiniMapViewportWidth));
@@ -629,6 +690,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(MiniMapViewportTop));
     }
 
+    /// <summary>
+    /// 모드, 전원, 줌 가능 여부 등이 바뀌면 버튼 활성 상태도 다시 계산해야 한다.
+    /// 그래서 관련 명령 객체 모두에게 CanExecuteChanged를 한 번에 전달한다.
+    /// </summary>
     private void RaiseAllCommandStates()
     {
         RaiseCommand(SetModeCommand);
@@ -656,6 +721,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    /// <summary>
+    /// 여러 곳에서 반복 사용할 고정 브러시를 생성한다.
+    /// Freeze해서 성능과 메모리 사용을 조금 더 안정적으로 만든다.
+    /// </summary>
     private static SolidColorBrush CreateBrush(byte r, byte g, byte b)
     {
         var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
@@ -663,9 +732,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
         return brush;
     }
 
-    private static ImageSource CreateIrPlaceholderFrame()
+    /// <summary>
+    /// 실제 IR 장치가 아직 연결되지 않았을 때 대신 보여 줄 플레이스홀더 이미지를 생성한다.
+    /// 덕분에 UI 테스트 단계에서도 IR 인셋이 비어 보이지 않는다.
+    /// </summary>
+    private static ImageSource CreateCameraPlaceholderFrame(string label, Color accentColor)
     {
-        // 실제 IR 카메라 입력 전에도 화면이 비어 보이지 않도록 임시 열화상 프레임을 만든다.
+        // 실제 입력이 아직 들어오지 않는 동안에도 어느 카메라가 어느 자리에 올 예정인지
+        // 운용자가 한눈에 알 수 있도록 간단한 안내용 플레이스홀더 프레임을 만든다.
         var group = new DrawingGroup();
         using (var dc = group.Open())
         {
@@ -676,7 +750,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
                 new Point(1, 1));
 
             dc.DrawRectangle(background, null, new Rect(0, 0, 320, 240));
-            dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(160, 255, 134, 52)), null, new Point(220, 92), 46, 32);
+            dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(180, accentColor.R, accentColor.G, accentColor.B)), null, new Point(220, 92), 46, 32);
             dc.DrawEllipse(new SolidColorBrush(Color.FromArgb(120, 255, 208, 90)), null, new Point(112, 152), 64, 22);
 
             var gridPen = new Pen(new SolidColorBrush(Color.FromArgb(36, 255, 255, 255)), 1);
@@ -689,6 +763,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
             {
                 dc.DrawLine(gridPen, new Point(0, y), new Point(320, y));
             }
+
+            var textBrush = new SolidColorBrush(Color.FromRgb(240, 243, 248));
+            textBrush.Freeze();
+            var typeface = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+            var formattedText = new FormattedText(
+                label,
+                System.Globalization.CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                30,
+                textBrush,
+                1.0);
+            dc.DrawText(formattedText, new Point(22, 20));
         }
 
         var image = new DrawingImage(group);
@@ -696,6 +783,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         return image;
     }
 
+    /// <summary>
+    /// ViewModel 공통 속성 변경 도우미이다.
+    /// 값이 정말 바뀐 경우에만 PropertyChanged를 발생시켜 불필요한 화면 갱신을 줄인다.
+    /// </summary>
     private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
     {
         if (EqualityComparer<T>.Default.Equals(storage, value))

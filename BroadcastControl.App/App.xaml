@@ -5,27 +5,43 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
+                <!-- Material Design 기본 테마 리소스를 먼저 불러온다. -->
                 <materialDesign:BundledTheme BaseTheme="Dark"
                                              PrimaryColor="Teal"
                                              SecondaryColor="Amber" />
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF0D1117" />
-            <SolidColorBrush x:Key="PanelBrush" Color="#FF141A23" />
-            <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF2E3642" />
-            <SolidColorBrush x:Key="AccentBrush" Color="#FF18C6B0" />
+            <!-- 아래 브러시들은 앱 전체가 공통으로 사용하는 색상 자원이다.
+                 App.xaml.cs 에서 테마 전환 시 이 리소스들을 한 번에 교체한다. -->
+            <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF161B24" />
+            <SolidColorBrush x:Key="PanelBrush" Color="#FF242A35" />
+            <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF464E5D" />
+            <SolidColorBrush x:Key="AccentBrush" Color="#FFE09A36" />
             <SolidColorBrush x:Key="DangerBrush" Color="#FFFF6B6B" />
-            <SolidColorBrush x:Key="WarningBrush" Color="#FFFFC145" />
-            <SolidColorBrush x:Key="SuccessBrush" Color="#FF7BD88F" />
-            <SolidColorBrush x:Key="PrimaryTextBrush" Color="#FFFFFFFF" />
-            <SolidColorBrush x:Key="SecondaryTextBrush" Color="#FFD6E4EF" />
-            <SolidColorBrush x:Key="OverlayPanelBrush" Color="#CC101722" />
-            <SolidColorBrush x:Key="DrawerBrush" Color="#FF141A23" />
-            <SolidColorBrush x:Key="DrawerBorderBrush" Color="#FF2E3642" />
-            <SolidColorBrush x:Key="DrawerTextBrush" Color="#FFFFFFFF" />
-            <SolidColorBrush x:Key="DrawerItemBrush" Color="#FF101722" />
-            <SolidColorBrush x:Key="DrawerItemBorderBrush" Color="#FF2E3642" />
+            <SolidColorBrush x:Key="WarningBrush" Color="#FFE5B057" />
+            <SolidColorBrush x:Key="SuccessBrush" Color="#FF64C59A" />
+            <SolidColorBrush x:Key="PrimaryTextBrush" Color="#FFF0F3F8" />
+            <SolidColorBrush x:Key="SecondaryTextBrush" Color="#FFC7CDD8" />
+            <SolidColorBrush x:Key="SurfaceAltBrush" Color="#FF0C1018" />
+            <SolidColorBrush x:Key="OverlayPanelBrush" Color="#DD111722" />
+            <SolidColorBrush x:Key="DrawerBrush" Color="#FF202631" />
+            <SolidColorBrush x:Key="DrawerBorderBrush" Color="#FF465061" />
+            <SolidColorBrush x:Key="DrawerTextBrush" Color="#FFF0F3F8" />
+            <SolidColorBrush x:Key="DrawerItemBrush" Color="#FF2C3442" />
+            <SolidColorBrush x:Key="DrawerItemBorderBrush" Color="#FF4A5567" />
+            <SolidColorBrush x:Key="TopBarButtonBrush" Color="#FF2E3643" />
+            <SolidColorBrush x:Key="TopBarButtonHoverBrush" Color="#FF394353" />
+            <SolidColorBrush x:Key="TopBarButtonPressedBrush" Color="#FF465164" />
+
+            <!-- 화면 가장 뒤에 깔리는 배경 그라데이션이다.
+                 라이트/다크 테마 전환 시 이 브러시도 같이 바뀌어야 전체 분위기가 자연스럽다. -->
+            <LinearGradientBrush x:Key="WindowBackdropBrush" StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Offset="0" Color="#FF1C2230" />
+                <GradientStop Offset="0.08" Color="#FF1A2742" />
+                <GradientStop Offset="0.16" Color="#FF141A25" />
+                <GradientStop Offset="1" Color="#FF161B24" />
+            </LinearGradientBrush>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
