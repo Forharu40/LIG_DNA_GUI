@@ -6,7 +6,7 @@
         WindowState="Maximized"
         WindowStyle="None"
         ResizeMode="NoResize"
-        Background="#FF0D1117">
+        Background="{DynamicResource WindowBackgroundBrush}">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
@@ -24,12 +24,11 @@
             <Setter Property="FontWeight" Value="SemiBold" />
         </Style>
 
-        <!-- 상단바 슬라이더는 Thumb와 트랙이 조금 더 작게 보이도록 축소한다. -->
         <Style x:Key="TopBarCompactSlider" TargetType="Slider">
-            <Setter Property="Height" Value="16" />
+            <Setter Property="Height" Value="14" />
             <Setter Property="LayoutTransform">
                 <Setter.Value>
-                    <ScaleTransform ScaleX="0.82" ScaleY="0.82" />
+                    <ScaleTransform ScaleX="0.72" ScaleY="0.72" />
                 </Setter.Value>
             </Setter>
         </Style>
@@ -39,66 +38,112 @@
             <Setter Property="Height" Value="44" />
             <Setter Property="Opacity" Value="0.55" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="#CC101722" />
+            <Setter Property="Background" Value="{DynamicResource OverlayPanelBrush}" />
             <Setter Property="BorderBrush" Value="#FF94A4B8" />
         </Style>
 
         <Style x:Key="PanelTitle" TargetType="TextBlock">
-            <Setter Property="Foreground" Value="White" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Setter Property="FontSize" Value="20" />
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
+
+        <Style x:Key="SettingsActionButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+            <Setter Property="Height" Value="40" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Background" Value="{DynamicResource DrawerItemBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DrawerItemBorderBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource DrawerTextBrush}" />
+        </Style>
+
+        <Style x:Key="ZoomSliderStyle" TargetType="Slider">
+            <Setter Property="Height" Value="14" />
+            <Setter Property="RenderTransformOrigin" Value="0.5,0.5" />
+            <Setter Property="RenderTransform">
+                <Setter.Value>
+                    <ScaleTransform ScaleX="0.72" ScaleY="0.72" />
+                </Setter.Value>
+            </Setter>
+        </Style>
     </Window.Resources>
 
-    <!-- 설정창은 우측에서 열리는 슬라이드 패널 형태로 유지한다. -->
     <materialDesign:DrawerHost IsRightDrawerOpen="{Binding IsSettingsOpen}">
         <materialDesign:DrawerHost.RightDrawerContent>
             <Border Width="280"
-                    Background="White"
+                    Background="{DynamicResource DrawerBrush}"
+                    BorderBrush="{DynamicResource DrawerBorderBrush}"
+                    BorderThickness="1,0,0,0"
                     Padding="22">
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <TextBlock Text="설정창"
                                FontSize="24"
                                FontWeight="Bold"
-                               Foreground="#FF111111" />
+                               Foreground="{DynamicResource DrawerTextBrush}" />
 
                     <Border Grid.Row="1"
                             Margin="0,18,0,14"
-                            BorderBrush="#FF111111"
+                            BorderBrush="{DynamicResource DrawerBorderBrush}"
                             BorderThickness="0,0,0,3">
                         <TextBlock Margin="0,0,0,10"
                                    Text="주 탐지체 변경"
                                    FontSize="18"
                                    FontWeight="SemiBold"
-                                   Foreground="#FF111111" />
+                                   Foreground="{DynamicResource DrawerTextBrush}" />
                     </Border>
 
-                    <!-- 주 탐지체는 자동/수동 모두에서 바꿀 수 있도록 유지한다. -->
                     <ItemsControl Grid.Row="2"
                                   ItemsSource="{Binding PrimaryTargets}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate>
                                 <Button Margin="0,0,0,10"
-                                        Height="40"
-                                        Padding="12,8"
                                         Command="{Binding DataContext.SelectPrimaryTargetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
                                         CommandParameter="{Binding}"
-                                        BorderBrush="#FF111111"
-                                        BorderThickness="2"
-                                        Background="White"
-                                        Foreground="#FF111111"
-                                        FontSize="14"
-                                        FontWeight="SemiBold"
+                                        Style="{StaticResource SettingsActionButton}"
                                         Content="{Binding}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
+
+                    <Border Grid.Row="3"
+                            Margin="0,8,0,12"
+                            BorderBrush="{DynamicResource DrawerBorderBrush}"
+                            BorderThickness="0,1,0,0">
+                        <TextBlock Margin="0,12,0,0"
+                                   Text="테마 변경"
+                                   FontSize="18"
+                                   FontWeight="SemiBold"
+                                   Foreground="{DynamicResource DrawerTextBrush}" />
+                    </Border>
+
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                                Margin="0,0,8,0"
+                                Command="{Binding SetThemeCommand}"
+                                CommandParameter="Dark"
+                                Opacity="{Binding DarkThemeButtonOpacity}"
+                                Style="{StaticResource SettingsActionButton}"
+                                Content="어두운 테마" />
+                        <Button Grid.Column="1"
+                                Command="{Binding SetThemeCommand}"
+                                CommandParameter="Light"
+                                Opacity="{Binding LightThemeButtonOpacity}"
+                                Style="{StaticResource SettingsActionButton}"
+                                Content="밝은 테마" />
+                    </Grid>
                 </Grid>
             </Border>
         </materialDesign:DrawerHost.RightDrawerContent>
@@ -109,20 +154,20 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <!-- 상단바: 밝기/대조비는 작게 줄여 오른쪽 설정 버튼 근처로 이동시킨다. -->
             <Border Grid.Row="0"
-                    Background="{StaticResource PanelBrush}"
-                    BorderBrush="{StaticResource PanelBorderBrush}"
+                    Background="{DynamicResource PanelBrush}"
+                    BorderBrush="{DynamicResource PanelBorderBrush}"
                     BorderThickness="1"
                     CornerRadius="14">
-                <Grid Margin="14,10">
+                <Grid Margin="14,10,42,10">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="120" />
-                        <ColumnDefinition Width="120" />
+                        <ColumnDefinition Width="152" />
+                        <ColumnDefinition Width="152" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="96" />
                         <ColumnDefinition Width="Auto" />
                     </Grid.ColumnDefinitions>
 
@@ -139,28 +184,27 @@
                         </StackPanel>
                     </Button>
 
-                    <Button Grid.Column="1"
-                            Margin="12,0,0,0"
-                            Width="92"
-                            Command="{Binding SetModeCommand}"
-                            CommandParameter="자동"
-                            IsEnabled="{Binding IsSystemPoweredOn}"
-                            Style="{StaticResource TopBarButton}"
-                            Content="자동" />
+                    <StackPanel Grid.Column="1"
+                                Margin="16,0,0,0"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Center"
+                                Orientation="Horizontal"
+                                Opacity="{Binding RecordingIndicatorOpacity}">
+                        <Ellipse Width="12"
+                                 Height="12"
+                                 Margin="0,0,8,0"
+                                 VerticalAlignment="Center"
+                                 Fill="{Binding RecordingIndicatorBrush}" />
+                        <TextBlock VerticalAlignment="Center"
+                                   Foreground="{Binding RecordingTextBrush}"
+                                   FontSize="13"
+                                   FontWeight="SemiBold"
+                                   Text="영상 녹화 중" />
+                    </StackPanel>
 
-                    <Button Grid.Column="2"
-                            Margin="8,0,0,0"
-                            Width="92"
-                            Command="{Binding SetModeCommand}"
-                            CommandParameter="수동"
-                            IsEnabled="{Binding IsSystemPoweredOn}"
-                            Style="{StaticResource TopBarButton}"
-                            Content="수동" />
-
-                    <StackPanel Grid.Column="4"
-                                Margin="0,0,8,0"
+                    <StackPanel Grid.Column="2"
+                                Margin="0,0,12,0"
                                 VerticalAlignment="Center">
-                        <!-- 버튼을 누르면 밝기가 기본값 50%로 즉시 복귀한다. -->
                         <Button HorizontalAlignment="Left"
                                 Command="{Binding ResetBrightnessCommand}"
                                 Style="{StaticResource TopBarSmallButton}"
@@ -173,10 +217,9 @@
                                 IsEnabled="{Binding IsSystemPoweredOn}" />
                     </StackPanel>
 
-                    <StackPanel Grid.Column="5"
-                                Margin="0,0,8,0"
+                    <StackPanel Grid.Column="3"
+                                Margin="0,0,14,0"
                                 VerticalAlignment="Center">
-                        <!-- 버튼을 누르면 대조비가 기본값 50%로 즉시 복귀한다. -->
                         <Button HorizontalAlignment="Left"
                                 Command="{Binding ResetContrastCommand}"
                                 Style="{StaticResource TopBarSmallButton}"
@@ -189,7 +232,39 @@
                                 IsEnabled="{Binding IsSystemPoweredOn}" />
                     </StackPanel>
 
+                    <Button Grid.Column="4"
+                            Margin="0,0,8,0"
+                            Width="92"
+                            Command="{Binding SetModeCommand}"
+                            CommandParameter="자동"
+                            IsHitTestVisible="{Binding CanSelectAutoMode}"
+                            Opacity="{Binding AutoModeOpacity}"
+                            Style="{StaticResource TopBarButton}"
+                            Content="자동" />
+
+                    <Button Grid.Column="5"
+                            Margin="0,0,8,0"
+                            Width="92"
+                            Command="{Binding SetModeCommand}"
+                            CommandParameter="수동"
+                            IsHitTestVisible="{Binding CanSelectManualMode}"
+                            Opacity="{Binding ManualModeOpacity}"
+                            Style="{StaticResource TopBarButton}"
+                            Content="수동" />
+
                     <Button Grid.Column="6"
+                            Width="84"
+                            Margin="0,0,12,0"
+                            Padding="10,4"
+                            FontSize="11"
+                            FontWeight="SemiBold"
+                            Style="{StaticResource TopBarSmallButton}"
+                            Opacity="{Binding ManualRecordingButtonOpacity}"
+                            IsEnabled="{Binding IsManualMode}"
+                            Command="{Binding ToggleManualRecordingCommand}"
+                            Content="{Binding ManualRecordingButtonText}" />
+
+                    <Button Grid.Column="7"
                             Width="54"
                             Command="{Binding ToggleSettingsCommand}"
                             Style="{StaticResource TopBarButton}">
@@ -207,23 +282,24 @@
                     <ColumnDefinition Width="1.02*" />
                 </Grid.ColumnDefinitions>
 
-                <!-- 카메라 화면 -->
                 <Border Grid.Column="0"
                         Margin="0,0,12,0"
-                        Background="{StaticResource PanelBrush}"
-                        BorderBrush="{StaticResource PanelBorderBrush}"
-                        BorderThickness="1"
+                        Background="{DynamicResource PanelBrush}"
+                        BorderBrush="Transparent"
+                        BorderThickness="0"
                         CornerRadius="18">
                     <Grid x:Name="CameraViewport"
                           ClipToBounds="True"
                           SizeChanged="CameraViewport_OnSizeChanged"
                           MouseLeftButtonDown="CameraViewport_OnMouseLeftButtonDown"
+                          MouseWheel="CameraViewport_OnMouseWheel"
                           MouseMove="CameraViewport_OnMouseMove"
                           MouseLeftButtonUp="CameraViewport_OnMouseLeftButtonUp">
                         <Rectangle Fill="#FF111821" />
 
                         <Image Source="{Binding LargeFeedImage}"
-                               Stretch="Uniform"
+                               Margin="0"
+                               Stretch="UniformToFill"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                RenderTransformOrigin="0.5,0.5">
@@ -237,47 +313,39 @@
                             </Image.RenderTransform>
                         </Image>
 
-                        <Rectangle Margin="14"
-                                   Fill="#10161F2A"
-                                   Stroke="#FF334050"
-                                   StrokeThickness="1.5"
-                                   RadiusX="14"
-                                   RadiusY="14" />
-
-                        <!-- EO 카메라 라벨과 미니맵 위치를 서로 바꾼다. -->
-                        <Border Margin="18"
+                        <Border Margin="16,12,0,0"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Top"
-                                Background="#CC101722"
-                                CornerRadius="10"
-                                Padding="10,6">
-                            <TextBlock Foreground="White"
-                                       FontSize="24"
+                                Background="{DynamicResource OverlayPanelBrush}"
+                                CornerRadius="8"
+                                Padding="8,4">
+                            <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                       FontSize="17"
                                        FontWeight="Bold"
                                        Text="{Binding LargeFeedTitle}" />
                         </Border>
 
-                        <Border Width="140"
-                                Height="98"
-                                Margin="28,0,0,20"
+                        <Border Width="152"
+                                Height="108"
+                                Margin="18,0,0,20"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Bottom"
-                                Background="#CC0F1620"
-                                BorderBrush="#FF334050"
+                                Background="{DynamicResource OverlayPanelBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
                                 BorderThickness="1"
                                 CornerRadius="10"
                                 Visibility="{Binding ShowZoomMiniMap, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Grid Margin="10">
-                                <TextBlock Foreground="#FFE7EDF4"
+                                <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
                                            FontSize="11"
                                            Text="Zoom 미니맵" />
-                                <Canvas Width="120"
-                                        Height="68"
+                                <Canvas Width="130"
+                                        Height="74"
                                         Margin="0,18,0,0"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Top">
-                                    <Rectangle Width="120"
-                                               Height="68"
+                                    <Rectangle Width="130"
+                                               Height="74"
                                                Fill="#55333F4D"
                                                Stroke="#FF64748B"
                                                StrokeThickness="1" />
@@ -286,49 +354,45 @@
                                                Canvas.Left="{Binding MiniMapViewportLeft}"
                                                Canvas.Top="{Binding MiniMapViewportTop}"
                                                Fill="#3300FFAA"
-                                               Stroke="#FF18C6B0"
+                                               Stroke="{DynamicResource AccentBrush}"
                                                StrokeThickness="1.5" />
                                 </Canvas>
                             </Grid>
                         </Border>
 
-                        <!-- 이후 객체 선택 및 위험 등급별 박스를 얹을 오버레이 -->
                         <Canvas IsHitTestVisible="False" />
 
-                        <Button Width="176"
-                                Height="224"
-                                Margin="0,18,18,0"
+                        <Button Width="168"
+                                Height="126"
+                                Margin="0,8,26,0"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Top"
                                 Command="{Binding SwapFeedsCommand}"
                                 Background="Transparent"
                                 BorderThickness="0"
                                 Padding="0">
-                            <Border Background="#FF151920"
-                                    BorderBrush="#FF334050"
-                                    BorderThickness="2"
+                            <Border Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="0"
                                     CornerRadius="12">
                                 <Grid ClipToBounds="True">
                                     <Image Source="{Binding InsetFeedImage}"
-                                           Stretch="Uniform" />
-                                    <Rectangle Margin="10"
-                                               Fill="#161E2834"
-                                               Stroke="#FF3D4958"
-                                               StrokeThickness="1"
-                                               RadiusX="10"
-                                               RadiusY="10" />
-                                    <TextBlock Margin="14,0,0,14"
-                                               HorizontalAlignment="Left"
-                                               VerticalAlignment="Bottom"
-                                               Foreground="White"
-                                               FontSize="16"
-                                               FontWeight="Bold"
-                                               Text="{Binding InsetFeedTitle}" />
+                                           Stretch="UniformToFill" />
+                                    <Border Margin="10,10,0,0"
+                                            HorizontalAlignment="Left"
+                                            VerticalAlignment="Top"
+                                            Background="{DynamicResource OverlayPanelBrush}"
+                                            CornerRadius="7"
+                                            Padding="7,3">
+                                        <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   FontSize="13"
+                                                   FontWeight="Bold"
+                                                   Text="{Binding InsetFeedTitle}" />
+                                    </Border>
                                 </Grid>
                             </Border>
                         </Button>
 
-                        <!-- 수동 모드일 때만 모터 화살표를 보여주고, 위치는 더 아래로 내린다. -->
                         <Grid Margin="0,0,24,26"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom"
@@ -380,12 +444,13 @@
                             </Button>
                         </Grid>
 
-                        <!-- 자동 모드에서는 전자 줌을 숨기고, 수동 모드에서만 표시한다. -->
+                        <!-- 전자 줌 패널은 슬라이더보다 배경이 과하게 길어 보이지 않도록 고정 폭으로 묶는다. -->
                         <Border Margin="182,0,220,18"
-                                Padding="16,12"
-                                HorizontalAlignment="Stretch"
+                                Padding="10,7"
+                                Width="340"
+                                HorizontalAlignment="Center"
                                 VerticalAlignment="Bottom"
-                                Background="#CC101722"
+                                Background="{DynamicResource OverlayPanelBrush}"
                                 CornerRadius="14"
                                 Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Grid>
@@ -394,23 +459,24 @@
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
-                                <TextBlock VerticalAlignment="Center"
-                                           Foreground="White"
-                                           FontSize="16"
-                                           FontWeight="SemiBold"
-                                           Text="전자 ZOOM" />
+                                <!-- 전자 줌 라벨도 작은 버튼으로 만들어 누르면 x1.0 기본 배율로 즉시 복귀한다. -->
+                                <Button VerticalAlignment="Center"
+                                        Command="{Binding ResetZoomCommand}"
+                                        Style="{StaticResource TopBarSmallButton}"
+                                        Content="전자 ZOOM" />
                                 <Slider Grid.Column="1"
-                                        Margin="16,0"
+                                        Margin="12,0"
                                         Minimum="1"
                                         Maximum="4"
                                         TickFrequency="0.1"
                                         IsSnapToTickEnabled="False"
                                         Value="{Binding ZoomLevel, UpdateSourceTrigger=PropertyChanged}"
-                                        IsEnabled="{Binding CanUseZoomControls}" />
+                                        IsEnabled="{Binding CanUseZoomControls}"
+                                        Style="{StaticResource ZoomSliderStyle}" />
                                 <TextBlock Grid.Column="2"
                                            VerticalAlignment="Center"
-                                           Foreground="#FFD6E4EF"
-                                           FontSize="15"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           FontSize="13"
                                            Text="{Binding ZoomLevelText}" />
                             </Grid>
                         </Border>
@@ -419,56 +485,42 @@
 
                 <Grid Grid.Column="1">
                     <Grid.RowDefinitions>
-                        <RowDefinition Height="0.88*" />
-                        <RowDefinition Height="1.28*" />
-                        <RowDefinition Height="1.42*" />
+                        <RowDefinition Height="0.68*" />
+                        <RowDefinition Height="1.44*" />
+                        <RowDefinition Height="1.56*" />
                     </Grid.RowDefinitions>
 
                     <Border Grid.Row="0"
-                            Background="{StaticResource PanelBrush}"
-                            BorderBrush="{StaticResource PanelBorderBrush}"
+                            Background="{DynamicResource PanelBrush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="18"
                             Padding="18">
                         <StackPanel>
                             <TextBlock Style="{StaticResource PanelTitle}" Text="시스템 현황" />
-                            <Border Margin="0,16,0,12"
-                                    Padding="12,8"
-                                    Background="{Binding CurrentThreatBrush}"
-                                    CornerRadius="10">
-                                <TextBlock Foreground="#FF0D1117"
+                            <StackPanel Margin="0,16,0,0"
+                                        Orientation="Horizontal">
+                                <Ellipse Width="14"
+                                         Height="14"
+                                         Margin="0,4,10,0"
+                                         VerticalAlignment="Top"
+                                         Fill="{Binding CurrentThreatBrush}" />
+                                <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                            FontSize="18"
                                            FontWeight="Bold"
                                            Text="{Binding CurrentThreatText}" />
-                            </Border>
-                            <TextBlock Foreground="White"
+                            </StackPanel>
+                            <TextBlock Margin="0,14,0,0"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
                                        FontSize="17"
-                                       Text="{Binding CurrentModeText}" />
-                            <TextBlock Margin="0,10,0,0"
-                                       Foreground="#FFD6E4EF"
-                                       FontSize="15"
                                        Text="{Binding PrimaryTargetText}" />
-                            <TextBlock Margin="0,8,0,0"
-                                       Foreground="#FFD6E4EF"
-                                       FontSize="15"
-                                       Text="{Binding ZoomLevelText}" />
-                            <TextBlock Margin="0,8,0,0"
-                                       Foreground="#FFD6E4EF"
-                                       FontSize="15"
-                                       Text="{Binding MotorPanText}"
-                                       Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVisibilityConverter}}" />
-                            <TextBlock Margin="0,8,0,0"
-                                       Foreground="#FFD6E4EF"
-                                       FontSize="15"
-                                       Text="{Binding MotorTiltText}"
-                                       Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVisibilityConverter}}" />
                         </StackPanel>
                     </Border>
 
                     <Border Grid.Row="1"
                             Margin="0,12,0,12"
-                            Background="{StaticResource PanelBrush}"
-                            BorderBrush="{StaticResource PanelBorderBrush}"
+                            Background="{DynamicResource PanelBrush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="18"
                             Padding="18">
@@ -487,16 +539,16 @@
                                     <DataTemplate>
                                         <Border Margin="0,0,0,10"
                                                 Padding="12"
-                                                Background="#FF101722"
-                                                BorderBrush="#FF27303C"
+                                                Background="{DynamicResource DrawerItemBrush}"
+                                                BorderBrush="{DynamicResource PanelBorderBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="12">
                                             <StackPanel>
-                                                <TextBlock Foreground="{StaticResource WarningBrush}"
+                                                <TextBlock Foreground="{DynamicResource WarningBrush}"
                                                            FontSize="12"
                                                            Text="{Binding Time}" />
                                                 <TextBlock Margin="0,6,0,0"
-                                                           Foreground="White"
+                                                           Foreground="{DynamicResource PrimaryTextBrush}"
                                                            FontSize="15"
                                                            TextWrapping="Wrap"
                                                            Text="{Binding Message}" />
@@ -509,8 +561,8 @@
                     </Border>
 
                     <Border Grid.Row="2"
-                            Background="{StaticResource PanelBrush}"
-                            BorderBrush="{StaticResource PanelBorderBrush}"
+                            Background="{DynamicResource PanelBrush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}"
                             BorderThickness="1"
                             CornerRadius="18"
                             Padding="18">
@@ -519,7 +571,20 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <TextBlock Style="{StaticResource PanelTitle}" Text="시스템 로그" />
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Style="{StaticResource PanelTitle}" Text="시스템 로그" />
+                                <Button Grid.Column="1"
+                                        Padding="10,4"
+                                        FontSize="11"
+                                        FontWeight="SemiBold"
+                                        Style="{StaticResource TopBarSmallButton}"
+                                        Command="{Binding SaveSystemLogsCommand}"
+                                        Content="저장" />
+                            </Grid>
                             <ListBox Grid.Row="1"
                                      Margin="0,14,0,0"
                                      ItemsSource="{Binding SystemLogs}"
@@ -529,16 +594,16 @@
                                     <DataTemplate>
                                         <Border Margin="0,0,0,10"
                                                 Padding="12"
-                                                Background="#FF101722"
-                                                BorderBrush="#FF27303C"
+                                                Background="{DynamicResource DrawerItemBrush}"
+                                                BorderBrush="{DynamicResource PanelBorderBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="12">
                                             <StackPanel>
-                                                <TextBlock Foreground="{StaticResource WarningBrush}"
+                                                <TextBlock Foreground="{DynamicResource WarningBrush}"
                                                            FontSize="12"
                                                            Text="{Binding Time}" />
                                                 <TextBlock Margin="0,6,0,0"
-                                                           Foreground="White"
+                                                           Foreground="{DynamicResource PrimaryTextBrush}"
                                                            FontSize="15"
                                                            TextWrapping="Wrap"
                                                            Text="{Binding Message}" />

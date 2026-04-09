@@ -1,6 +1,8 @@
 using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.IO;
 using System.Runtime.CompilerServices;
+using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
@@ -14,21 +16,28 @@ namespace BroadcastControl.App.ViewModels;
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged
 {
-    private const double MiniMapWidth = 120;
-    private const double MiniMapHeight = 68;
+    // 전자 줌 미니맵은 이전보다 아주 조금만 키워서 현재 시야를 읽기 쉽게 만든다.
+    private const double MiniMapWidth = 130;
+    private const double MiniMapHeight = 74;
 
     private static readonly SolidColorBrush LowThreatBrush = CreateBrush(0x7B, 0xD8, 0x8F);
     private static readonly SolidColorBrush MediumThreatBrush = CreateBrush(0xFF, 0xC1, 0x45);
     private static readonly SolidColorBrush HighThreatBrush = CreateBrush(0xFF, 0x6B, 0x6B);
+    private static readonly SolidColorBrush RecordingOnBrush = CreateBrush(0xFF, 0x4D, 0x4F);
+    private static readonly SolidColorBrush RecordingOffBrush = CreateBrush(0x41, 0x49, 0x55);
+    private static readonly SolidColorBrush RecordingTextOffBrush = CreateBrush(0x92, 0x9D, 0xAA);
 
     private bool _isEoPrimary = true;
     private bool _isSettingsOpen;
     private bool _isSystemPoweredOn = true;
-    private string _currentMode = "수동";
+    private string _currentMode = "자동";
     private string _selectedPrimaryTarget = "복합";
     private string _currentThreatLevel = "낮음";
-    private double _brightness = 58;
-    private double _contrast = 52;
+    // 프로그램 시작 시 밝기 기본값은 항상 중립값인 50%로 시작한다.
+    private double _brightness = 50;
+    private double _contrast = 50;
+    private bool _isManualRecordingEnabled;
+    private AppThemeMode _currentThemeMode;
     private double _zoomLevel = 1.0;
     private double _zoomPanX;
     private double _zoomPanY;
@@ -42,6 +51,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
+        if (Application.Current is App app)
+        {
+            _currentThemeMode = app.CurrentThemeMode;
+        }
+
         AnalysisItems = new ObservableCollection<AnalysisItem>
         {
             new("10:05:00", "시스템 초기화 단계에서는 기본 위험 등급을 낮음으로 유지합니다."),
@@ -52,7 +66,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         SystemLogs = new ObservableCollection<SystemLogItem>
         {
             new("10:05:00", "시스템 전원이 켜졌습니다."),
-            new("10:05:02", "카메라 제어 모드가 수동으로 설정되었습니다."),
+            new("10:05:02", "카메라 제어 모드가 자동으로 설정되었습니다."),
             new("10:05:04", "초기 위험 등급은 낮음으로 설정되었습니다."),
         };
 
@@ -72,6 +86,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         SelectPrimaryTargetCommand = new RelayCommand(SelectPrimaryTarget, _ => IsSystemPoweredOn);
         ResetBrightnessCommand = new RelayCommand(_ => Brightness = 50, _ => IsSystemPoweredOn);
         ResetContrastCommand = new RelayCommand(_ => Contrast = 50, _ => IsSystemPoweredOn);
+        // 전자 줌 제목 버튼을 누르면 항상 기본 배율인 x1.0으로 복귀한다.
+        ResetZoomCommand = new RelayCommand(_ => ZoomLevel = 1.0, _ => CanUseZoomControls);
+        ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsManualMode);
+        SetThemeCommand = new RelayCommand(SetTheme);
+        SaveSystemLogsCommand = new RelayCommand(_ => SaveSystemLogsToDesktop());
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         MoveMotorCommand = new RelayCommand(MoveMotor, _ => CanUseMotorControls);
     }
@@ -96,6 +115,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public ICommand ResetContrastCommand { get; }
 
+    public ICommand ResetZoomCommand { get; }
+
+    public ICommand ToggleManualRecordingCommand { get; }
+
+    public ICommand SetThemeCommand { get; }
+
+    public ICommand SaveSystemLogsCommand { get; }
+
     public ICommand SwapFeedsCommand { get; }
 
     public ICommand MoveMotorCommand { get; }
@@ -114,6 +141,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (SetProperty(ref _isSystemPoweredOn, value))
             {
                 OnPropertyChanged(nameof(IsManualMode));
+                OnPropertyChanged(nameof(ManualRecordingButtonOpacity));
+                OnPropertyChanged(nameof(CanSelectAutoMode));
+                OnPropertyChanged(nameof(CanSelectManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
                 OnPropertyChanged(nameof(CanUseZoomControls));
                 RaiseAllCommandStates();
@@ -132,7 +162,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (SetProperty(ref _currentMode, value))
             {
                 OnPropertyChanged(nameof(CurrentModeText));
+                OnPropertyChanged(nameof(AutoModeOpacity));
+                OnPropertyChanged(nameof(ManualModeOpacity));
                 OnPropertyChanged(nameof(IsManualMode));
+                OnPropertyChanged(nameof(ManualRecordingButtonOpacity));
+                OnPropertyChanged(nameof(CanSelectAutoMode));
+                OnPropertyChanged(nameof(CanSelectManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
                 OnPropertyChanged(nameof(CanUseZoomControls));
                 OnPropertyChanged(nameof(ShowZoomMiniMap));
@@ -143,11 +178,59 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string CurrentModeText => $"카메라 모드: {CurrentMode}";
 
+    // 현재 모드 버튼만 선명하게 보여서 별도 텍스트 없이도 상태를 바로 읽을 수 있게 한다.
+    public double AutoModeOpacity => CurrentMode == "자동" ? 1.0 : 0.35;
+
+    public double ManualModeOpacity => CurrentMode == "수동" ? 1.0 : 0.35;
+
+    // 위험 등급이 올라가면 이후 VLM 연동 시 자동 녹화가 시작될 수 있도록 상태 표시를 준비한다.
+    // 녹화 표시등은 위험 상황 자동 녹화와 수동 녹화를 모두 반영한다.
+    public bool IsRecordingActive => CurrentThreatLevel != "낮음" || IsManualRecordingEnabled;
+
+    public Brush RecordingIndicatorBrush => IsRecordingActive ? RecordingOnBrush : RecordingOffBrush;
+
+    public Brush RecordingTextBrush => IsRecordingActive ? RecordingOnBrush : RecordingTextOffBrush;
+
+    public double RecordingIndicatorOpacity => IsRecordingActive ? 1.0 : 0.42;
+
     public bool IsManualMode => IsSystemPoweredOn && CurrentMode == "수동";
+
+    public bool CanSelectAutoMode => IsSystemPoweredOn && CurrentMode != "자동";
+
+    public bool CanSelectManualMode => IsSystemPoweredOn && CurrentMode != "수동";
 
     public bool CanUseMotorControls => IsManualMode;
 
     public bool CanUseZoomControls => IsManualMode;
+
+    public double ManualRecordingButtonOpacity => IsManualMode ? 1.0 : 0.0;
+
+    public bool IsDarkThemeActive => _currentThemeMode == AppThemeMode.Dark;
+
+    public bool IsLightThemeActive => _currentThemeMode == AppThemeMode.Light;
+
+    public double DarkThemeButtonOpacity => IsDarkThemeActive ? 1.0 : 0.55;
+
+    public double LightThemeButtonOpacity => IsLightThemeActive ? 1.0 : 0.55;
+
+    // 수동 녹화는 수동 모드일 때만 켜고 끌 수 있게 제한한다.
+    public bool IsManualRecordingEnabled
+    {
+        get => _isManualRecordingEnabled;
+        private set
+        {
+            if (SetProperty(ref _isManualRecordingEnabled, value))
+            {
+                OnPropertyChanged(nameof(ManualRecordingButtonText));
+                OnPropertyChanged(nameof(IsRecordingActive));
+                OnPropertyChanged(nameof(RecordingIndicatorBrush));
+                OnPropertyChanged(nameof(RecordingTextBrush));
+                OnPropertyChanged(nameof(RecordingIndicatorOpacity));
+            }
+        }
+    }
+
+    public string ManualRecordingButtonText => IsManualRecordingEnabled ? "녹화 종료" : "녹화 시작";
 
     public string CurrentThreatLevel
     {
@@ -158,6 +241,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(CurrentThreatText));
                 OnPropertyChanged(nameof(CurrentThreatBrush));
+                OnPropertyChanged(nameof(IsRecordingActive));
+                OnPropertyChanged(nameof(RecordingIndicatorBrush));
+                OnPropertyChanged(nameof(RecordingTextBrush));
+                OnPropertyChanged(nameof(RecordingIndicatorOpacity));
             }
         }
     }
@@ -185,9 +272,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string PrimaryTargetText => $"주 탐지체: {SelectedPrimaryTarget}";
 
-    public string EoTitle => "EO 카메라";
+    // 영상 위 라벨은 짧게 유지해서 실제 화면을 덜 가리도록 한다.
+    public string EoTitle => "EO cam";
 
-    public string IrTitle => "IR 카메라";
+    public string IrTitle => "IR cam";
 
     public string EoSubtitle => "노트북 카메라 입력";
 
@@ -282,7 +370,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
 
             var normalized = (_zoomPanX + maxPan) / (maxPan * 2);
-            return normalized * (MiniMapWidth - MiniMapViewportWidth);
+            // 실제 화면을 왼쪽/위쪽으로 끌어 이동할 때 미니맵 표시도 같은 방향으로 움직이도록 반전한다.
+            return (1.0 - normalized) * (MiniMapWidth - MiniMapViewportWidth);
         }
     }
 
@@ -297,7 +386,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
 
             var normalized = (_zoomPanY + maxPan) / (maxPan * 2);
-            return normalized * (MiniMapHeight - MiniMapViewportHeight);
+            // 실제 화면을 왼쪽/위쪽으로 끌어 이동할 때 미니맵 표시도 같은 방향으로 움직이도록 반전한다.
+            return (1.0 - normalized) * (MiniMapHeight - MiniMapViewportHeight);
         }
     }
 
@@ -344,10 +434,54 @@ public sealed class MainViewModel : INotifyPropertyChanged
         UpdateMiniMapViewport();
     }
 
+    /// <summary>
+    /// 마우스 휠 입력으로 전자 줌 배율을 조금씩 조절한다.
+    /// </summary>
+    public void AdjustZoomByWheel(double wheelSteps)
+    {
+        if (!CanUseZoomControls || Math.Abs(wheelSteps) < double.Epsilon)
+        {
+            return;
+        }
+
+        // 휠 한 칸마다 0.1배씩 조절해서 슬라이더와 비슷한 감도로 맞춘다.
+        ZoomLevel += wheelSteps * 0.1;
+    }
+
     public void AppendImportantLog(string message)
     {
         SystemLogs.Insert(0, new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), message));
         TrimCollection(SystemLogs, 8);
+    }
+
+    /// <summary>
+    /// 시스템 로그를 바탕화면에 시간 기준 파일명으로 저장해 테스트 결과를 바로 확인할 수 있게 한다.
+    /// </summary>
+    private void SaveSystemLogsToDesktop()
+    {
+        try
+        {
+            var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var filePath = Path.Combine(desktopPath, $"system_log_{timestamp}.txt");
+
+            var builder = new StringBuilder();
+            builder.AppendLine("LIG DNA GUI System Log");
+            builder.AppendLine($"Saved At: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            builder.AppendLine();
+
+            foreach (var log in SystemLogs)
+            {
+                builder.AppendLine($"[{log.Time}] {log.Message}");
+            }
+
+            File.WriteAllText(filePath, builder.ToString(), new UTF8Encoding(false));
+            AppendImportantLog($"시스템 로그를 저장했습니다: {Path.GetFileName(filePath)}");
+        }
+        catch (Exception ex)
+        {
+            AppendImportantLog($"시스템 로그 저장에 실패했습니다: {ex.Message}");
+        }
     }
 
     private void TogglePower()
@@ -369,10 +503,21 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
         }
 
+        if (mode == CurrentMode)
+        {
+            return;
+        }
+
         CurrentMode = mode;
 
         if (!IsManualMode)
         {
+            if (IsManualRecordingEnabled)
+            {
+                // 자동 모드로 돌아갈 때 수동 녹화는 즉시 종료되어 저장되도록 한다.
+                IsManualRecordingEnabled = false;
+            }
+
             _motorPan = 0;
             _motorTilt = 0;
             ZoomLevel = 1.0;
@@ -383,6 +528,36 @@ public sealed class MainViewModel : INotifyPropertyChanged
         AppendImportantLog($"카메라 제어 모드가 {CurrentMode}으로 전환되었습니다.");
     }
 
+    private void ToggleManualRecording()
+    {
+        if (!IsManualMode)
+        {
+            return;
+        }
+
+        IsManualRecordingEnabled = !IsManualRecordingEnabled;
+    }
+
+    /// <summary>
+    /// 설정창에서 앱 테마를 직접 바꿀 수 있게 한다.
+    /// </summary>
+    private void SetTheme(object? parameter)
+    {
+        if (parameter is not string themeName || Application.Current is not App app)
+        {
+            return;
+        }
+
+        var nextTheme = themeName == "Light" ? AppThemeMode.Light : AppThemeMode.Dark;
+        app.ApplyTheme(nextTheme);
+        _currentThemeMode = nextTheme;
+        OnPropertyChanged(nameof(IsDarkThemeActive));
+        OnPropertyChanged(nameof(IsLightThemeActive));
+        OnPropertyChanged(nameof(DarkThemeButtonOpacity));
+        OnPropertyChanged(nameof(LightThemeButtonOpacity));
+        AppendImportantLog($"테마가 {(nextTheme == AppThemeMode.Dark ? "어두운 테마" : "밝은 테마")}로 변경되었습니다.");
+    }
+
     private void SelectPrimaryTarget(object? parameter)
     {
         if (!IsSystemPoweredOn || parameter is not string target)
@@ -391,8 +566,6 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
 
         SelectedPrimaryTarget = target;
-        AnalysisItems.Insert(0, new AnalysisItem(DateTime.Now.ToString("HH:mm:ss"), $"주 탐지체가 {SelectedPrimaryTarget}으로 변경되었습니다."));
-        TrimCollection(AnalysisItems, 10);
         AppendImportantLog($"주 탐지체가 {SelectedPrimaryTarget}으로 변경되었습니다.");
     }
 
@@ -462,6 +635,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
         RaiseCommand(SelectPrimaryTargetCommand);
         RaiseCommand(ResetBrightnessCommand);
         RaiseCommand(ResetContrastCommand);
+        RaiseCommand(ResetZoomCommand);
+        RaiseCommand(ToggleManualRecordingCommand);
         RaiseCommand(MoveMotorCommand);
     }
 
