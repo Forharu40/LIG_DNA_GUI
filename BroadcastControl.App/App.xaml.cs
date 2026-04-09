@@ -34,22 +34,22 @@ public partial class App : Application
 
         if (themeMode == AppThemeMode.Dark)
         {
-            SetBrushColor("WindowBackgroundBrush", "#FF2B2E33");
-            SetBrushColor("PanelBrush", "#FF3A3D43");
-            SetBrushColor("PanelBorderBrush", "#FF565A61");
+            SetBrushColor("WindowBackgroundBrush", "#FF1E2024");
+            SetBrushColor("PanelBrush", "#FF2B2E34");
+            SetBrushColor("PanelBorderBrush", "#FF474B53");
             SetBrushColor("AccentBrush", "#FF5F7BEA");
-            SetBrushColor("PrimaryTextBrush", "#FFFFFFFF");
-            SetBrushColor("SecondaryTextBrush", "#FFC5C9D1");
-            SetBrushColor("SurfaceAltBrush", "#FFE6E0D6");
-            SetBrushColor("OverlayPanelBrush", "#D932353A");
-            SetBrushColor("DrawerBrush", "#FF34373D");
-            SetBrushColor("DrawerBorderBrush", "#FF5A5E66");
-            SetBrushColor("DrawerTextBrush", "#FFFFFFFF");
-            SetBrushColor("DrawerItemBrush", "#FF3C4047");
-            SetBrushColor("DrawerItemBorderBrush", "#FF61656D");
-            SetBrushColor("TopBarButtonBrush", "#FF484C53");
-            SetBrushColor("TopBarButtonHoverBrush", "#FF565B63");
-            SetBrushColor("TopBarButtonPressedBrush", "#FF656A73");
+            SetBrushColor("PrimaryTextBrush", "#FFF2F4F7");
+            SetBrushColor("SecondaryTextBrush", "#FFB8BDC6");
+            SetBrushColor("SurfaceAltBrush", "#FF181A1F");
+            SetBrushColor("OverlayPanelBrush", "#D926292E");
+            SetBrushColor("DrawerBrush", "#FF26292F");
+            SetBrushColor("DrawerBorderBrush", "#FF454A53");
+            SetBrushColor("DrawerTextBrush", "#FFF2F4F7");
+            SetBrushColor("DrawerItemBrush", "#FF31353C");
+            SetBrushColor("DrawerItemBorderBrush", "#FF4E535C");
+            SetBrushColor("TopBarButtonBrush", "#FF3A3E46");
+            SetBrushColor("TopBarButtonHoverBrush", "#FF474C55");
+            SetBrushColor("TopBarButtonPressedBrush", "#FF565B65");
             return;
         }
 
