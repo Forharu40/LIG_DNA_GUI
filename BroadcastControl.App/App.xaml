@@ -11,21 +11,25 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF0D1117" />
-            <SolidColorBrush x:Key="PanelBrush" Color="#FF141A23" />
-            <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF2E3642" />
-            <SolidColorBrush x:Key="AccentBrush" Color="#FF18C6B0" />
+            <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF07111D" />
+            <SolidColorBrush x:Key="PanelBrush" Color="#FF0E1827" />
+            <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF223249" />
+            <SolidColorBrush x:Key="AccentBrush" Color="#FF41D6FF" />
             <SolidColorBrush x:Key="DangerBrush" Color="#FFFF6B6B" />
             <SolidColorBrush x:Key="WarningBrush" Color="#FFFFC145" />
             <SolidColorBrush x:Key="SuccessBrush" Color="#FF7BD88F" />
             <SolidColorBrush x:Key="PrimaryTextBrush" Color="#FFFFFFFF" />
-            <SolidColorBrush x:Key="SecondaryTextBrush" Color="#FFD6E4EF" />
-            <SolidColorBrush x:Key="OverlayPanelBrush" Color="#CC101722" />
-            <SolidColorBrush x:Key="DrawerBrush" Color="#FF141A23" />
-            <SolidColorBrush x:Key="DrawerBorderBrush" Color="#FF2E3642" />
+            <SolidColorBrush x:Key="SecondaryTextBrush" Color="#FFAFC1D6" />
+            <SolidColorBrush x:Key="SurfaceAltBrush" Color="#FF0A1421" />
+            <SolidColorBrush x:Key="OverlayPanelBrush" Color="#CC0B1420" />
+            <SolidColorBrush x:Key="DrawerBrush" Color="#FF0C1523" />
+            <SolidColorBrush x:Key="DrawerBorderBrush" Color="#FF223249" />
             <SolidColorBrush x:Key="DrawerTextBrush" Color="#FFFFFFFF" />
-            <SolidColorBrush x:Key="DrawerItemBrush" Color="#FF101722" />
-            <SolidColorBrush x:Key="DrawerItemBorderBrush" Color="#FF2E3642" />
+            <SolidColorBrush x:Key="DrawerItemBrush" Color="#FF111D2D" />
+            <SolidColorBrush x:Key="DrawerItemBorderBrush" Color="#FF29415C" />
+            <SolidColorBrush x:Key="TopBarButtonBrush" Color="#FF102032" />
+            <SolidColorBrush x:Key="TopBarButtonHoverBrush" Color="#FF173149" />
+            <SolidColorBrush x:Key="TopBarButtonPressedBrush" Color="#FF1D3D59" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
