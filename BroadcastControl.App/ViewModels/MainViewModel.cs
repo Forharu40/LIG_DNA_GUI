@@ -9,8 +9,8 @@ using BroadcastControl.App.Infrastructure;
 namespace BroadcastControl.App.ViewModels;
 
 /// <summary>
-/// 메인 화면에서 필요한 표시 상태와 제어 상태를 한 곳에서 관리한다.
-/// 실제 장비와 VLM이 연결되면 이 ViewModel에 실시간 값을 주입해 같은 화면 구조를 그대로 사용할 수 있다.
+/// 메인 화면의 표시 상태, 모드 상태, 위험 등급, 설정 패널 상태를 한 곳에서 관리한다.
+/// 실제 장비와 VLM이 연결되면 같은 ViewModel에 실시간 값을 주입해 그대로 확장할 수 있다.
 /// </summary>
 public sealed class MainViewModel : INotifyPropertyChanged
 {
@@ -21,44 +21,43 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private static readonly SolidColorBrush MediumThreatBrush = CreateBrush(0xFF, 0xC1, 0x45);
     private static readonly SolidColorBrush HighThreatBrush = CreateBrush(0xFF, 0x6B, 0x6B);
 
-    // EO가 큰 화면인지, IR이 큰 화면인지 기억한다.
+    // EO 화면이 메인 화면인지 여부를 저장한다.
     private bool _isEoPrimary = true;
 
-    // 설정 패널은 우측에서 슬라이드되는 형태로 열고 닫는다.
+    // 우측 설정 패널 열림 상태를 저장한다.
     private bool _isSettingsOpen;
 
-    // 전원과 모드는 상단바 전체와 하단 조작 기능의 기준이 된다.
+    // 현재 카메라 운용 상태를 저장한다.
     private bool _isSystemPoweredOn = true;
     private string _currentMode = "수동";
-    private string _selectedPrimaryTarget = "복합";
+    private string _selectedPrimaryTarget = "비행체";
     private string _currentThreatLevel = "높음";
 
-    // 상단바와 카메라 패널에서 함께 사용할 밝기/대조비/줌 값이다.
+    // 상단바와 카메라 패널에서 사용할 표시값이다.
     private double _brightness = 58;
     private double _contrast = 52;
     private double _zoomLevel = 1.0;
 
-    // 확대된 화면을 드래그로 움직일 수 있도록 현재 팬 오프셋을 저장한다.
+    // 확대된 EO 화면을 드래그할 때 사용할 팬 오프셋과 뷰포트 크기다.
     private double _zoomPanX;
     private double _zoomPanY;
     private double _viewportWidth = 1;
     private double _viewportHeight = 1;
 
-    // 수동 모드에서 모터 방향 조정을 눌렀을 때 상태창에 반영할 값이다.
+    // 수동 모드에서 모터 방향 값을 상태창에 표시하기 위해 유지한다.
     private int _motorPan;
     private int _motorTilt;
 
-    // EO 입력은 실제 웹캠 프레임, IR은 임시 열화상 느낌 프레임을 사용한다.
     private ImageSource? _eoFrame;
     private readonly ImageSource _irPlaceholderFrame = CreateIrPlaceholderFrame();
 
     public MainViewModel()
     {
-        VlmResults = new ObservableCollection<VlmInsightItem>
+        AnalysisItems = new ObservableCollection<AnalysisItem>
         {
-            new("10:05:00", "북동측 500m 구간에 복합 비행체 패턴이 감지되었습니다."),
-            new("10:05:03", "현재 주 탐색체는 복합이며 다중 객체 관측 모드가 유지되고 있습니다."),
-            new("10:05:05", "EO 입력 기준 객체 밀집도가 상승해 위험 등급을 높음으로 유지합니다."),
+            new("10:05:00", "북동측 500m 구간에서 복합 비행체 패턴이 감지되었습니다."),
+            new("10:05:03", "현재 주 탐색체는 비행체이며 우선 감시 상태를 유지합니다."),
+            new("10:05:05", "EO 입력 기준 이동 밀도가 상승해 위험 등급을 높음으로 유지합니다."),
         };
 
         SystemLogs = new ObservableCollection<SystemLogItem>
@@ -70,24 +69,23 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         PrimaryTargets = new ReadOnlyCollection<string>(new[]
         {
-            "복합",
-            "고정익",
-            "회전익",
-            "드론",
-            "사람",
+            "비행체",
+            "비군사 표적(오탐 유발 요소)",
+            "통신 장비",
+            "자주포 및 견인포",
         });
 
         TogglePowerCommand = new RelayCommand(_ => TogglePower());
-        SetModeCommand = new RelayCommand(SetMode);
+        SetModeCommand = new RelayCommand(SetMode, _ => IsSystemPoweredOn);
         ToggleSettingsCommand = new RelayCommand(_ => IsSettingsOpen = !IsSettingsOpen);
-        SelectPrimaryTargetCommand = new RelayCommand(SelectPrimaryTarget, _ => CanUseOperationalControls);
+        SelectPrimaryTargetCommand = new RelayCommand(SelectPrimaryTarget, _ => IsSystemPoweredOn);
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         MoveMotorCommand = new RelayCommand(MoveMotor, _ => CanUseMotorControls);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public ObservableCollection<VlmInsightItem> VlmResults { get; }
+    public ObservableCollection<AnalysisItem> AnalysisItems { get; }
 
     public ObservableCollection<SystemLogItem> SystemLogs { get; }
 
@@ -118,19 +116,16 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (SetProperty(ref _isSystemPoweredOn, value))
             {
-                OnPropertyChanged(nameof(PowerButtonText));
-                OnPropertyChanged(nameof(SystemPowerText));
-                OnPropertyChanged(nameof(CanUseOperationalControls));
                 OnPropertyChanged(nameof(CanUseMotorControls));
+                OnPropertyChanged(nameof(CanUseZoomControls));
+                OnPropertyChanged(nameof(IsManualMode));
                 RaiseAllCommandStates();
             }
         }
     }
 
-    // 상단 전원 버튼은 상태 표시가 아니라 프로그램 종료 버튼으로 사용한다.
+    // 상단 전원 버튼은 시스템 종료 버튼으로 사용한다.
     public string PowerButtonText => "전원 종료";
-
-    public string SystemPowerText => $"시스템 전원: {(IsSystemPoweredOn ? "ON" : "OFF")}";
 
     public string CurrentMode
     {
@@ -140,7 +135,9 @@ public sealed class MainViewModel : INotifyPropertyChanged
             if (SetProperty(ref _currentMode, value))
             {
                 OnPropertyChanged(nameof(CurrentModeText));
+                OnPropertyChanged(nameof(IsManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
+                OnPropertyChanged(nameof(CanUseZoomControls));
                 RaiseAllCommandStates();
             }
         }
@@ -148,9 +145,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string CurrentModeText => $"카메라 모드: {CurrentMode}";
 
-    public bool CanUseOperationalControls => IsSystemPoweredOn;
+    public bool IsManualMode => CurrentMode == "수동";
 
-    public bool CanUseMotorControls => IsSystemPoweredOn && CurrentMode == "수동";
+    public bool CanUseMotorControls => IsSystemPoweredOn && IsManualMode;
+
+    public bool CanUseZoomControls => IsSystemPoweredOn && IsManualMode;
 
     public string CurrentThreatLevel
     {
@@ -186,7 +185,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string PrimaryTargetText => $"주 탐색체: {SelectedPrimaryTarget}";
+    public string PrimaryTargetText => $"주 탐지체: {SelectedPrimaryTarget}";
 
     public string EoTitle => "EO 카메라";
 
@@ -220,7 +219,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string BrightnessText => $"카메라 밝기 {Brightness:0}%";
+    public string BrightnessText => $"밝기 {Brightness:0}%";
 
     public double Contrast
     {
@@ -234,7 +233,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ContrastText => $"화면 대조비 {Contrast:0}%";
+    public string ContrastText => $"대조비 {Contrast:0}%";
 
     public double ZoomLevel
     {
@@ -260,7 +259,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ZoomLevelText => $"전자 ZOOM x{ZoomLevel:0.0}";
+    public string ZoomLevelText => $"x{ZoomLevel:0.0}";
 
     public double LargeFeedScale => ZoomLevel;
 
@@ -268,7 +267,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public double ZoomTransformY => _zoomPanY;
 
-    public bool ShowZoomMiniMap => ZoomLevel > 1.0;
+    public bool ShowZoomMiniMap => CanUseZoomControls && ZoomLevel > 1.0;
 
     public double MiniMapViewportWidth => MiniMapWidth / ZoomLevel;
 
@@ -309,7 +308,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string MotorTiltText => $"모터 상/하: {_motorTilt}도";
 
     /// <summary>
-    /// 웹캠 프레임을 받아 EO 화면에 갱신한다.
+    /// 웹캠 프레임을 EO 화면에 반영한다.
     /// </summary>
     public void UpdateEoFrame(ImageSource? frame)
     {
@@ -330,7 +329,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 확대된 상태에서 마우스 드래그로 화면 위치를 옮긴다.
+    /// 확대 상태에서 마우스 드래그로 화면 위치를 옮긴다.
     /// </summary>
     public void PanZoom(double deltaX, double deltaY)
     {
@@ -355,7 +354,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private void TogglePower()
     {
-        // 전원 버튼을 누르면 운용 콘솔을 즉시 종료한다.
+        // 위험 등급이 높음이면 운용 중인 프로그램을 종료할 수 없게 막는다.
+        if (CurrentThreatLevel == "높음")
+        {
+            AppendImportantLog("위험 등급이 높음 상태여서 프로그램을 종료할 수 없습니다.");
+            return;
+        }
+
         Application.Current?.Shutdown();
     }
 
@@ -368,10 +373,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
         CurrentMode = mode;
 
-        if (CurrentMode == "자동")
+        if (!IsManualMode)
         {
             _motorPan = 0;
             _motorTilt = 0;
+            ZoomLevel = 1.0;
             OnPropertyChanged(nameof(MotorPanText));
             OnPropertyChanged(nameof(MotorTiltText));
         }
@@ -390,10 +396,10 @@ public sealed class MainViewModel : INotifyPropertyChanged
         SelectedPrimaryTarget = target;
         CurrentThreatLevel = MapThreatLevel(target);
 
-        VlmResults.Insert(0, new VlmInsightItem(DateTime.Now.ToString("HH:mm:ss"), $"주 탐색체가 {SelectedPrimaryTarget}으로 변경되었습니다."));
-        TrimCollection(VlmResults, 10);
+        AnalysisItems.Insert(0, new AnalysisItem(DateTime.Now.ToString("HH:mm:ss"), $"주 탐지체가 {SelectedPrimaryTarget}으로 변경되었습니다."));
+        TrimCollection(AnalysisItems, 10);
 
-        AppendImportantLog($"주 탐색체가 {SelectedPrimaryTarget}으로 변경되었습니다.");
+        AppendImportantLog($"주 탐지체가 {SelectedPrimaryTarget}으로 변경되었습니다.");
         if (previousThreat != CurrentThreatLevel)
         {
             AppendImportantLog($"위험 등급이 {CurrentThreatLevel}으로 변경되었습니다.");
@@ -477,8 +483,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private static string MapThreatLevel(string target) => target switch
     {
-        "사람" => "낮음",
-        "드론" or "회전익" => "중간",
+        "비군사 표적(오탐 유발 요소)" => "낮음",
+        "통신 장비" => "중간",
         _ => "높음",
     };
 
@@ -499,7 +505,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     private static ImageSource CreateIrPlaceholderFrame()
     {
-        // 실제 IR 입력 전에도 우측 상단 작은 화면이 비지 않도록 열화상 느낌의 임시 프레임을 만든다.
+        // 실제 IR 카메라 입력 전에도 화면이 비어 보이지 않도록 임시 열화상 프레임을 만든다.
         var group = new DrawingGroup();
         using (var dc = group.Open())
         {
@@ -549,11 +555,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 }
 
 /// <summary>
-/// VLM 결과창에 표시할 짧은 분석 문장이다.
+/// 상황 분석 창에 표시할 분석 문장이다.
 /// </summary>
-public sealed record VlmInsightItem(string Time, string Message);
+public sealed record AnalysisItem(string Time, string Message);
 
 /// <summary>
-/// 시스템 로그에는 중요한 상태 변화만 남긴다.
+/// 시스템 로그에는 중요한 상태 변화만 기록한다.
 /// </summary>
 public sealed record SystemLogItem(string Time, string Message);

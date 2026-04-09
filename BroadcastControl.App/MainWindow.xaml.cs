@@ -1,3 +1,4 @@
+using System.ComponentModel;
 using System.Windows;
 using System.Windows.Input;
 using BroadcastControl.App.Services;
@@ -6,8 +7,8 @@ using BroadcastControl.App.ViewModels;
 namespace BroadcastControl.App;
 
 /// <summary>
-/// 메인 윈도우는 전체화면 초기화, 웹캠 연결, 확대 화면 드래그 입력만 담당한다.
-/// 실제 상태와 화면 데이터는 MainViewModel에서 관리한다.
+/// 메인 윈도우는 전체화면 초기화, 웹캠 연결, 확대 드래그 입력, 화면 보정값 전달을 담당한다.
+/// 실제 화면 상태와 표시 데이터는 MainViewModel에서 관리한다.
 /// </summary>
 public partial class MainWindow : Window
 {
@@ -31,10 +32,15 @@ public partial class MainWindow : Window
 
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
-        // 전체화면 콘솔 형태로 시작한다.
         WindowState = WindowState.Maximized;
 
+        _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _webcamCaptureService.FrameReady += OnFrameReady;
+
+        // 초기 슬라이더 값도 바로 카메라 서비스에 반영한다.
+        _webcamCaptureService.SetBrightness(_viewModel.Brightness);
+        _webcamCaptureService.SetContrast(_viewModel.Contrast);
+
         _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
 
         if (_webcamCaptureService.Start())
@@ -44,6 +50,20 @@ public partial class MainWindow : Window
         else
         {
             _viewModel.AppendImportantLog("노트북 카메라 연결에 실패했습니다.");
+        }
+    }
+
+    private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
+    {
+        // 밝기 또는 대조비 슬라이더가 바뀌면 카메라 프레임 보정값도 즉시 갱신한다.
+        switch (e.PropertyName)
+        {
+            case nameof(MainViewModel.Brightness):
+                _webcamCaptureService.SetBrightness(_viewModel.Brightness);
+                break;
+            case nameof(MainViewModel.Contrast):
+                _webcamCaptureService.SetContrast(_viewModel.Contrast);
+                break;
         }
     }
 
@@ -75,7 +95,7 @@ public partial class MainWindow : Window
         var delta = currentPoint - _lastZoomDragPoint;
         _lastZoomDragPoint = currentPoint;
 
-        // 드래그 방향으로 확대 화면이 움직이도록 오프셋을 갱신한다.
+        // 드래그 방향으로 확대 화면이 이동하도록 ViewModel에 오프셋 갱신을 요청한다.
         _viewModel.PanZoom(delta.X, delta.Y);
     }
 
@@ -97,6 +117,7 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _webcamCaptureService.FrameReady -= OnFrameReady;
         _webcamCaptureService.Dispose();
     }
