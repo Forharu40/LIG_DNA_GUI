@@ -141,6 +141,8 @@
     </Window.Resources>
 
     <Grid x:Name="RootLayout">
+        <!-- RootLayout은 전체 창을 감싸는 최상위 컨테이너이다.
+             상단 툴바, 본문 패널, 설정 드로어를 모두 이 Grid 안에서 배치한다. -->
         <Grid Margin="12">
             <Grid.RowDefinitions>
                 <RowDefinition Height="66" />
@@ -155,6 +157,8 @@
                 </Rectangle.Fill>
             </Rectangle>
 
+            <!-- 상단 툴바:
+                 전원 종료, 녹화 상태, 밝기/대조비, 모드 전환, 설정 버튼을 한 줄에 배치한다. -->
             <Border Grid.Row="0"
                     Style="{StaticResource GlassCardBorder}"
                     CornerRadius="2"
@@ -275,6 +279,8 @@
                 </Grid>
             </Border>
 
+            <!-- 본문 영역:
+                 왼쪽은 카메라 화면, 오른쪽은 시스템 현황/상황 분석/시스템 로그 패널이다. -->
             <Grid Grid.Row="1"
                   Margin="0,12,0,0">
                 <Grid.ColumnDefinitions>
@@ -282,6 +288,8 @@
                     <ColumnDefinition Width="1.02*" />
                 </Grid.ColumnDefinitions>
 
+                <!-- 카메라 패널:
+                     EO 주 화면, IR 인셋 화면, 모터 조작 버튼, 전자 줌 UI가 모두 들어간다. -->
                 <Border Grid.Column="0"
                         Margin="0,0,12,0"
                         Style="{StaticResource GlassCardBorder}"
@@ -296,6 +304,8 @@
                           MouseLeftButtonUp="CameraViewport_OnMouseLeftButtonUp">
                         <Rectangle Fill="{DynamicResource SurfaceAltBrush}" />
 
+                        <!-- LargeFeedImage는 현재 크게 보여줄 카메라 영상을 바인딩한다.
+                             EO/IR 스왑 상태에 따라 실제로 표시되는 영상이 달라진다. -->
                         <Image Source="{Binding LargeFeedImage}"
                                Margin="0"
                                Stretch="UniformToFill"
@@ -312,6 +322,7 @@
                             </Image.RenderTransform>
                         </Image>
 
+                        <!-- 좌상단 라벨은 현재 큰 화면이 EO인지 IR인지 운용자가 바로 구분하도록 돕는다. -->
                         <Border Margin="16,12,0,0"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Top"
@@ -325,6 +336,8 @@
                                        Text="{Binding LargeFeedTitle}" />
                         </Border>
 
+                        <!-- 전자 줌 미니맵:
+                             확대 중일 때 전체 화면 대비 현재 보고 있는 영역을 작은 지도처럼 보여준다. -->
                         <Border Width="152"
                                 Height="108"
                                 Margin="18,0,0,20"
@@ -360,6 +373,8 @@
 
                         <Canvas IsHitTestVisible="False" />
 
+                        <!-- IR/EO 인셋 화면:
+                             작은 화면을 클릭하면 큰 화면과 스왑되도록 만든 입력 영역이다. -->
                         <Button Width="168"
                                 Height="126"
                                 Margin="0,8,26,0"
@@ -393,6 +408,8 @@
                             </Border>
                         </Button>
 
+                        <!-- 모터 방향 버튼:
+                             수동 모드일 때만 보이며, 이후 실제 모터 제어 명령과 연결될 위치이다. -->
                         <Grid Margin="0,0,24,26"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom"
@@ -445,6 +462,8 @@
                         </Grid>
 
                         <!-- 전자 줌 패널은 슬라이더보다 배경이 과하게 길어 보이지 않도록 고정 폭으로 묶는다. -->
+                        <!-- 전자 줌 패널:
+                             줌 리셋 버튼, 배율 슬라이더, 현재 배율 텍스트를 한 묶음으로 보여준다. -->
                         <Border Margin="182,0,220,18"
                                 Padding="10,7"
                                 Width="340"
@@ -483,6 +502,8 @@
                     </Grid>
                 </Border>
 
+                <!-- 우측 정보 패널:
+                     시스템 현황, 상황 분석, 시스템 로그를 세로로 쌓아 배치한다. -->
                 <Grid Grid.Column="1">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="0.68*" />
@@ -490,6 +511,8 @@
                         <RowDefinition Height="1.56*" />
                     </Grid.RowDefinitions>
 
+                    <!-- 시스템 현황 패널:
+                         위험 등급과 주 탐지체처럼 지금 꼭 봐야 하는 핵심 상태만 간단히 보여준다. -->
                     <Border Grid.Row="0"
                             Style="{StaticResource GlassCardBorder}"
                             CornerRadius="2"
@@ -515,6 +538,8 @@
                         </StackPanel>
                     </Border>
 
+                    <!-- 상황 분석 패널:
+                         향후 VLM이 분석한 문장을 실시간으로 누적해서 보여줄 영역이다. -->
                     <Border Grid.Row="1"
                             Margin="0,12,0,12"
                             Style="{StaticResource GlassCardBorder}"
@@ -556,6 +581,8 @@
                         </Grid>
                     </Border>
 
+                    <!-- 시스템 로그 패널:
+                         중요한 모드 변경, 저장, 경고 같은 이벤트만 남기는 운영 로그 영역이다. -->
                     <Border Grid.Row="2"
                             Style="{StaticResource GlassCardBorder}"
                             CornerRadius="2"
@@ -612,6 +639,8 @@
             </Grid>
         </Grid>
 
+        <!-- SettingsBackdrop은 설정창이 열렸을 때 뒤 배경을 어둡게 깔고,
+             배경 클릭으로 설정창을 닫을 수 있게 해주는 오버레이다. -->
         <Rectangle x:Name="SettingsBackdrop"
                    Fill="#22000000"
                    Opacity="0"
@@ -620,6 +649,8 @@
                    Panel.ZIndex="20"
                    MouseLeftButtonDown="SettingsBackdrop_OnMouseLeftButtonDown" />
 
+        <!-- 설정 드로어:
+             우측에서 슬라이드되어 나오는 패널이며, 주 탐지체와 테마 변경 기능을 담는다. -->
         <Border x:Name="SettingsDrawer"
                 Width="280"
                 Margin="0,12,12,12"

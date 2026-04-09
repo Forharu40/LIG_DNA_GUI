@@ -11,6 +11,11 @@ namespace BroadcastControl.App.Services;
 /// </summary>
 public sealed class WebcamCaptureService : IDisposable
 {
+    /// <summary>
+    /// 이 서비스는 실제 카메라 프레임을 읽고,
+    /// 화면 표시용 변환과 녹화용 변환을 함께 처리하는 역할을 맡는다.
+    /// 즉, MainWindow와 OpenCV 사이의 중간 어댑터라고 보면 된다.
+    /// </summary>
     private readonly DispatcherTimer _timer;
     private VideoCapture? _capture;
     private VideoWriter? _writer;
@@ -71,11 +76,13 @@ public sealed class WebcamCaptureService : IDisposable
 
     public bool Start(int cameraIndex = 0)
     {
+        // 이미 시작된 상태면 다시 열 필요가 없으므로 그대로 성공 처리한다.
         if (_isRunning)
         {
             return true;
         }
 
+        // 현재는 기본 노트북 카메라(인덱스 0)를 우선 사용한다.
         _capture = new VideoCapture(cameraIndex);
         if (!_capture.IsOpened())
         {
@@ -92,6 +99,7 @@ public sealed class WebcamCaptureService : IDisposable
 
     public void Stop()
     {
+        // 타이머를 먼저 멈춰서 더 이상 프레임을 읽지 않게 만든다.
         _timer.Stop();
         _isRunning = false;
         StopRecording();
@@ -108,6 +116,7 @@ public sealed class WebcamCaptureService : IDisposable
 
     private void OnTick(object? sender, EventArgs e)
     {
+        // 타이머 주기마다 카메라에서 최신 프레임을 하나 읽는다.
         if (_capture is null || !_capture.IsOpened())
         {
             return;
@@ -127,6 +136,7 @@ public sealed class WebcamCaptureService : IDisposable
 
         if (_isRecording)
         {
+            // 저장 파일은 사용자가 보고 있는 줌/이동 구도와 같아야 하므로 별도 프레임을 만든다.
             using var recordingFrame = CreateRecordedFrame(adjusted);
             EnsureVideoWriter(recordingFrame.Width, recordingFrame.Height);
             _writer?.Write(recordingFrame);
@@ -191,6 +201,7 @@ public sealed class WebcamCaptureService : IDisposable
     /// </summary>
     private Mat CreateRecordedFrame(Mat source)
     {
+        // 화면에 실제로 보이는 비율과 같은 기준 영역을 먼저 계산한다.
         var sourceWidth = source.Width;
         var sourceHeight = source.Height;
         var viewportAspect = _viewportWidth / _viewportHeight;
@@ -255,6 +266,7 @@ public sealed class WebcamCaptureService : IDisposable
 
     private static double GetViewportOffset(double pan, double maxPan, double remainingSize)
     {
+        // 현재 패닝 값을 0~1 범위로 정규화한 뒤 실제 잘라낼 픽셀 위치로 변환한다.
         if (maxPan <= 0 || remainingSize <= 0)
         {
             return remainingSize / 2.0;
@@ -266,6 +278,7 @@ public sealed class WebcamCaptureService : IDisposable
 
     private void EnsureVideoWriter(int width, int height)
     {
+        // 녹화가 시작될 때 실제 출력 크기가 결정되므로, 그 순간 VideoWriter를 연다.
         if (_writer is not null || string.IsNullOrWhiteSpace(_recordingPath))
         {
             return;
@@ -286,6 +299,7 @@ public sealed class WebcamCaptureService : IDisposable
 
     public void Dispose()
     {
+        // 타이머 이벤트를 반드시 끊어야 창을 닫은 뒤에도 자원이 남지 않는다.
         Stop();
         _timer.Tick -= OnTick;
     }
