@@ -1,8 +1,7 @@
 <Application x:Class="BroadcastControl.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-             StartupUri="MainWindow.xaml">
+             xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
@@ -12,12 +11,21 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
+            <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF0D1117" />
             <SolidColorBrush x:Key="PanelBrush" Color="#FF141A23" />
             <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF2E3642" />
             <SolidColorBrush x:Key="AccentBrush" Color="#FF18C6B0" />
             <SolidColorBrush x:Key="DangerBrush" Color="#FFFF6B6B" />
             <SolidColorBrush x:Key="WarningBrush" Color="#FFFFC145" />
             <SolidColorBrush x:Key="SuccessBrush" Color="#FF7BD88F" />
+            <SolidColorBrush x:Key="PrimaryTextBrush" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="SecondaryTextBrush" Color="#FFD6E4EF" />
+            <SolidColorBrush x:Key="OverlayPanelBrush" Color="#CC101722" />
+            <SolidColorBrush x:Key="DrawerBrush" Color="#FF141A23" />
+            <SolidColorBrush x:Key="DrawerBorderBrush" Color="#FF2E3642" />
+            <SolidColorBrush x:Key="DrawerTextBrush" Color="#FFFFFFFF" />
+            <SolidColorBrush x:Key="DrawerItemBrush" Color="#FF101722" />
+            <SolidColorBrush x:Key="DrawerItemBorderBrush" Color="#FF2E3642" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
