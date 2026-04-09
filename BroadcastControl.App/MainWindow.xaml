@@ -13,28 +13,31 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
         <DropShadowEffect x:Key="SoftPanelShadow"
-                          BlurRadius="28"
-                          ShadowDepth="0"
-                          Opacity="0.22"
-                          Color="#CC000000" />
+                          BlurRadius="36"
+                          ShadowDepth="8"
+                          Direction="270"
+                          Opacity="0.20"
+                          Color="#66281405" />
 
         <DropShadowEffect x:Key="TopBarShadow"
-                          BlurRadius="22"
-                          ShadowDepth="0"
-                          Opacity="0.18"
-                          Color="#B3000000" />
+                          BlurRadius="26"
+                          ShadowDepth="10"
+                          Direction="270"
+                          Opacity="0.16"
+                          Color="#4D281405" />
 
         <DropShadowEffect x:Key="DrawerShadow"
-                          BlurRadius="14"
-                          ShadowDepth="0"
-                          Opacity="0.12"
-                          Color="#80000000" />
+                          BlurRadius="22"
+                          ShadowDepth="8"
+                          Direction="270"
+                          Opacity="0.16"
+                          Color="#59281405" />
 
         <Style x:Key="GlassCardBorder" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="20" />
+            <Setter Property="CornerRadius" Value="24" />
             <Setter Property="Effect" Value="{StaticResource SoftPanelShadow}" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
@@ -43,7 +46,7 @@
             <Setter Property="Background" Value="{DynamicResource OverlayPanelBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="CornerRadius" Value="16" />
         </Style>
 
         <Style x:Key="TopBarButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
@@ -52,12 +55,12 @@
             <Setter Property="FontSize" Value="15" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Background" Value="{DynamicResource TopBarButtonBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+            <Setter Property="BorderBrush" Value="#00000000" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource TopBarButtonHoverBrush}" />
-                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="{DynamicResource TopBarButtonPressedBrush}" />
@@ -71,12 +74,12 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Background" Value="{DynamicResource TopBarButtonBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+            <Setter Property="BorderBrush" Value="#00000000" />
+            <Setter Property="BorderThickness" Value="0" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource TopBarButtonHoverBrush}" />
-                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="{DynamicResource TopBarButtonPressedBrush}" />
@@ -96,16 +99,16 @@
         <Style x:Key="ArrowButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
             <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="44" />
-            <Setter Property="Opacity" Value="0.82" />
+            <Setter Property="Opacity" Value="0.9" />
             <Setter Property="Padding" Value="0" />
             <Setter Property="Background" Value="{DynamicResource OverlayPanelBrush}" />
-            <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
         </Style>
 
         <Style x:Key="PanelTitle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
-            <Setter Property="FontSize" Value="20" />
+            <Setter Property="FontSize" Value="21" />
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
 
@@ -117,6 +120,7 @@
             <Setter Property="Background" Value="{DynamicResource DrawerItemBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource DrawerItemBorderBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource DrawerTextBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
         </Style>
 
         <Style x:Key="ZoomSliderStyle" TargetType="Slider">
@@ -144,12 +148,44 @@
                        IsHitTestVisible="False">
                 <Rectangle.Fill>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                        <GradientStop Offset="0" Color="#1200E5FF" />
-                        <GradientStop Offset="0.42" Color="#00000000" />
-                        <GradientStop Offset="1" Color="#1612B7FF" />
+                        <GradientStop Offset="0" Color="#20F4A261" />
+                        <GradientStop Offset="0.36" Color="#08FFFFFF" />
+                        <GradientStop Offset="1" Color="#16C77D3B" />
                     </LinearGradientBrush>
                 </Rectangle.Fill>
             </Rectangle>
+
+            <Ellipse Grid.RowSpan="2"
+                     Width="440"
+                     Height="440"
+                     Margin="-160,-180,0,0"
+                     HorizontalAlignment="Left"
+                     VerticalAlignment="Top"
+                     IsHitTestVisible="False"
+                     Opacity="0.18">
+                <Ellipse.Fill>
+                    <RadialGradientBrush RadiusX="0.68" RadiusY="0.68">
+                        <GradientStop Offset="0" Color="#FFFFD7A8" />
+                        <GradientStop Offset="1" Color="#00FFD7A8" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
+
+            <Ellipse Grid.RowSpan="2"
+                     Width="360"
+                     Height="360"
+                     Margin="0,0,-120,-120"
+                     HorizontalAlignment="Right"
+                     VerticalAlignment="Bottom"
+                     IsHitTestVisible="False"
+                     Opacity="0.14">
+                <Ellipse.Fill>
+                    <RadialGradientBrush RadiusX="0.7" RadiusY="0.7">
+                        <GradientStop Offset="0" Color="#FFE7A76A" />
+                        <GradientStop Offset="1" Color="#00E7A76A" />
+                    </RadialGradientBrush>
+                </Ellipse.Fill>
+            </Ellipse>
 
             <Border Grid.Row="0"
                     Style="{StaticResource GlassCardBorder}"
