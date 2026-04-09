@@ -34,22 +34,22 @@ public partial class App : Application
 
         if (themeMode == AppThemeMode.Dark)
         {
-            SetBrushColor("WindowBackgroundBrush", "#FF1E2024");
-            SetBrushColor("PanelBrush", "#FF2B2E34");
-            SetBrushColor("PanelBorderBrush", "#FF474B53");
-            SetBrushColor("AccentBrush", "#FF5F7BEA");
-            SetBrushColor("PrimaryTextBrush", "#FFF2F4F7");
-            SetBrushColor("SecondaryTextBrush", "#FFB8BDC6");
-            SetBrushColor("SurfaceAltBrush", "#FF181A1F");
-            SetBrushColor("OverlayPanelBrush", "#D926292E");
-            SetBrushColor("DrawerBrush", "#FF26292F");
-            SetBrushColor("DrawerBorderBrush", "#FF454A53");
-            SetBrushColor("DrawerTextBrush", "#FFF2F4F7");
-            SetBrushColor("DrawerItemBrush", "#FF31353C");
-            SetBrushColor("DrawerItemBorderBrush", "#FF4E535C");
-            SetBrushColor("TopBarButtonBrush", "#FF3A3E46");
-            SetBrushColor("TopBarButtonHoverBrush", "#FF474C55");
-            SetBrushColor("TopBarButtonPressedBrush", "#FF565B65");
+            SetBrushColor("WindowBackgroundBrush", "#FF161B24");
+            SetBrushColor("PanelBrush", "#FF242A35");
+            SetBrushColor("PanelBorderBrush", "#FF464E5D");
+            SetBrushColor("AccentBrush", "#FFE09A36");
+            SetBrushColor("PrimaryTextBrush", "#FFF0F3F8");
+            SetBrushColor("SecondaryTextBrush", "#FFC7CDD8");
+            SetBrushColor("SurfaceAltBrush", "#FF0C1018");
+            SetBrushColor("OverlayPanelBrush", "#DD111722");
+            SetBrushColor("DrawerBrush", "#FF202631");
+            SetBrushColor("DrawerBorderBrush", "#FF465061");
+            SetBrushColor("DrawerTextBrush", "#FFF0F3F8");
+            SetBrushColor("DrawerItemBrush", "#FF2C3442");
+            SetBrushColor("DrawerItemBorderBrush", "#FF4A5567");
+            SetBrushColor("TopBarButtonBrush", "#FF2E3643");
+            SetBrushColor("TopBarButtonHoverBrush", "#FF394353");
+            SetBrushColor("TopBarButtonPressedBrush", "#FF465164");
             return;
         }
 

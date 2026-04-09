@@ -13,17 +13,17 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
         <DropShadowEffect x:Key="SoftPanelShadow"
-                          BlurRadius="12"
-                          ShadowDepth="2"
+                          BlurRadius="10"
+                          ShadowDepth="1"
                           Direction="270"
-                          Opacity="0.10"
+                          Opacity="0.12"
                           Color="#66000000" />
 
         <DropShadowEffect x:Key="TopBarShadow"
-                          BlurRadius="8"
-                          ShadowDepth="1"
+                          BlurRadius="6"
+                          ShadowDepth="0"
                           Direction="270"
-                          Opacity="0.08"
+                          Opacity="0.12"
                           Color="#66000000" />
 
         <DropShadowEffect x:Key="DrawerShadow"
@@ -37,7 +37,7 @@
             <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="6" />
+            <Setter Property="CornerRadius" Value="2" />
             <Setter Property="Effect" Value="{StaticResource SoftPanelShadow}" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
@@ -46,7 +46,7 @@
             <Setter Property="Background" Value="{DynamicResource OverlayPanelBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="4" />
+            <Setter Property="CornerRadius" Value="2" />
         </Style>
 
         <Style x:Key="TopBarButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
@@ -58,6 +58,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource TopBarButtonHoverBrush}" />
@@ -78,6 +79,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource TopBarButtonHoverBrush}" />
@@ -106,6 +108,7 @@
             <Setter Property="Background" Value="{DynamicResource OverlayPanelBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
         </Style>
 
         <Style x:Key="PanelTitle" TargetType="TextBlock">
@@ -123,6 +126,7 @@
             <Setter Property="BorderBrush" Value="{DynamicResource DrawerItemBorderBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource DrawerTextBrush}" />
             <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
         </Style>
 
         <Style x:Key="ZoomSliderStyle" TargetType="Slider">
@@ -148,15 +152,17 @@
                        IsHitTestVisible="False">
                 <Rectangle.Fill>
                     <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
-                        <GradientStop Offset="0" Color="#FF2E3136" />
-                        <GradientStop Offset="1" Color="#FF2A2D32" />
+                        <GradientStop Offset="0" Color="#FF1C2230" />
+                        <GradientStop Offset="0.08" Color="#FF1A2742" />
+                        <GradientStop Offset="0.16" Color="#FF141A25" />
+                        <GradientStop Offset="1" Color="#FF161B24" />
                     </LinearGradientBrush>
                 </Rectangle.Fill>
             </Rectangle>
 
             <Border Grid.Row="0"
                     Style="{StaticResource GlassCardBorder}"
-                    CornerRadius="4"
+                    CornerRadius="2"
                     Effect="{StaticResource TopBarShadow}">
                 <Grid Margin="14,10,42,10">
                     <Grid.ColumnDefinitions>
@@ -285,7 +291,7 @@
                         Margin="0,0,12,0"
                         Style="{StaticResource GlassCardBorder}"
                         BorderBrush="#00000000"
-                        CornerRadius="4">
+                        CornerRadius="2">
                     <Grid x:Name="CameraViewport"
                           ClipToBounds="True"
                           SizeChanged="CameraViewport_OnSizeChanged"
@@ -316,7 +322,7 @@
                                 VerticalAlignment="Top"
                                 Style="{StaticResource OverlayCardBorder}"
                                 BorderThickness="0"
-                                CornerRadius="4"
+                                CornerRadius="2"
                                 Padding="8,4">
                             <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                        FontSize="17"
@@ -330,7 +336,7 @@
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Bottom"
                                 Style="{StaticResource OverlayCardBorder}"
-                                CornerRadius="4"
+                                CornerRadius="2"
                                 Visibility="{Binding ShowZoomMiniMap, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Grid Margin="10">
                                 <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
@@ -372,7 +378,7 @@
                             <Border Background="Transparent"
                                     BorderBrush="Transparent"
                                     BorderThickness="0"
-                                    CornerRadius="2">
+                                    CornerRadius="1">
                                 <Grid ClipToBounds="True">
                                     <Image Source="{Binding InsetFeedImage}"
                                            Stretch="UniformToFill" />
@@ -381,7 +387,7 @@
                                              VerticalAlignment="Top"
                                              Style="{StaticResource OverlayCardBorder}"
                                              BorderThickness="0"
-                                             CornerRadius="3"
+                                             CornerRadius="2"
                                              Padding="7,3">
                                         <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                                    FontSize="13"
@@ -450,6 +456,7 @@
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Bottom"
                                 Style="{StaticResource OverlayCardBorder}"
+                                CornerRadius="2"
                                 Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -490,7 +497,7 @@
 
                     <Border Grid.Row="0"
                             Style="{StaticResource GlassCardBorder}"
-                            CornerRadius="4"
+                            CornerRadius="2"
                             Padding="18">
                         <StackPanel>
                             <TextBlock Style="{StaticResource PanelTitle}" Text="시스템 현황" />
@@ -516,7 +523,7 @@
                     <Border Grid.Row="1"
                             Margin="0,12,0,12"
                             Style="{StaticResource GlassCardBorder}"
-                            CornerRadius="4"
+                            CornerRadius="2"
                             Padding="18">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -536,7 +543,7 @@
                                                 Background="{DynamicResource DrawerItemBrush}"
                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
                                                 BorderThickness="1"
-                                                CornerRadius="2">
+                                                CornerRadius="1">
                                             <StackPanel>
                                                 <TextBlock Foreground="{DynamicResource WarningBrush}"
                                                            FontSize="12"
@@ -556,7 +563,7 @@
 
                     <Border Grid.Row="2"
                             Style="{StaticResource GlassCardBorder}"
-                            CornerRadius="4"
+                            CornerRadius="2"
                             Padding="18">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -589,7 +596,7 @@
                                                 Background="{DynamicResource DrawerItemBrush}"
                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
                                                 BorderThickness="1"
-                                                CornerRadius="2">
+                                                CornerRadius="1">
                                             <StackPanel>
                                                 <TextBlock Foreground="{DynamicResource WarningBrush}"
                                                            FontSize="12"

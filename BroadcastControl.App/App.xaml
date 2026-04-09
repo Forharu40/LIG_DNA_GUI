@@ -11,25 +11,25 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF1E2024" />
-            <SolidColorBrush x:Key="PanelBrush" Color="#FF2B2E34" />
-            <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF474B53" />
-            <SolidColorBrush x:Key="AccentBrush" Color="#FF5F7BEA" />
+            <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF161B24" />
+            <SolidColorBrush x:Key="PanelBrush" Color="#FF242A35" />
+            <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF464E5D" />
+            <SolidColorBrush x:Key="AccentBrush" Color="#FFE09A36" />
             <SolidColorBrush x:Key="DangerBrush" Color="#FFFF6B6B" />
-            <SolidColorBrush x:Key="WarningBrush" Color="#FFD6AD52" />
-            <SolidColorBrush x:Key="SuccessBrush" Color="#FF86C595" />
-            <SolidColorBrush x:Key="PrimaryTextBrush" Color="#FFF2F4F7" />
-            <SolidColorBrush x:Key="SecondaryTextBrush" Color="#FFB8BDC6" />
-            <SolidColorBrush x:Key="SurfaceAltBrush" Color="#FF181A1F" />
-            <SolidColorBrush x:Key="OverlayPanelBrush" Color="#D926292E" />
-            <SolidColorBrush x:Key="DrawerBrush" Color="#FF26292F" />
-            <SolidColorBrush x:Key="DrawerBorderBrush" Color="#FF454A53" />
-            <SolidColorBrush x:Key="DrawerTextBrush" Color="#FFF2F4F7" />
-            <SolidColorBrush x:Key="DrawerItemBrush" Color="#FF31353C" />
-            <SolidColorBrush x:Key="DrawerItemBorderBrush" Color="#FF4E535C" />
-            <SolidColorBrush x:Key="TopBarButtonBrush" Color="#FF3A3E46" />
-            <SolidColorBrush x:Key="TopBarButtonHoverBrush" Color="#FF474C55" />
-            <SolidColorBrush x:Key="TopBarButtonPressedBrush" Color="#FF565B65" />
+            <SolidColorBrush x:Key="WarningBrush" Color="#FFE5B057" />
+            <SolidColorBrush x:Key="SuccessBrush" Color="#FF64C59A" />
+            <SolidColorBrush x:Key="PrimaryTextBrush" Color="#FFF0F3F8" />
+            <SolidColorBrush x:Key="SecondaryTextBrush" Color="#FFC7CDD8" />
+            <SolidColorBrush x:Key="SurfaceAltBrush" Color="#FF0C1018" />
+            <SolidColorBrush x:Key="OverlayPanelBrush" Color="#DD111722" />
+            <SolidColorBrush x:Key="DrawerBrush" Color="#FF202631" />
+            <SolidColorBrush x:Key="DrawerBorderBrush" Color="#FF465061" />
+            <SolidColorBrush x:Key="DrawerTextBrush" Color="#FFF0F3F8" />
+            <SolidColorBrush x:Key="DrawerItemBrush" Color="#FF2C3442" />
+            <SolidColorBrush x:Key="DrawerItemBorderBrush" Color="#FF4A5567" />
+            <SolidColorBrush x:Key="TopBarButtonBrush" Color="#FF2E3643" />
+            <SolidColorBrush x:Key="TopBarButtonHoverBrush" Color="#FF394353" />
+            <SolidColorBrush x:Key="TopBarButtonPressedBrush" Color="#FF465164" />
         </ResourceDictionary>
     </Application.Resources>
 </Application>
