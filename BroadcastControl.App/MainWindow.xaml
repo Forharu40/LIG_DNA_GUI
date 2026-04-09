@@ -13,31 +13,31 @@
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
         <DropShadowEffect x:Key="SoftPanelShadow"
-                          BlurRadius="36"
-                          ShadowDepth="8"
+                          BlurRadius="12"
+                          ShadowDepth="2"
                           Direction="270"
-                          Opacity="0.20"
-                          Color="#66281405" />
+                          Opacity="0.10"
+                          Color="#66000000" />
 
         <DropShadowEffect x:Key="TopBarShadow"
-                          BlurRadius="26"
-                          ShadowDepth="10"
+                          BlurRadius="8"
+                          ShadowDepth="1"
                           Direction="270"
-                          Opacity="0.16"
-                          Color="#4D281405" />
+                          Opacity="0.08"
+                          Color="#66000000" />
 
         <DropShadowEffect x:Key="DrawerShadow"
-                          BlurRadius="22"
-                          ShadowDepth="8"
+                          BlurRadius="10"
+                          ShadowDepth="1"
                           Direction="270"
-                          Opacity="0.16"
-                          Color="#59281405" />
+                          Opacity="0.10"
+                          Color="#66000000" />
 
         <Style x:Key="GlassCardBorder" TargetType="Border">
             <Setter Property="Background" Value="{DynamicResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="24" />
+            <Setter Property="CornerRadius" Value="6" />
             <Setter Property="Effect" Value="{StaticResource SoftPanelShadow}" />
             <Setter Property="SnapsToDevicePixels" Value="True" />
         </Style>
@@ -46,21 +46,22 @@
             <Setter Property="Background" Value="{DynamicResource OverlayPanelBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="16" />
+            <Setter Property="CornerRadius" Value="4" />
         </Style>
 
         <Style x:Key="TopBarButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
             <Setter Property="Height" Value="40" />
             <Setter Property="Padding" Value="14,8" />
-            <Setter Property="FontSize" Value="15" />
+            <Setter Property="FontSize" Value="14" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Background" Value="{DynamicResource TopBarButtonBrush}" />
-            <Setter Property="BorderBrush" Value="#00000000" />
-            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource TopBarButtonHoverBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="{DynamicResource TopBarButtonPressedBrush}" />
@@ -74,12 +75,13 @@
             <Setter Property="FontSize" Value="11" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Background" Value="{DynamicResource TopBarButtonBrush}" />
-            <Setter Property="BorderBrush" Value="#00000000" />
-            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
                     <Setter Property="Background" Value="{DynamicResource TopBarButtonHoverBrush}" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
                     <Setter Property="Background" Value="{DynamicResource TopBarButtonPressedBrush}" />
@@ -108,7 +110,7 @@
 
         <Style x:Key="PanelTitle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
-            <Setter Property="FontSize" Value="21" />
+            <Setter Property="FontSize" Value="19" />
             <Setter Property="FontWeight" Value="Bold" />
         </Style>
 
@@ -120,7 +122,7 @@
             <Setter Property="Background" Value="{DynamicResource DrawerItemBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource DrawerItemBorderBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource DrawerTextBrush}" />
-            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="BorderThickness" Value="1" />
         </Style>
 
         <Style x:Key="ZoomSliderStyle" TargetType="Slider">
@@ -142,54 +144,19 @@
             </Grid.RowDefinitions>
 
             <Rectangle Grid.RowSpan="2"
-                       RadiusX="28"
-                       RadiusY="28"
                        Margin="-4"
                        IsHitTestVisible="False">
                 <Rectangle.Fill>
-                    <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                        <GradientStop Offset="0" Color="#20F4A261" />
-                        <GradientStop Offset="0.36" Color="#08FFFFFF" />
-                        <GradientStop Offset="1" Color="#16C77D3B" />
+                    <LinearGradientBrush StartPoint="0,0" EndPoint="0,1">
+                        <GradientStop Offset="0" Color="#FF2E3136" />
+                        <GradientStop Offset="1" Color="#FF2A2D32" />
                     </LinearGradientBrush>
                 </Rectangle.Fill>
             </Rectangle>
 
-            <Ellipse Grid.RowSpan="2"
-                     Width="440"
-                     Height="440"
-                     Margin="-160,-180,0,0"
-                     HorizontalAlignment="Left"
-                     VerticalAlignment="Top"
-                     IsHitTestVisible="False"
-                     Opacity="0.18">
-                <Ellipse.Fill>
-                    <RadialGradientBrush RadiusX="0.68" RadiusY="0.68">
-                        <GradientStop Offset="0" Color="#FFFFD7A8" />
-                        <GradientStop Offset="1" Color="#00FFD7A8" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-            </Ellipse>
-
-            <Ellipse Grid.RowSpan="2"
-                     Width="360"
-                     Height="360"
-                     Margin="0,0,-120,-120"
-                     HorizontalAlignment="Right"
-                     VerticalAlignment="Bottom"
-                     IsHitTestVisible="False"
-                     Opacity="0.14">
-                <Ellipse.Fill>
-                    <RadialGradientBrush RadiusX="0.7" RadiusY="0.7">
-                        <GradientStop Offset="0" Color="#FFE7A76A" />
-                        <GradientStop Offset="1" Color="#00E7A76A" />
-                    </RadialGradientBrush>
-                </Ellipse.Fill>
-            </Ellipse>
-
             <Border Grid.Row="0"
                     Style="{StaticResource GlassCardBorder}"
-                    CornerRadius="18"
+                    CornerRadius="4"
                     Effect="{StaticResource TopBarShadow}">
                 <Grid Margin="14,10,42,10">
                     <Grid.ColumnDefinitions>
@@ -318,7 +285,7 @@
                         Margin="0,0,12,0"
                         Style="{StaticResource GlassCardBorder}"
                         BorderBrush="#00000000"
-                        CornerRadius="24">
+                        CornerRadius="4">
                     <Grid x:Name="CameraViewport"
                           ClipToBounds="True"
                           SizeChanged="CameraViewport_OnSizeChanged"
@@ -349,7 +316,7 @@
                                 VerticalAlignment="Top"
                                 Style="{StaticResource OverlayCardBorder}"
                                 BorderThickness="0"
-                                CornerRadius="10"
+                                CornerRadius="4"
                                 Padding="8,4">
                             <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                        FontSize="17"
@@ -363,7 +330,7 @@
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Bottom"
                                 Style="{StaticResource OverlayCardBorder}"
-                                CornerRadius="12"
+                                CornerRadius="4"
                                 Visibility="{Binding ShowZoomMiniMap, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Grid Margin="10">
                                 <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
@@ -405,7 +372,7 @@
                             <Border Background="Transparent"
                                     BorderBrush="Transparent"
                                     BorderThickness="0"
-                                    CornerRadius="12">
+                                    CornerRadius="2">
                                 <Grid ClipToBounds="True">
                                     <Image Source="{Binding InsetFeedImage}"
                                            Stretch="UniformToFill" />
@@ -414,7 +381,7 @@
                                              VerticalAlignment="Top"
                                              Style="{StaticResource OverlayCardBorder}"
                                              BorderThickness="0"
-                                             CornerRadius="8"
+                                             CornerRadius="3"
                                              Padding="7,3">
                                         <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                                    FontSize="13"
@@ -523,7 +490,7 @@
 
                     <Border Grid.Row="0"
                             Style="{StaticResource GlassCardBorder}"
-                            CornerRadius="22"
+                            CornerRadius="4"
                             Padding="18">
                         <StackPanel>
                             <TextBlock Style="{StaticResource PanelTitle}" Text="시스템 현황" />
@@ -549,7 +516,7 @@
                     <Border Grid.Row="1"
                             Margin="0,12,0,12"
                             Style="{StaticResource GlassCardBorder}"
-                            CornerRadius="22"
+                            CornerRadius="4"
                             Padding="18">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -569,7 +536,7 @@
                                                 Background="{DynamicResource DrawerItemBrush}"
                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
                                                 BorderThickness="1"
-                                                CornerRadius="16">
+                                                CornerRadius="2">
                                             <StackPanel>
                                                 <TextBlock Foreground="{DynamicResource WarningBrush}"
                                                            FontSize="12"
@@ -589,7 +556,7 @@
 
                     <Border Grid.Row="2"
                             Style="{StaticResource GlassCardBorder}"
-                            CornerRadius="22"
+                            CornerRadius="4"
                             Padding="18">
                         <Grid>
                             <Grid.RowDefinitions>
@@ -622,7 +589,7 @@
                                                 Background="{DynamicResource DrawerItemBrush}"
                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
                                                 BorderThickness="1"
-                                                CornerRadius="16">
+                                                CornerRadius="2">
                                             <StackPanel>
                                                 <TextBlock Foreground="{DynamicResource WarningBrush}"
                                                            FontSize="12"

@@ -34,41 +34,41 @@ public partial class App : Application
 
         if (themeMode == AppThemeMode.Dark)
         {
-            SetBrushColor("WindowBackgroundBrush", "#FF14100D");
-            SetBrushColor("PanelBrush", "#FF1C1713");
-            SetBrushColor("PanelBorderBrush", "#FF4C3C2F");
-            SetBrushColor("AccentBrush", "#FFEB9B52");
+            SetBrushColor("WindowBackgroundBrush", "#FF2B2E33");
+            SetBrushColor("PanelBrush", "#FF3A3D43");
+            SetBrushColor("PanelBorderBrush", "#FF565A61");
+            SetBrushColor("AccentBrush", "#FF5F7BEA");
             SetBrushColor("PrimaryTextBrush", "#FFFFFFFF");
-            SetBrushColor("SecondaryTextBrush", "#FFD5C2AF");
-            SetBrushColor("SurfaceAltBrush", "#FF15110E");
-            SetBrushColor("OverlayPanelBrush", "#D9231B15");
-            SetBrushColor("DrawerBrush", "#FF18130F");
-            SetBrushColor("DrawerBorderBrush", "#FF4C3C2F");
+            SetBrushColor("SecondaryTextBrush", "#FFC5C9D1");
+            SetBrushColor("SurfaceAltBrush", "#FFE6E0D6");
+            SetBrushColor("OverlayPanelBrush", "#D932353A");
+            SetBrushColor("DrawerBrush", "#FF34373D");
+            SetBrushColor("DrawerBorderBrush", "#FF5A5E66");
             SetBrushColor("DrawerTextBrush", "#FFFFFFFF");
-            SetBrushColor("DrawerItemBrush", "#FF241D16");
-            SetBrushColor("DrawerItemBorderBrush", "#FF5D4937");
-            SetBrushColor("TopBarButtonBrush", "#FF2A2018");
-            SetBrushColor("TopBarButtonHoverBrush", "#FF36281E");
-            SetBrushColor("TopBarButtonPressedBrush", "#FF443124");
+            SetBrushColor("DrawerItemBrush", "#FF3C4047");
+            SetBrushColor("DrawerItemBorderBrush", "#FF61656D");
+            SetBrushColor("TopBarButtonBrush", "#FF484C53");
+            SetBrushColor("TopBarButtonHoverBrush", "#FF565B63");
+            SetBrushColor("TopBarButtonPressedBrush", "#FF656A73");
             return;
         }
 
-        SetBrushColor("WindowBackgroundBrush", "#FFF8F2EB");
-        SetBrushColor("PanelBrush", "#FFFFFBF7");
-        SetBrushColor("PanelBorderBrush", "#FFE1D2C3");
-        SetBrushColor("AccentBrush", "#FFB56622");
-        SetBrushColor("PrimaryTextBrush", "#FF2B2119");
-        SetBrushColor("SecondaryTextBrush", "#FF7A6653");
-        SetBrushColor("SurfaceAltBrush", "#FFF3E8DD");
-        SetBrushColor("OverlayPanelBrush", "#F7FFF8F2");
-        SetBrushColor("DrawerBrush", "#FFFFFBF7");
-        SetBrushColor("DrawerBorderBrush", "#FFE1D2C3");
-        SetBrushColor("DrawerTextBrush", "#FF2B2119");
-        SetBrushColor("DrawerItemBrush", "#FFF5ECE3");
-        SetBrushColor("DrawerItemBorderBrush", "#FFD9C6B2");
-        SetBrushColor("TopBarButtonBrush", "#FFF6ECE1");
-        SetBrushColor("TopBarButtonHoverBrush", "#FFF0E0D0");
-        SetBrushColor("TopBarButtonPressedBrush", "#FFE9D3BE");
+        SetBrushColor("WindowBackgroundBrush", "#FFE7E8EB");
+        SetBrushColor("PanelBrush", "#FFF8F8F9");
+        SetBrushColor("PanelBorderBrush", "#FFCBCDD2");
+        SetBrushColor("AccentBrush", "#FF4E68D1");
+        SetBrushColor("PrimaryTextBrush", "#FF1E2329");
+        SetBrushColor("SecondaryTextBrush", "#FF616873");
+        SetBrushColor("SurfaceAltBrush", "#FFEBE4D8");
+        SetBrushColor("OverlayPanelBrush", "#F3FFFFFF");
+        SetBrushColor("DrawerBrush", "#FFF2F3F5");
+        SetBrushColor("DrawerBorderBrush", "#FFC8CBD0");
+        SetBrushColor("DrawerTextBrush", "#FF1E2329");
+        SetBrushColor("DrawerItemBrush", "#FFE7E9EC");
+        SetBrushColor("DrawerItemBorderBrush", "#FFBEC2C8");
+        SetBrushColor("TopBarButtonBrush", "#FFE3E6EA");
+        SetBrushColor("TopBarButtonHoverBrush", "#FFD8DCE2");
+        SetBrushColor("TopBarButtonPressedBrush", "#FFCDD2D9");
     }
 
     private AppThemeMode GetSystemThemeMode()
