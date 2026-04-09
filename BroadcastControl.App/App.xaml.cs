@@ -50,6 +50,7 @@ public partial class App : Application
             SetBrushColor("TopBarButtonBrush", "#FF2E3643");
             SetBrushColor("TopBarButtonHoverBrush", "#FF394353");
             SetBrushColor("TopBarButtonPressedBrush", "#FF465164");
+            SetBackdropBrush("#FF1C2230", "#FF1A2742", "#FF141A25", "#FF161B24");
             return;
         }
 
@@ -69,6 +70,7 @@ public partial class App : Application
         SetBrushColor("TopBarButtonBrush", "#FFE3E6EA");
         SetBrushColor("TopBarButtonHoverBrush", "#FFD8DCE2");
         SetBrushColor("TopBarButtonPressedBrush", "#FFCDD2D9");
+        SetBackdropBrush("#FFF7F8FB", "#FFEAEFF8", "#FFE4E9F2", "#FFE7E8EB");
     }
 
     private AppThemeMode GetSystemThemeMode()
@@ -99,6 +101,28 @@ public partial class App : Application
 
         // XAML 리소스 브러시는 공유 과정에서 동결될 수 있으므로 기존 인스턴스를 직접 수정하지 않는다.
         Resources[resourceKey] = new SolidColorBrush(color);
+    }
+
+    private void SetBackdropBrush(string startColor, string accentColor, string midColor, string endColor)
+    {
+        if (ColorConverter.ConvertFromString(startColor) is not Color start ||
+            ColorConverter.ConvertFromString(accentColor) is not Color accent ||
+            ColorConverter.ConvertFromString(midColor) is not Color mid ||
+            ColorConverter.ConvertFromString(endColor) is not Color end)
+        {
+            return;
+        }
+
+        Resources["WindowBackdropBrush"] = new LinearGradientBrush(
+            new GradientStopCollection
+            {
+                new(start, 0.0),
+                new(accent, 0.08),
+                new(mid, 0.16),
+                new(end, 1.0),
+            },
+            new Point(0, 0),
+            new Point(0, 1));
     }
 }
 

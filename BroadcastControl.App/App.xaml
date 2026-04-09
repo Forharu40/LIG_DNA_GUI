@@ -30,6 +30,12 @@
             <SolidColorBrush x:Key="TopBarButtonBrush" Color="#FF2E3643" />
             <SolidColorBrush x:Key="TopBarButtonHoverBrush" Color="#FF394353" />
             <SolidColorBrush x:Key="TopBarButtonPressedBrush" Color="#FF465164" />
+            <LinearGradientBrush x:Key="WindowBackdropBrush" StartPoint="0,0" EndPoint="0,1">
+                <GradientStop Offset="0" Color="#FF1C2230" />
+                <GradientStop Offset="0.08" Color="#FF1A2742" />
+                <GradientStop Offset="0.16" Color="#FF141A25" />
+                <GradientStop Offset="1" Color="#FF161B24" />
+            </LinearGradientBrush>
         </ResourceDictionary>
     </Application.Resources>
 </Application>
