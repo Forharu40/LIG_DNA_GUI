@@ -5,15 +5,15 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Material Design 기본 테마 리소스를 먼저 불러온다. -->
+                <!-- Material Design 기본 테마 리소스 로드 -->
                 <materialDesign:BundledTheme BaseTheme="Dark"
                                              PrimaryColor="Teal"
                                              SecondaryColor="Amber" />
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- 아래 브러시들은 앱 전체가 공통으로 사용하는 색상 자원이다.
-                 App.xaml.cs 에서 테마 전환 시 이 리소스들을 한 번에 교체한다. -->
+            <!-- 앱 전체 공통 색상 리소스임.
+                 App.xaml.cs에서 다크/라이트 테마 전환 시 함께 교체함. -->
             <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF161B24" />
             <SolidColorBrush x:Key="PanelBrush" Color="#FF242A35" />
             <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF464E5D" />
@@ -34,8 +34,8 @@
             <SolidColorBrush x:Key="TopBarButtonHoverBrush" Color="#FF394353" />
             <SolidColorBrush x:Key="TopBarButtonPressedBrush" Color="#FF465164" />
 
-            <!-- 화면 가장 뒤에 깔리는 배경 그라데이션이다.
-                 라이트/다크 테마 전환 시 이 브러시도 같이 바뀌어야 전체 분위기가 자연스럽다. -->
+            <!-- 화면 최하단 배경 그라데이션임.
+                 테마 전환 시 패널색과 함께 바꿔 전체 분위기를 맞춤. -->
             <LinearGradientBrush x:Key="WindowBackdropBrush" StartPoint="0,0" EndPoint="0,1">
                 <GradientStop Offset="0" Color="#FF1C2230" />
                 <GradientStop Offset="0.08" Color="#FF1A2742" />

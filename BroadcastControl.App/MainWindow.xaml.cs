@@ -10,48 +10,43 @@ using BroadcastControl.App.ViewModels;
 namespace BroadcastControl.App;
 
 /// <summary>
-/// MainWindow는 ViewModel과 실제 입력/출력 서비스 사이를 연결하는 조정자 역할을 한다.
-/// 화면 배치 자체는 XAML이 담당하고, 여기서는 다음 흐름을 연결한다.
-/// - EO UDP 영상 수신 시작/종료
-/// - IR 임시 노트북 카메라 시작/종료
-/// - 전자 줌 드래그/휠 입력
-/// - 수동 녹화 시작/종료
-/// - 설정창 열림/닫힘 애니메이션
+/// MainWindow와 입력/출력 서비스를 연결하는 조정자임.
+/// XAML은 화면 배치를 담당하고, 이 파일은 EO UDP 수신, IR 임시 웹캠, 줌 입력, 녹화, 설정창 애니메이션을 연결함.
 /// </summary>
 public partial class MainWindow : Window
 {
     /// <summary>
-    /// 설정창이 닫혀 있을 때 화면 오른쪽 바깥으로 얼마나 밀려나 있을지 정의한다.
+    /// 설정창 닫힘 상태에서 오른쪽 바깥으로 밀어둘 거리임.
     /// </summary>
     private const double SettingsDrawerClosedOffset = 320;
 
     /// <summary>
-    /// 화면 상태, 버튼 명령, 텍스트, 줌 값을 관리하는 ViewModel이다.
+    /// 화면 상태, 명령, 텍스트, 줌 값을 관리하는 ViewModel임.
     /// </summary>
     private readonly MainViewModel _viewModel;
 
     /// <summary>
-    /// 외부 EO 카메라가 보내는 UDP 패킷을 받아 프레임으로 복원하는 서비스이다.
+    /// 외부 EO 카메라 UDP 패킷을 프레임으로 복원하는 서비스임.
     /// </summary>
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
 
     /// <summary>
-    /// 임시 IR 화면으로 쓸 노트북 카메라 프레임을 읽는 서비스이다.
+    /// 임시 IR 화면으로 사용할 노트북 카메라 서비스임.
     /// </summary>
     private readonly WebcamCaptureService _irWebcamCaptureService;
 
     /// <summary>
-    /// 전자 줌 상태에서 마우스로 화면을 끌고 있는지 여부를 기억한다.
+    /// 전자 줌 상태에서 마우스 드래그 중인지 저장함.
     /// </summary>
     private bool _isDraggingZoom;
 
     /// <summary>
-    /// 마지막 드래그 좌표를 기억해 다음 이동량(delta)을 계산한다.
+    /// 이전 드래그 좌표임. 다음 이동량 계산에 사용함.
     /// </summary>
     private Point _lastZoomDragPoint;
 
     /// <summary>
-    /// 첫 프레임 수신 로그를 한 번만 남기기 위한 플래그이다.
+    /// 첫 프레임 수신 로그를 한 번만 남기기 위한 플래그임.
     /// </summary>
     private bool _hasReceivedEoFrame;
     private bool _hasReceivedIrFrame;
@@ -70,7 +65,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 창이 실제로 화면에 표시될 때 입력 서비스 연결과 초기 상태 동기화를 수행한다.
+    /// 창 표시 시 입력 서비스 연결과 초기 상태 동기화를 수행함.
     /// </summary>
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
@@ -80,38 +75,38 @@ public partial class MainWindow : Window
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
         _irWebcamCaptureService.FrameReady += OnIrFrameReady;
 
-        // 상단 밝기/대조비 슬라이더는 EO 외부 영상에 적용된다.
+        // 밝기/대조비 슬라이더 값은 EO 외부 영상 보정에 적용함.
         _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
         _eoUdpCaptureService.SetContrast(_viewModel.Contrast);
 
-        // 현재 EO 화면의 실제 표시 크기를 ViewModel과 EO 녹화 서비스에 전달한다.
+        // 현재 EO 표시 영역 크기를 ViewModel과 EO 녹화 서비스에 전달함.
         _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
         UpdateRecordingViewportState();
 
-        // 설정창은 초기 로딩 순간에도 위치와 열림 상태가 맞아야 한다.
+        // 초기 설정창 위치를 ViewModel 상태와 맞춤.
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
 
         if (_eoUdpCaptureService.Start())
         {
-            _viewModel.AppendImportantLog($"EO UDP 수신 대기 중입니다. 포트: {_eoUdpCaptureService.ListeningPort}");
+            _viewModel.AppendImportantLog($"EO UDP 수신 대기 중임. 포트: {_eoUdpCaptureService.ListeningPort}");
         }
         else
         {
-            _viewModel.AppendImportantLog("EO UDP 수신 소켓 생성에 실패했습니다.");
+            _viewModel.AppendImportantLog("EO UDP 수신 소켓 생성 실패.");
         }
 
         if (_irWebcamCaptureService.Start())
         {
-            _viewModel.AppendImportantLog("노트북 카메라가 IR 화면에 임시 연결되었습니다.");
+            _viewModel.AppendImportantLog("노트북 카메라를 IR 임시 화면에 연결함.");
         }
         else
         {
-            _viewModel.AppendImportantLog("노트북 카메라를 IR 화면에 연결하지 못했습니다.");
+            _viewModel.AppendImportantLog("노트북 카메라를 IR 임시 화면에 연결하지 못함.");
         }
     }
 
     /// <summary>
-    /// ViewModel 값이 바뀔 때 실제 서비스와 애니메이션이 따라가야 하는 항목을 처리한다.
+    /// ViewModel 변경 사항 중 실제 서비스와 애니메이션에 반영해야 할 항목을 처리함.
     /// </summary>
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
@@ -142,7 +137,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// EO 메인 화면 크기가 바뀌면 전자 줌 이동 범위와 녹화 구도를 다시 계산한다.
+    /// EO 메인 화면 크기 변경 시 전자 줌 이동 범위와 녹화 구도를 재계산함.
     /// </summary>
     private void CameraViewport_OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
@@ -151,7 +146,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 전자 줌이 켜져 있을 때만 드래그 패닝을 시작한다.
+    /// 전자 줌 상태에서만 드래그 패닝을 시작함.
     /// </summary>
     private void CameraViewport_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -166,7 +161,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 드래그 중에는 EO 화면 안에서 확대된 시야를 이동시킨다.
+    /// 드래그 중 확대된 EO 시야를 이동함.
     /// </summary>
     private void CameraViewport_OnMouseMove(object sender, MouseEventArgs e)
     {
@@ -183,7 +178,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 수동 모드일 때 EO 화면 위에서 마우스 휠로 전자 줌 배율을 조절한다.
+    /// 수동 모드에서 EO 화면 위 마우스 휠로 전자 줌 배율을 조절함.
     /// </summary>
     private void CameraViewport_OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
@@ -197,7 +192,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 드래그를 끝내고 마우스 캡처를 해제한다.
+    /// 드래그 종료 시 마우스 캡처를 해제함.
     /// </summary>
     private void CameraViewport_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
@@ -211,37 +206,37 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// EO UDP 프레임이 도착하면 메인 EO 화면에 반영한다.
-    /// 첫 프레임 수신 시 로그를 한 번 남겨 연결 여부를 쉽게 확인할 수 있게 한다.
+    /// EO UDP 프레임을 메인 EO 화면에 반영함.
+    /// 첫 프레임 수신 시 연결 확인 로그를 한 번만 남김.
     /// </summary>
     private void OnEoFrameReady(BitmapSource frame)
     {
         if (!_hasReceivedEoFrame)
         {
             _hasReceivedEoFrame = true;
-            _viewModel.AppendImportantLog("EO UDP 카메라 첫 프레임을 수신했습니다.");
+            _viewModel.AppendImportantLog("EO UDP 카메라 첫 프레임을 수신함.");
         }
 
         _viewModel.UpdateEoFrame(frame);
     }
 
     /// <summary>
-    /// 노트북 카메라 프레임을 임시 IR 화면에 반영한다.
+    /// 노트북 카메라 프레임을 임시 IR 화면에 반영함.
     /// </summary>
     private void OnIrFrameReady(BitmapSource frame)
     {
         if (!_hasReceivedIrFrame)
         {
             _hasReceivedIrFrame = true;
-            _viewModel.AppendImportantLog("IR 임시 카메라 첫 프레임을 수신했습니다.");
+            _viewModel.AppendImportantLog("IR 임시 카메라 첫 프레임을 수신함.");
         }
 
         _viewModel.UpdateIrFrame(frame);
     }
 
     /// <summary>
-    /// EO 화면에 보이는 전자 줌/패닝 상태를 녹화 서비스에 전달한다.
-    /// 그래야 저장되는 영상도 현재 운용자가 보는 구도와 같아진다.
+    /// EO 화면의 전자 줌/패닝 상태를 녹화 서비스에 전달함.
+    /// 저장 영상 구도를 현재 운용자가 보는 화면과 맞추기 위한 처리임.
     /// </summary>
     private void UpdateRecordingViewportState()
     {
@@ -254,26 +249,26 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// ViewModel의 수동 녹화 상태가 바뀌면 EO 서비스의 실제 녹화 시작/종료를 처리한다.
+    /// 수동 녹화 상태 변경 시 EO 서비스의 실제 녹화 시작/종료를 처리함.
     /// </summary>
     private void HandleManualRecordingStateChanged()
     {
         if (_viewModel.IsManualRecordingEnabled)
         {
             var filePath = _eoUdpCaptureService.StartRecordingToDesktop();
-            _viewModel.AppendImportantLog($"수동 녹화를 시작했습니다: {System.IO.Path.GetFileName(filePath)}");
+            _viewModel.AppendImportantLog($"수동 녹화를 시작함: {System.IO.Path.GetFileName(filePath)}");
             return;
         }
 
         var savedPath = _eoUdpCaptureService.StopRecording();
         if (!string.IsNullOrWhiteSpace(savedPath))
         {
-            _viewModel.AppendImportantLog($"영상이 저장되었습니다: {System.IO.Path.GetFileName(savedPath)}");
+            _viewModel.AppendImportantLog($"영상 저장 완료: {System.IO.Path.GetFileName(savedPath)}");
         }
     }
 
     /// <summary>
-    /// 설정창 바깥 어두운 배경을 클릭하면 설정창을 닫는다.
+    /// 설정창 바깥 배경 클릭 시 설정창을 닫음.
     /// </summary>
     private void SettingsBackdrop_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
@@ -284,7 +279,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 설정창을 직접 페이드+슬라이드 애니메이션으로 열고 닫는다.
+    /// 설정창을 페이드와 슬라이드 애니메이션으로 열고 닫음.
     /// </summary>
     private void AnimateSettingsDrawer(bool isOpen, bool animate)
     {
@@ -350,7 +345,7 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
-    /// 창 종료 시 이벤트와 입력 장치를 모두 정리한다.
+    /// 창 종료 시 이벤트 구독과 입력 장치 리소스를 정리함.
     /// </summary>
     private void OnClosed(object? sender, EventArgs e)
     {

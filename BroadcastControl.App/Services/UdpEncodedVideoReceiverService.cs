@@ -9,19 +9,9 @@ using OpenCvSharp;
 namespace BroadcastControl.App.Services;
 
 /// <summary>
-/// 외부 EO 카메라가 UDP로 보내는 JPEG 프레임을 받아 디코드하는 서비스이다.
-///
-/// 현재 지원하는 패킷 형식은 Python의 struct.pack("!QIIHH", ...) 기준이다.
-/// - utc time: uint64 (big-endian)
-/// - frame index: uint32 (big-endian)
-/// - image byte length: uint32 (big-endian)
-/// - image width: uint16 (big-endian)
-/// - image height: uint16 (big-endian)
-/// - image bytes: JPEG 바이트
-///
-/// 여기서 "!"는 실제 데이터 바이트가 아니라 Python struct의 네트워크 바이트 오더 지정자이다.
-/// 따라서 헤더는 20바이트이며, 한 개의 UDP 데이터그램 안에 "20바이트 헤더 + JPEG 한 장"이 모두 들어온다고 가정한다.
-/// 만약 송신 쪽이 프레임을 여러 패킷으로 나눠 보낸다면 그에 맞는 재조립 로직이 추가로 필요하다.
+/// EO 카메라 UDP JPEG 프레임 수신/디코드 서비스임.
+/// Python struct.pack("!QIIHH", ...) 기반 20바이트 헤더와 JPEG 바디를 처리함.
+/// 현재는 한 UDP 데이터그램에 헤더와 JPEG 한 장이 모두 들어온다는 가정임.
 /// </summary>
 public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
@@ -50,7 +40,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     }
 
     /// <summary>
-    /// 디코드가 끝난 EO 프레임을 UI로 전달한다.
+    /// 디코드 완료된 EO 프레임을 UI로 전달하는 이벤트임.
     /// </summary>
     public event Action<BitmapSource>? FrameReady;
 
@@ -89,7 +79,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         }
         catch
         {
-            // 종료 중 소켓이 이미 닫혀 있더라도 별도 처리 없이 자원 정리를 계속한다.
+            // 종료 중 소켓이 이미 닫혀도 자원 정리는 계속함.
         }
 
         _udpClient?.Dispose();
@@ -101,7 +91,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         }
         catch
         {
-            // 비동기 루프 종료를 기다리는 동안 예외가 나더라도 종료 흐름은 유지한다.
+            // 수신 루프 종료 대기 중 예외가 나도 종료 흐름은 유지함.
         }
 
         _receiveLoopTask = null;
@@ -121,7 +111,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     }
 
     /// <summary>
-    /// EO 화면에 적용된 전자 줌/패닝 상태를 받아 녹화 영상에도 같은 구도가 기록되도록 한다.
+    /// EO 화면의 전자 줌/패닝 상태를 녹화 영상 구도에 반영함.
     /// </summary>
     public void UpdateViewportTransform(double zoomLevel, double panX, double panY, double viewportWidth, double viewportHeight)
     {
@@ -199,8 +189,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
         var header = packet.AsSpan(0, HeaderSize);
 
-        // 현재는 UTC 시간과 프레임 인덱스를 화면에는 쓰지 않지만,
-        // 이후 Yolo/VLM 결과 동기화에 사용할 수 있도록 파싱은 유지한다.
+        // UTC 시간과 프레임 인덱스는 향후 VLM/YOLO 동기화용으로 파싱만 유지함.
         _ = BinaryPrimitives.ReadUInt64BigEndian(header.Slice(0, 8));
         _ = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(8, 4));
         var imageByteLength = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(12, 4));
@@ -226,11 +215,10 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 return;
             }
 
-            // 송신 헤더에 적힌 크기와 실제 디코드 크기가 다를 수 있어, 문제를 잡기 쉽게 최소 검증만 해둔다.
             if (declaredWidth > 0 && declaredHeight > 0 &&
                 (decoded.Width != declaredWidth || decoded.Height != declaredHeight))
             {
-                // 크기 불일치가 있어도 실제 프레임이 디코드되면 화면에는 표시한다.
+                // 헤더 크기와 실제 디코드 크기가 달라도 디코드 성공 시 화면 표시는 유지함.
             }
 
             using var adjusted = new Mat();
@@ -267,7 +255,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         }
         catch
         {
-            // 손상된 JPEG나 디코드 불가 프레임은 버리고 다음 프레임을 기다린다.
+            // 손상된 JPEG 또는 디코드 불가 프레임은 버리고 다음 프레임을 기다림.
         }
     }
 

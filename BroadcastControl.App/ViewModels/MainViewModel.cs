@@ -10,17 +10,12 @@ using BroadcastControl.App.Infrastructure;
 
 namespace BroadcastControl.App.ViewModels;
 
-/// <summary>
-/// 메인 화면의 상태, 모드, 위험 등급, 설정 패널, 줌/팬 값을 한 곳에서 관리한다.
-/// 실제 장비와 VLM이 연결되면 이 ViewModel에 실시간 값을 넣어 같은 화면 구조를 유지할 수 있다.
-/// </summary>
+/// 메인 화면 상태, 모드, 위험 등급, 설정 패널, 줌/팬 값을 한 곳에서 관리함.
+/// 실제 장비와 VLM 연결 시 이 ViewModel에 실시간 값을 넣어 같은 화면 구조를 유지함.
 public sealed class MainViewModel : INotifyPropertyChanged
 {
-    /// <summary>
-    /// 메인 화면의 상태를 한 곳에서 관리하는 ViewModel이다.
-    /// 모드, 위험 등급, 밝기/대조비, 전자 줌, 로그, 테마 버튼 상태까지 모두 이 클래스에 모여 있다.
-    /// </summary>
-    // 전자 줌 미니맵은 이전보다 아주 조금만 키워서 현재 시야를 읽기 쉽게 만든다.
+    /// 모드, 위험 등급, 밝기/대조비, 전자 줌, 로그, 테마 버튼 상태를 관리하는 ViewModel임.
+    // 전자 줌 미니맵은 현재 시야를 읽기 쉽도록 약간 크게 유지함.
     private const double MiniMapWidth = 130;
     private const double MiniMapHeight = 74;
 
@@ -37,7 +32,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private string _currentMode = "자동";
     private string _selectedPrimaryTarget = "복합";
     private string _currentThreatLevel = "낮음";
-    // 프로그램 시작 시 밝기 기본값은 항상 중립값인 50%로 시작한다.
+    // 프로그램 시작 시 밝기 기본값은 중립값 50%로 시작함.
     private double _brightness = 50;
     private double _contrast = 50;
     private bool _isManualRecordingEnabled;
@@ -50,8 +45,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private int _motorPan;
     private int _motorTilt;
 
-    // EO는 외부 UDP 카메라 영상, IR은 임시로 노트북 카메라 영상을 받는다.
-    // 아직 프레임이 들어오지 않았을 때를 대비해 EO/IR 각각 기본 안내 이미지를 준비해 둔다.
+    // EO는 외부 UDP 영상, IR은 임시 노트북 카메라 영상을 사용함.
+    // 프레임 수신 전에도 화면이 비지 않도록 EO/IR 기본 안내 이미지를 준비함.
     private ImageSource? _eoFrame;
     private ImageSource? _irFrame;
     private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame("EO UDP", Color.FromRgb(51, 94, 160));
@@ -59,7 +54,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
-        // 앱이 이미 어떤 테마로 실행 중인지 확인해 설정창 버튼 상태를 맞춘다.
+        // 앱의 현재 테마를 읽어 설정창 버튼 상태와 맞춤.
         if (Application.Current is App app)
         {
             _currentThemeMode = app.CurrentThemeMode;
@@ -89,14 +84,14 @@ public sealed class MainViewModel : INotifyPropertyChanged
             "비군사 표적",
         });
 
-        // 화면의 모든 버튼은 Command 바인딩으로 연결되므로, 생성자에서 한 번에 등록한다.
+        // 화면의 모든 버튼은 Command 바인딩으로 연결하므로 생성자에서 한 번에 등록함.
         TogglePowerCommand = new RelayCommand(_ => TogglePower());
         SetModeCommand = new RelayCommand(SetMode, _ => IsSystemPoweredOn);
         ToggleSettingsCommand = new RelayCommand(_ => IsSettingsOpen = !IsSettingsOpen);
         SelectPrimaryTargetCommand = new RelayCommand(SelectPrimaryTarget, _ => IsSystemPoweredOn);
         ResetBrightnessCommand = new RelayCommand(_ => Brightness = 50, _ => IsSystemPoweredOn);
         ResetContrastCommand = new RelayCommand(_ => Contrast = 50, _ => IsSystemPoweredOn);
-        // 전자 줌 제목 버튼을 누르면 항상 기본 배율인 x1.0으로 복귀한다.
+        // 전자 줌 제목 버튼 클릭 시 기본 배율 x1.0으로 복귀함.
         ResetZoomCommand = new RelayCommand(_ => ZoomLevel = 1.0, _ => CanUseZoomControls);
         ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsManualMode);
         SetThemeCommand = new RelayCommand(SetTheme);
@@ -161,7 +156,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    // 상단 전원 버튼은 프로그램 종료 버튼으로 사용한다.
+    // 상단 전원 버튼은 프로그램 종료 버튼으로 사용함.
     public string PowerButtonText => "전원 종료";
 
     public string CurrentMode
@@ -188,13 +183,13 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string CurrentModeText => $"카메라 모드: {CurrentMode}";
 
-    // 현재 모드 버튼만 선명하게 보여서 별도 텍스트 없이도 상태를 바로 읽을 수 있게 한다.
+    // 현재 모드 버튼만 선명하게 보여 별도 텍스트 없이 상태를 읽게 함.
     public double AutoModeOpacity => CurrentMode == "자동" ? 1.0 : 0.35;
 
     public double ManualModeOpacity => CurrentMode == "수동" ? 1.0 : 0.35;
 
-    // 위험 등급이 올라가면 이후 VLM 연동 시 자동 녹화가 시작될 수 있도록 상태 표시를 준비한다.
-    // 녹화 표시등은 위험 상황 자동 녹화와 수동 녹화를 모두 반영한다.
+    // 위험 등급 상승 시 향후 자동 녹화 표시와 연결할 상태값임.
+    // 녹화 표시등은 위험 상황 자동 녹화와 수동 녹화를 모두 반영함.
     public bool IsRecordingActive => CurrentThreatLevel != "낮음" || IsManualRecordingEnabled;
 
     public Brush RecordingIndicatorBrush => IsRecordingActive ? RecordingOnBrush : RecordingOffBrush;
@@ -223,7 +218,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public double LightThemeButtonOpacity => IsLightThemeActive ? 1.0 : 0.55;
 
-    // 수동 녹화는 수동 모드일 때만 켜고 끌 수 있게 제한한다.
+    // 수동 녹화는 수동 모드에서만 켜고 끌 수 있게 제한함.
     public bool IsManualRecordingEnabled
     {
         get => _isManualRecordingEnabled;
@@ -282,7 +277,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
 
     public string PrimaryTargetText => $"주 탐지체: {SelectedPrimaryTarget}";
 
-    // 영상 위 라벨은 짧게 유지해서 실제 화면을 덜 가리도록 한다.
+    // 영상 위 라벨은 짧게 유지해 실제 화면을 덜 가리도록 함.
     public string EoTitle => "EO cam";
 
     public string IrTitle => "IR cam";
@@ -312,7 +307,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _brightness;
         set
         {
-            // 슬라이더 값이 바뀌면 화면에 표시되는 텍스트도 바로 함께 갱신한다.
+            // 슬라이더 값 변경 시 표시 텍스트도 함께 갱신함.
             if (SetProperty(ref _brightness, value))
             {
                 OnPropertyChanged(nameof(BrightnessText));
@@ -327,7 +322,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _contrast;
         set
         {
-            // 대조비 역시 숫자 표시와 실제 영상 보정이 같은 값을 바라보게 유지한다.
+            // 대조비 숫자 표시와 실제 영상 보정 값을 동일하게 유지함.
             if (SetProperty(ref _contrast, value))
             {
                 OnPropertyChanged(nameof(ContrastText));
@@ -342,11 +337,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
         get => _zoomLevel;
         set
         {
-            // 전자 줌은 과도하게 확대되지 않도록 1.0~4.0 범위로 제한한다.
+            // 전자 줌은 과확대를 막기 위해 1.0~4.0 범위로 제한함.
             var clamped = Math.Clamp(value, 1.0, 4.0);
             if (SetProperty(ref _zoomLevel, clamped))
             {
-                // 기본 배율로 돌아오면 화면 이동값도 의미가 없어지므로 중심으로 복귀시킨다.
+                // 기본 배율 복귀 시 화면 이동값도 중심으로 초기화함.
                 if (_zoomLevel <= 1.0)
                 {
                     _zoomPanX = 0;
@@ -388,7 +383,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
 
             var normalized = (_zoomPanX + maxPan) / (maxPan * 2);
-            // 실제 화면을 왼쪽/위쪽으로 끌어 이동할 때 미니맵 표시도 같은 방향으로 움직이도록 반전한다.
+            // 실제 화면 이동 방향과 미니맵 표시 방향을 맞추기 위해 좌표를 반전함.
             return (1.0 - normalized) * (MiniMapWidth - MiniMapViewportWidth);
         }
     }
@@ -404,7 +399,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
             }
 
             var normalized = (_zoomPanY + maxPan) / (maxPan * 2);
-            // 실제 화면을 왼쪽/위쪽으로 끌어 이동할 때 미니맵 표시도 같은 방향으로 움직이도록 반전한다.
+            // 실제 화면 이동 방향과 미니맵 표시 방향을 맞추기 위해 좌표를 반전함.
             return (1.0 - normalized) * (MiniMapHeight - MiniMapViewportHeight);
         }
     }
@@ -414,7 +409,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     public string MotorTiltText => $"모터 상/하: {_motorTilt}도";
 
     /// <summary>
-    /// 웹캠 프레임을 EO 화면에 반영한다.
+    /// EO 프레임을 화면에 반영함.
     /// </summary>
     public void UpdateEoFrame(ImageSource? frame)
     {
@@ -424,8 +419,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 임시 IR 화면으로 쓰는 노트북 카메라 프레임을 반영한다.
-    /// EO/IR 스왑 상태에 따라 작은 화면 또는 큰 화면에 즉시 반영된다.
+    /// 임시 IR 화면으로 쓰는 노트북 카메라 프레임을 반영함.
+    /// EO/IR 스왑 상태에 따라 작은 화면 또는 큰 화면에 즉시 반영함.
     /// </summary>
     public void UpdateIrFrame(ImageSource? frame)
     {
@@ -435,7 +430,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 카메라 뷰포트 크기를 받아 확대 이동 한계를 다시 계산한다.
+    /// 카메라 뷰포트 크기를 받아 확대 이동 한계를 다시 계산함.
     /// </summary>
     public void UpdateViewportSize(double width, double height)
     {
@@ -446,7 +441,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 확대 상태에서 마우스 드래그로 화면 위치를 이동한다.
+    /// 확대 상태에서 마우스 드래그로 화면 위치를 이동함.
     /// </summary>
     public void PanZoom(double deltaX, double deltaY)
     {
@@ -464,7 +459,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 마우스 휠 입력으로 전자 줌 배율을 조금씩 조절한다.
+    /// 마우스 휠 입력으로 전자 줌 배율을 조금씩 조절함.
     /// </summary>
     public void AdjustZoomByWheel(double wheelSteps)
     {
@@ -473,19 +468,19 @@ public sealed class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        // 휠 한 칸마다 0.1배씩 조절해서 슬라이더와 비슷한 감도로 맞춘다.
+        // 휠 한 칸마다 0.1배씩 조절해 슬라이더와 비슷한 감도로 맞춤.
         ZoomLevel += wheelSteps * 0.1;
     }
 
     public void AppendImportantLog(string message)
     {
-        // 가장 최근 로그가 위에 오도록 맨 앞에 넣는다.
+        // 가장 최근 로그가 위에 오도록 맨 앞에 추가함.
         SystemLogs.Insert(0, new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), message));
         TrimCollection(SystemLogs, 8);
     }
 
     /// <summary>
-    /// 시스템 로그를 바탕화면에 시간 기준 파일명으로 저장해 테스트 결과를 바로 확인할 수 있게 한다.
+    /// 시스템 로그를 바탕화면에 시간 기준 파일명으로 저장함.
     /// </summary>
     private void SaveSystemLogsToDesktop()
     {
@@ -515,12 +510,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 상단 전원 종료 버튼의 실제 동작이다.
-    /// 위험 등급이 높음인 상태에서는 실수로 프로그램을 닫지 못하게 막는다.
+    /// 상단 전원 종료 버튼의 실제 동작임.
+    /// 위험 등급이 높음일 때 실수로 프로그램을 닫지 못하게 막음.
     /// </summary>
     private void TogglePower()
     {
-        // 위험 등급이 높음이면 운용 중인 프로그램을 종료하지 못하게 막는다.
+        // 위험 등급이 높음이면 운용 중인 프로그램 종료를 차단함.
         if (CurrentThreatLevel == "높음")
         {
             AppendImportantLog("위험 등급이 높음 상태여서 프로그램을 종료할 수 없습니다.");
@@ -531,8 +526,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 자동/수동 모드를 전환한다.
-    /// 자동 모드로 돌아가면 수동 녹화, 모터 값, 줌 배율 같은 수동 전용 상태를 초기화한다.
+    /// 자동/수동 모드를 전환함.
+    /// 자동 모드 복귀 시 수동 녹화, 모터 값, 줌 배율을 초기화함.
     /// </summary>
     private void SetMode(object? parameter)
     {
@@ -552,7 +547,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         {
             if (IsManualRecordingEnabled)
             {
-                // 자동 모드로 돌아갈 때 수동 녹화는 즉시 종료되어 저장되도록 한다.
+                // 자동 모드 복귀 시 수동 녹화를 즉시 종료해 저장함.
                 IsManualRecordingEnabled = false;
             }
 
@@ -567,8 +562,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 수동 녹화 버튼을 눌렀을 때 상태를 반전시킨다.
-    /// 실제 파일 저장 시작/종료는 MainWindow가 서비스와 연결해서 처리한다.
+    /// 수동 녹화 버튼 클릭 시 상태를 반전함.
+    /// 실제 파일 저장 시작/종료는 MainWindow가 서비스와 연결해 처리함.
     /// </summary>
     private void ToggleManualRecording()
     {
@@ -581,7 +576,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 설정창에서 앱 테마를 직접 바꿀 수 있게 한다.
+    /// 설정창에서 앱 테마를 직접 바꾸는 명령 처리임.
     /// </summary>
     private void SetTheme(object? parameter)
     {
@@ -601,8 +596,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 설정창에서 주 탐지체를 선택했을 때 현재 선택 상태를 갱신한다.
-    /// 위험 등급은 여기서 바꾸지 않고, 이후 VLM 분석 결과가 들어올 때만 바뀌게 둔다.
+    /// 설정창에서 주 탐지체 선택 시 현재 선택 상태를 갱신함.
+    /// 위험 등급은 VLM 분석 결과가 들어올 때만 바뀌도록 유지함.
     /// </summary>
     private void SelectPrimaryTarget(object? parameter)
     {
@@ -616,8 +611,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// EO/IR 메인 화면과 작은 인셋 화면을 서로 교체한다.
-    /// 사용자는 작은 화면을 눌러 원하는 영상을 크게 볼 수 있다.
+    /// EO/IR 메인 화면과 작은 인셋 화면을 서로 교체함.
+    /// 사용자가 작은 화면을 눌러 원하는 영상을 크게 볼 수 있게 함.
     /// </summary>
     private void SwapFeeds()
     {
@@ -633,8 +628,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 수동 모드에서 모터 방향 버튼을 누를 때 좌우/상하 각도를 조금씩 변경한다.
-    /// 현재는 UI 시뮬레이션 값이지만, 이후 실제 모터 제어 명령으로 연결할 수 있다.
+    /// 수동 모드에서 모터 방향 버튼 클릭 시 좌우/상하 각도를 변경함.
+    /// 현재는 UI 시뮬레이션 값이며, 이후 실제 모터 제어 명령과 연결 가능함.
     /// </summary>
     private void MoveMotor(object? parameter)
     {
@@ -664,8 +659,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 현재 줌 이동 값이 허용 범위를 넘지 않도록 보정한다.
-    /// 화면 크기나 줌 배율이 바뀐 뒤에는 항상 이 정리가 필요하다.
+    /// 현재 줌 이동 값이 허용 범위를 넘지 않도록 보정함.
+    /// 화면 크기나 줌 배율 변경 후 필요한 정리임.
     /// </summary>
     private void ClampZoomPan()
     {
@@ -680,7 +675,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
     private double GetMaxPanY() => (_viewportHeight * (ZoomLevel - 1)) / 2;
 
     /// <summary>
-    /// 전자 줌 미니맵 사각형의 크기와 위치를 다시 계산하도록 UI에 알린다.
+    /// 전자 줌 미니맵 사각형의 크기와 위치 재계산을 UI에 알림.
     /// </summary>
     private void UpdateMiniMapViewport()
     {
@@ -691,8 +686,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 모드, 전원, 줌 가능 여부 등이 바뀌면 버튼 활성 상태도 다시 계산해야 한다.
-    /// 그래서 관련 명령 객체 모두에게 CanExecuteChanged를 한 번에 전달한다.
+    /// 모드, 전원, 줌 가능 여부 변경 시 버튼 활성 상태를 다시 계산함.
+    /// 관련 명령 객체에 CanExecuteChanged를 한 번에 전달함.
     /// </summary>
     private void RaiseAllCommandStates()
     {
@@ -722,8 +717,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 여러 곳에서 반복 사용할 고정 브러시를 생성한다.
-    /// Freeze해서 성능과 메모리 사용을 조금 더 안정적으로 만든다.
+    /// 여러 곳에서 반복 사용할 고정 브러시 생성.
+    /// Freeze 처리로 성능과 메모리 사용을 안정화함.
     /// </summary>
     private static SolidColorBrush CreateBrush(byte r, byte g, byte b)
     {
@@ -733,13 +728,12 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 실제 IR 장치가 아직 연결되지 않았을 때 대신 보여 줄 플레이스홀더 이미지를 생성한다.
-    /// 덕분에 UI 테스트 단계에서도 IR 인셋이 비어 보이지 않는다.
+    /// 실제 카메라 프레임 수신 전 보여 줄 플레이스홀더 이미지를 생성함.
+    /// UI 테스트 단계에서 카메라 영역이 비어 보이지 않도록 함.
     /// </summary>
     private static ImageSource CreateCameraPlaceholderFrame(string label, Color accentColor)
     {
-        // 실제 입력이 아직 들어오지 않는 동안에도 어느 카메라가 어느 자리에 올 예정인지
-        // 운용자가 한눈에 알 수 있도록 간단한 안내용 플레이스홀더 프레임을 만든다.
+        // 실제 입력 수신 전에도 카메라 배치 의도를 알 수 있도록 안내 프레임 생성.
         var group = new DrawingGroup();
         using (var dc = group.Open())
         {
@@ -784,8 +778,8 @@ public sealed class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ViewModel 공통 속성 변경 도우미이다.
-    /// 값이 정말 바뀐 경우에만 PropertyChanged를 발생시켜 불필요한 화면 갱신을 줄인다.
+    /// ViewModel 공통 속성 변경 도우미임.
+    /// 값이 실제로 바뀐 경우에만 PropertyChanged를 발생시켜 불필요한 갱신을 줄임.
     /// </summary>
     private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
     {
@@ -806,11 +800,11 @@ public sealed class MainViewModel : INotifyPropertyChanged
 }
 
 /// <summary>
-/// 상황 분석 창에 표시할 분석 문장이다.
+/// 상황 분석 창에 표시할 분석 문장임.
 /// </summary>
 public sealed record AnalysisItem(string Time, string Message);
 
 /// <summary>
-/// 시스템 로그에는 중요한 상태 변화만 기록한다.
+/// 시스템 로그에 표시할 중요 상태 변화 항목임.
 /// </summary>
 public sealed record SystemLogItem(string Time, string Message);
