@@ -1,0 +1,111 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="980" viewBox="0 0 1600 980">
+  <defs>
+    <style>
+      .title { font: 700 34px 'Malgun Gothic', 'Segoe UI', sans-serif; fill: #18212b; }
+      .section { font: 700 24px 'Malgun Gothic', 'Segoe UI', sans-serif; fill: #1f2d3d; }
+      .boxTitle { font: 700 20px 'Malgun Gothic', 'Segoe UI', sans-serif; fill: #102030; }
+      .body { font: 500 16px 'Malgun Gothic', 'Segoe UI', sans-serif; fill: #213547; }
+      .small { font: 500 14px 'Malgun Gothic', 'Segoe UI', sans-serif; fill: #31465b; }
+      .note { font: 600 15px 'Malgun Gothic', 'Segoe UI', sans-serif; fill: #253443; }
+      .panel { stroke: #29465b; stroke-width: 2.5; rx: 18; ry: 18; }
+      .sub { stroke: #4b6478; stroke-width: 1.8; rx: 14; ry: 14; }
+      .arrow { stroke: #2a74b8; stroke-width: 5; fill: none; marker-end: url(#arrowhead); }
+      .dashed { stroke: #6a7f91; stroke-width: 3; stroke-dasharray: 10 10; fill: none; marker-end: url(#arrowheadGray); }
+    </style>
+    <marker id="arrowhead" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#2a74b8"/>
+    </marker>
+    <marker id="arrowheadGray" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <path d="M 0 0 L 12 6 L 0 12 z" fill="#6a7f91"/>
+    </marker>
+  </defs>
+
+  <rect x="0" y="0" width="1600" height="980" fill="#f4f7fb"/>
+  <text x="60" y="70" class="title">운용통제 GUI(C#) 와 Jetson Thor(C++) 간 상세 통신 과정</text>
+
+  <rect x="50" y="110" width="560" height="800" class="panel" fill="#eaf3ff"/>
+  <text x="80" y="155" class="section">운용통제 PC / GUI 영역</text>
+
+  <rect x="90" y="200" width="480" height="120" class="sub" fill="#ffffff"/>
+  <text x="115" y="235" class="boxTitle">1. MainWindow / ViewModel 시작</text>
+  <text x="115" y="265" class="body">- WPF 앱 로드</text>
+  <text x="115" y="292" class="body">- EO UDP 수신기 시작</text>
+  <text x="115" y="319" class="body">- Jetson 예제 프롬프트 전송 시작</text>
+
+  <rect x="90" y="355" width="480" height="170" class="sub" fill="#ffffff"/>
+  <text x="115" y="390" class="boxTitle">2. JetsonBridgeClientService</text>
+  <text x="115" y="420" class="body">- TCP 클라이언트 연결</text>
+  <text x="115" y="447" class="body">- JSON 한 줄 생성 후 newline 포함 전송</text>
+  <text x="115" y="474" class="small">requestId / model / prompt</text>
+  <text x="115" y="501" class="small">예: model=gemma3, prompt=Why is the sky blue?</text>
+
+  <rect x="90" y="560" width="480" height="150" class="sub" fill="#ffffff"/>
+  <text x="115" y="595" class="boxTitle">3. Jetson 응답 수신 후 GUI 반영</text>
+  <text x="115" y="625" class="body">- 응답 JSON 역직렬화</text>
+  <text x="115" y="652" class="body">- 상황 분석 창에 문장 추가</text>
+  <text x="115" y="679" class="body">- 시스템 로그에 성공/실패 기록</text>
+
+  <rect x="90" y="745" width="480" height="125" class="sub" fill="#ffffff"/>
+  <text x="115" y="780" class="boxTitle">4. 화면에 보이는 최종 결과</text>
+  <text x="115" y="810" class="body">- 상황 분석: Ollama 응답 문장 표시</text>
+  <text x="115" y="837" class="body">- 시스템 로그: 요청 시작, 응답 성공/실패 표시</text>
+
+  <rect x="670" y="110" width="420" height="800" class="panel" fill="#fff4ea"/>
+  <text x="700" y="155" class="section">Jetson Thor / C++ 브리지 영역</text>
+
+  <rect x="710" y="220" width="340" height="180" class="sub" fill="#ffffff"/>
+  <text x="735" y="255" class="boxTitle">5. TCP 서버 수신</text>
+  <text x="735" y="285" class="body">- 포트 7001 대기</text>
+  <text x="735" y="312" class="body">- GUI가 보낸 JSON 1줄 수신</text>
+  <text x="735" y="339" class="body">- requestId / model / prompt 파싱</text>
+  <text x="735" y="366" class="small">파일: JetsonThor.Bridge/src/main.cpp</text>
+
+  <rect x="710" y="455" width="340" height="180" class="sub" fill="#ffffff"/>
+  <text x="735" y="490" class="boxTitle">6. Ollama용 REST 요청 생성</text>
+  <text x="735" y="520" class="body">- HTTP POST /api/generate</text>
+  <text x="735" y="547" class="body">- JSON body 작성</text>
+  <text x="735" y="574" class="small">{"model":"gemma3","prompt":"Why is the sky blue?","stream":false}</text>
+  <text x="735" y="601" class="body">- localhost:11434 로 전달</text>
+
+  <rect x="710" y="690" width="340" height="160" class="sub" fill="#ffffff"/>
+  <text x="735" y="725" class="boxTitle">7. Ollama 응답 재포장</text>
+  <text x="735" y="755" class="body">- response 또는 error 추출</text>
+  <text x="735" y="782" class="body">- elapsedMs 계산</text>
+  <text x="735" y="809" class="body">- GUI로 다시 JSON 1줄 송신</text>
+
+  <rect x="1150" y="110" width="400" height="800" class="panel" fill="#eefbe9"/>
+  <text x="1180" y="155" class="section">Ollama 영역</text>
+
+  <rect x="1190" y="300" width="320" height="180" class="sub" fill="#ffffff"/>
+  <text x="1215" y="335" class="boxTitle">8. Ollama /api/generate</text>
+  <text x="1215" y="365" class="body">- model 로드 또는 사용 가능 여부 확인</text>
+  <text x="1215" y="392" class="body">- prompt 처리</text>
+  <text x="1215" y="419" class="body">- 최종 자연어 응답 생성</text>
+  <text x="1215" y="446" class="small">예: Rayleigh scattering 설명</text>
+
+  <rect x="1190" y="560" width="320" height="150" class="sub" fill="#ffffff"/>
+  <text x="1215" y="595" class="boxTitle">9. Jetson 브리지로 JSON 응답</text>
+  <text x="1215" y="625" class="small">{"response":"...", "done":true, ...}</text>
+  <text x="1215" y="652" class="body">- Jetson 브리지가 필요한 필드만 추림</text>
+
+  <path d="M 570 440 C 620 440, 650 440, 705 440" class="arrow"/>
+  <text x="590" y="415" class="note">TCP JSON 요청</text>
+
+  <path d="M 710 545 C 870 545, 1020 390, 1185 390" class="arrow"/>
+  <text x="905" y="470" class="note">HTTP POST /api/generate</text>
+
+  <path d="M 1190 640 C 1070 640, 940 770, 1050 770" class="arrow"/>
+  <text x="1050" y="675" class="note">Ollama JSON 응답</text>
+
+  <path d="M 710 790 C 650 790, 620 640, 570 640" class="arrow"/>
+  <text x="585" y="740" class="note">TCP JSON 응답</text>
+
+  <path d="M 330 320 L 330 350" class="dashed"/>
+  <path d="M 330 525 L 330 555" class="dashed"/>
+  <path d="M 330 710 L 330 740" class="dashed"/>
+  <path d="M 880 400 L 880 450" class="dashed"/>
+  <path d="M 880 635 L 880 690" class="dashed"/>
+
+  <rect x="60" y="925" width="1480" height="35" rx="12" ry="12" fill="#dde7f2" stroke="#9eb3c6"/>
+  <text x="80" y="948" class="small">현재 구현 기준: GUI는 TCP 클라이언트, Jetson은 TCP 서버 + Ollama REST 브리지, 결과는 GUI의 '상황 분석'과 '시스템 로그'에 반영됨</text>
+</svg>

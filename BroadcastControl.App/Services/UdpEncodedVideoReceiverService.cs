@@ -11,6 +11,7 @@ namespace BroadcastControl.App.Services;
 public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
     private const int DefaultPort = 5000;
+    // 송신기 쪽에서 JPEG 데이터 앞에 20바이트 길이의 사용자 정의 헤더를 붙일 수 있다.
     private const int HeaderSize = 20;
 
     private readonly Dispatcher _dispatcher;
@@ -49,6 +50,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         {
             ListeningPort = port;
             _udpClient = new UdpClient();
+            // 로컬 테스트를 반복 실행하거나 재시작했을 때 포트 바인딩 실패를 줄이기 위한 설정이다.
             _udpClient.Client.ExclusiveAddressUse = false;
             _udpClient.Client.ReceiveBufferSize = 4 * 1024 * 1024;
             _udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, port));
@@ -173,6 +175,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             return;
         }
 
+        // 가장 단순한 경우는 헤더 없이 JPEG 원본만 바로 들어오는 경우다.
         if (LooksLikeJpeg(packet))
         {
             TryDecodeFrame(packet, 0, 0);
@@ -184,6 +187,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             return;
         }
 
+        // 송신기 구현에 따라 헤더의 바이트 순서가 달라질 수 있어서
+        // big-endian / little-endian 두 형식을 모두 시도한다.
         if (TryExtractEncodedFrame(packet, useBigEndian: true, out var bigEndianFrame))
         {
             TryDecodeFrame(bigEndianFrame.EncodedBytes, bigEndianFrame.DeclaredWidth, bigEndianFrame.DeclaredHeight);
@@ -200,6 +205,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     {
         try
         {
+            // 먼저 JPEG 디코딩이 실제로 되는지 확인한다.
+            // 헤더에 적힌 크기와 조금 달라도 디코딩에 성공한 프레임은 화면에 표시한다.
             using var decoded = Cv2.ImDecode(encodedFrame, ImreadModes.Color);
             if (decoded.Empty())
             {
@@ -209,7 +216,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             if (declaredWidth > 0 && declaredHeight > 0 &&
                 (decoded.Width != declaredWidth || decoded.Height != declaredHeight))
             {
-                // If the declared size differs, keep rendering the successfully decoded frame.
+                // 헤더상의 크기 정보가 실제 영상 크기와 다르더라도,
+                // 디코딩된 영상 자체는 정상일 수 있으므로 계속 사용한다.
             }
 
             using var adjusted = new Mat();
@@ -219,6 +227,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
             if (_isRecording)
             {
+                // 녹화는 항상 원본 전체 화면이 아니라,
+                // 사용자가 현재 보고 있는 줌/이동 상태의 화면 기준으로 맞춘다.
                 using var recordingFrame = CreateRecordedFrame(adjusted);
                 EnsureVideoWriter(recordingFrame.Width, recordingFrame.Height);
                 _writer?.Write(recordingFrame);
@@ -261,6 +271,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         double baseWidth;
         double baseHeight;
 
+        // 먼저 현재 화면 비율과 맞는 기준 영역(base 영역)을 계산한다.
         if (sourceAspect > viewportAspect)
         {
             baseHeight = sourceHeight;
@@ -286,6 +297,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         var offsetX = GetViewportOffset(_zoomPanX, maxPanX, remainingX);
         var offsetY = GetViewportOffset(_zoomPanY, maxPanY, remainingY);
 
+        // 그 다음 줌/이동 값에 따라 잘라내고,
+        // 최종 저장 영상의 해상도가 흔들리지 않도록 기준 크기로 다시 맞춘다.
         var cropRect = new Rect(
             (int)Math.Clamp(Math.Round(baseX + offsetX), 0, sourceWidth - 1),
             (int)Math.Clamp(Math.Round(baseY + offsetY), 0, sourceHeight - 1),
@@ -364,6 +377,10 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         var header = packet.AsSpan(0, HeaderSize);
         var payload = packet.AsSpan(HeaderSize);
 
+        // 헤더 구조는 다음과 같이 해석한다.
+        // [12..15] JPEG 데이터 길이
+        // [16..17] 선언된 영상 너비
+        // [18..19] 선언된 영상 높이
         var imageByteLength = useBigEndian
             ? BinaryPrimitives.ReadUInt32BigEndian(header.Slice(12, 4))
             : BinaryPrimitives.ReadUInt32LittleEndian(header.Slice(12, 4));
@@ -391,6 +408,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             return false;
         }
 
+        // 헤더 값이 멀쩡해 보여도 실제 JPEG가 아니면 잘못된 패킷으로 보고 버린다.
         var encodedBytes = payload[..checked((int)imageByteLength)].ToArray();
         if (!LooksLikeJpeg(encodedBytes))
         {
