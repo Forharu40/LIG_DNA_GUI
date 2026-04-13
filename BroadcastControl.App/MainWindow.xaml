@@ -514,6 +514,7 @@
                     <!-- 시스템 현황 패널:
                          위험 등급과 주 탐지체처럼 즉시 필요한 상태만 표시함. -->
                     <Border Grid.Row="0"
+                            Margin="0,0,0,12"
                             Style="{StaticResource GlassCardBorder}"
                             CornerRadius="2"
                             Padding="18">
@@ -541,7 +542,7 @@
                     <!-- 상황 분석 패널:
                          향후 VLM 분석 문장을 실시간으로 누적 표시할 영역임. -->
                     <Border Grid.Row="1"
-                            Margin="0,12,0,12"
+                            Margin="0,0,0,12"
                             Style="{StaticResource GlassCardBorder}"
                             CornerRadius="2"
                             Padding="18">

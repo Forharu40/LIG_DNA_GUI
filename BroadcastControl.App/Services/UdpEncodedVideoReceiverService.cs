@@ -8,11 +8,6 @@ using OpenCvSharp;
 
 namespace BroadcastControl.App.Services;
 
-/// <summary>
-/// EO 카메라 UDP JPEG 프레임 수신/디코드 서비스임.
-/// Python struct.pack("!QIIHH", ...) 기반 20바이트 헤더와 JPEG 바디를 처리함.
-/// 현재는 한 UDP 데이터그램에 헤더와 JPEG 한 장이 모두 들어온다는 가정임.
-/// </summary>
 public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
     private const int DefaultPort = 5000;
@@ -39,9 +34,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         _dispatcher = System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
     }
 
-    /// <summary>
-    /// 디코드 완료된 EO 프레임을 UI로 전달하는 이벤트임.
-    /// </summary>
     public event Action<BitmapSource>? FrameReady;
 
     public int ListeningPort { get; private set; } = DefaultPort;
@@ -56,8 +48,11 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         try
         {
             ListeningPort = port;
-            _udpClient = new UdpClient(new IPEndPoint(IPAddress.Any, port));
+            _udpClient = new UdpClient();
+            _udpClient.Client.ExclusiveAddressUse = false;
             _udpClient.Client.ReceiveBufferSize = 4 * 1024 * 1024;
+            _udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, port));
+
             _cancellationTokenSource = new CancellationTokenSource();
             _receiveLoopTask = Task.Run(() => ReceiveLoopAsync(_cancellationTokenSource.Token));
             return true;
@@ -79,7 +74,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         }
         catch
         {
-            // 종료 중 소켓이 이미 닫혀도 자원 정리는 계속함.
         }
 
         _udpClient?.Dispose();
@@ -91,7 +85,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         }
         catch
         {
-            // 수신 루프 종료 대기 중 예외가 나도 종료 흐름은 유지함.
         }
 
         _receiveLoopTask = null;
@@ -110,9 +103,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         _contrast = Math.Clamp(value, 0, 100);
     }
 
-    /// <summary>
-    /// EO 화면의 전자 줌/패닝 상태를 녹화 영상 구도에 반영함.
-    /// </summary>
     public void UpdateViewportTransform(double zoomLevel, double panX, double panY, double viewportWidth, double viewportHeight)
     {
         _zoomLevel = Math.Clamp(zoomLevel, 1.0, 4.0);
@@ -152,8 +142,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     {
         while (!cancellationToken.IsCancellationRequested)
         {
-            UdpReceiveResult receiveResult;
-
             try
             {
                 if (_udpClient is null)
@@ -161,7 +149,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                     break;
                 }
 
-                receiveResult = await _udpClient.ReceiveAsync(cancellationToken);
+                var receiveResult = await _udpClient.ReceiveAsync(cancellationToken);
+                TryProcessPacket(receiveResult.Buffer);
             }
             catch (OperationCanceledException)
             {
@@ -173,36 +162,38 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             }
             catch
             {
-                continue;
             }
-
-            TryProcessPacket(receiveResult.Buffer);
         }
     }
 
     private void TryProcessPacket(byte[] packet)
     {
+        if (packet.Length == 0)
+        {
+            return;
+        }
+
+        if (LooksLikeJpeg(packet))
+        {
+            TryDecodeFrame(packet, 0, 0);
+            return;
+        }
+
         if (packet.Length <= HeaderSize)
         {
             return;
         }
 
-        var header = packet.AsSpan(0, HeaderSize);
-
-        // UTC 시간과 프레임 인덱스는 향후 VLM/YOLO 동기화용으로 파싱만 유지함.
-        _ = BinaryPrimitives.ReadUInt64BigEndian(header.Slice(0, 8));
-        _ = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(8, 4));
-        var imageByteLength = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(12, 4));
-        var declaredWidth = BinaryPrimitives.ReadUInt16BigEndian(header.Slice(16, 2));
-        var declaredHeight = BinaryPrimitives.ReadUInt16BigEndian(header.Slice(18, 2));
-
-        var payload = packet.AsSpan(HeaderSize);
-        if (imageByteLength == 0 || payload.Length < imageByteLength)
+        if (TryExtractEncodedFrame(packet, useBigEndian: true, out var bigEndianFrame))
         {
+            TryDecodeFrame(bigEndianFrame.EncodedBytes, bigEndianFrame.DeclaredWidth, bigEndianFrame.DeclaredHeight);
             return;
         }
 
-        TryDecodeFrame(payload[..checked((int)imageByteLength)].ToArray(), declaredWidth, declaredHeight);
+        if (TryExtractEncodedFrame(packet, useBigEndian: false, out var littleEndianFrame))
+        {
+            TryDecodeFrame(littleEndianFrame.EncodedBytes, littleEndianFrame.DeclaredWidth, littleEndianFrame.DeclaredHeight);
+        }
     }
 
     private void TryDecodeFrame(byte[] encodedFrame, ushort declaredWidth, ushort declaredHeight)
@@ -218,7 +209,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             if (declaredWidth > 0 && declaredHeight > 0 &&
                 (decoded.Width != declaredWidth || decoded.Height != declaredHeight))
             {
-                // 헤더 크기와 실제 디코드 크기가 달라도 디코드 성공 시 화면 표시는 유지함.
+                // If the declared size differs, keep rendering the successfully decoded frame.
             }
 
             using var adjusted = new Mat();
@@ -255,7 +246,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         }
         catch
         {
-            // 손상된 JPEG 또는 디코드 불가 프레임은 버리고 다음 프레임을 기다림.
         }
     }
 
@@ -352,4 +342,64 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     {
         Stop();
     }
+
+    private static bool LooksLikeJpeg(IReadOnlyList<byte> packet)
+    {
+        return packet.Count >= 4
+            && packet[0] == 0xFF
+            && packet[1] == 0xD8
+            && packet[^2] == 0xFF
+            && packet[^1] == 0xD9;
+    }
+
+    private static bool TryExtractEncodedFrame(byte[] packet, bool useBigEndian, out EncodedFrame frame)
+    {
+        frame = default;
+
+        if (packet.Length <= HeaderSize)
+        {
+            return false;
+        }
+
+        var header = packet.AsSpan(0, HeaderSize);
+        var payload = packet.AsSpan(HeaderSize);
+
+        var imageByteLength = useBigEndian
+            ? BinaryPrimitives.ReadUInt32BigEndian(header.Slice(12, 4))
+            : BinaryPrimitives.ReadUInt32LittleEndian(header.Slice(12, 4));
+
+        var declaredWidth = useBigEndian
+            ? BinaryPrimitives.ReadUInt16BigEndian(header.Slice(16, 2))
+            : BinaryPrimitives.ReadUInt16LittleEndian(header.Slice(16, 2));
+
+        var declaredHeight = useBigEndian
+            ? BinaryPrimitives.ReadUInt16BigEndian(header.Slice(18, 2))
+            : BinaryPrimitives.ReadUInt16LittleEndian(header.Slice(18, 2));
+
+        if (imageByteLength == 0 || imageByteLength > payload.Length)
+        {
+            return false;
+        }
+
+        if ((declaredWidth == 0) != (declaredHeight == 0))
+        {
+            return false;
+        }
+
+        if (declaredWidth > 10000 || declaredHeight > 10000)
+        {
+            return false;
+        }
+
+        var encodedBytes = payload[..checked((int)imageByteLength)].ToArray();
+        if (!LooksLikeJpeg(encodedBytes))
+        {
+            return false;
+        }
+
+        frame = new EncodedFrame(encodedBytes, declaredWidth, declaredHeight);
+        return true;
+    }
+
+    private readonly record struct EncodedFrame(byte[] EncodedBytes, ushort DeclaredWidth, ushort DeclaredHeight);
 }

@@ -7,12 +7,13 @@ using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
 using BroadcastControl.App.Infrastructure;
+using BroadcastControl.App.Services;
 
 namespace BroadcastControl.App.ViewModels;
 
 /// 메인 화면 상태, 모드, 위험 등급, 설정 패널, 줌/팬 값을 한 곳에서 관리함.
 /// 실제 장비와 VLM 연결 시 이 ViewModel에 실시간 값을 넣어 같은 화면 구조를 유지함.
-public sealed class MainViewModel : INotifyPropertyChanged
+public sealed partial class MainViewModel : INotifyPropertyChanged
 {
     /// 모드, 위험 등급, 밝기/대조비, 전자 줌, 로그, 테마 버튼 상태를 관리하는 ViewModel임.
     // 전자 줌 미니맵은 현재 시야를 읽기 쉽도록 약간 크게 유지함.
@@ -98,6 +99,7 @@ public sealed class MainViewModel : INotifyPropertyChanged
         SaveSystemLogsCommand = new RelayCommand(_ => SaveSystemLogsToDesktop());
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         MoveMotorCommand = new RelayCommand(MoveMotor, _ => CanUseMotorControls);
+        InitializeJetsonBridge();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
