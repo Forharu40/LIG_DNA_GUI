@@ -232,7 +232,3 @@ system_log_yyyyMMdd_HHmmss.txt
 | `BroadcastControl.App/Infrastructure/RelayCommand.cs` | WPF Command 바인딩용 공통 명령 클래스 |
 
 ## 개발 메모
-
-- 현재 기본 개발 기준은 `main`이며, 최종 테마 결과 브랜치는 `theme_result`임.
-- 외부 EO 영상이 안 보이면 먼저 송신 대상 IP, UDP 포트 `5000`, Windows 방화벽, JPEG 단일 데이터그램 여부를 확인해야 함.
-- UDP 프레임 분할 전송이 필요해지면 `frame_index`, `chunk_index`, `chunk_count` 같은 필드를 추가한 재조립 프로토콜로 확장해야 함.
