@@ -21,6 +21,10 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     private Task? _receiveLoopTask;
     private VideoWriter? _writer;
     private string? _recordingPath;
+    private string? _recordingErrorMessage;
+    private int _recordedFrameCount;
+    private OpenCvSharp.Size _recordingOutputSize;
+    private Mat? _latestRecordableFrame;
     private bool _isRecording;
     private double _brightness = 50;
     private double _contrast = 50;
@@ -38,6 +42,10 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     public event Action<BitmapSource>? FrameReady;
 
     public int ListeningPort { get; private set; } = DefaultPort;
+
+    public string? LastRecordingErrorMessage => _recordingErrorMessage;
+
+    public int RecordedFrameCount => _recordedFrameCount;
 
     public bool Start(int port = DefaultPort)
     {
@@ -122,9 +130,28 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         }
 
         var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+        if (string.IsNullOrWhiteSpace(desktopPath) || !Directory.Exists(desktopPath))
+        {
+            desktopPath = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+                "Desktop");
+        }
+
+        Directory.CreateDirectory(desktopPath);
         var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
         _recordingPath = Path.Combine(desktopPath, $"video_{timestamp}.avi");
+        _recordingErrorMessage = null;
+        _recordedFrameCount = 0;
+        _recordingOutputSize = default;
         _isRecording = true;
+
+        if (_latestRecordableFrame is not null && !_latestRecordableFrame.Empty())
+        {
+            using var initialFrame = CreateRecordedFrame(_latestRecordableFrame);
+            EnsureVideoWriter(initialFrame.Width, initialFrame.Height);
+            WriteRecordingFrame(initialFrame);
+        }
+
         return _recordingPath;
     }
 
@@ -225,13 +252,16 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             var beta = (_brightness - 50.0) * 2.0;
             decoded.ConvertTo(adjusted, MatType.CV_8UC3, alpha, beta);
 
+            _latestRecordableFrame?.Dispose();
+            _latestRecordableFrame = adjusted.Clone();
+
             if (_isRecording)
             {
                 // 녹화는 항상 원본 전체 화면이 아니라,
                 // 사용자가 현재 보고 있는 줌/이동 상태의 화면 기준으로 맞춘다.
                 using var recordingFrame = CreateRecordedFrame(adjusted);
                 EnsureVideoWriter(recordingFrame.Width, recordingFrame.Height);
-                _writer?.Write(recordingFrame);
+                WriteRecordingFrame(recordingFrame);
             }
 
             using var converted = new Mat();
@@ -344,16 +374,102 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             return;
         }
 
-        _writer = new VideoWriter(
-            _recordingPath,
-            FourCC.MJPG,
-            30,
-            new OpenCvSharp.Size(width, height));
+        _recordingOutputSize = NormalizeRecordingSize(width, height);
+        var attempts = new List<string>();
+        var strategies = new[]
+        {
+            (Api: VideoCaptureAPIs.OPENCV_MJPEG, Codec: FourCC.MJPG, Name: "OPENCV_MJPEG/MJPG"),
+            (Api: VideoCaptureAPIs.MSMF, Codec: FourCC.MJPG, Name: "MSMF/MJPG"),
+            (Api: VideoCaptureAPIs.FFMPEG, Codec: FourCC.MJPG, Name: "FFMPEG/MJPG"),
+            (Api: VideoCaptureAPIs.ANY, Codec: FourCC.MJPG, Name: "ANY/MJPG"),
+            (Api: VideoCaptureAPIs.MSMF, Codec: FourCC.XVID, Name: "MSMF/XVID"),
+            (Api: VideoCaptureAPIs.FFMPEG, Codec: FourCC.XVID, Name: "FFMPEG/XVID"),
+            (Api: VideoCaptureAPIs.ANY, Codec: FourCC.XVID, Name: "ANY/XVID"),
+        };
+
+        foreach (var strategy in strategies)
+        {
+            VideoWriter? writer = null;
+            try
+            {
+                writer = new VideoWriter(
+                    _recordingPath,
+                    strategy.Api,
+                    strategy.Codec,
+                    30,
+                    _recordingOutputSize,
+                    true);
+
+                if (writer.IsOpened())
+                {
+                    _writer = writer;
+                    _recordingErrorMessage = null;
+                    return;
+                }
+            }
+            catch (Exception ex)
+            {
+                attempts.Add($"{strategy.Name}: {ex.Message}");
+            }
+            finally
+            {
+                if (writer is not null && _writer is null)
+                {
+                    writer.Dispose();
+                }
+            }
+
+            attempts.Add(strategy.Name);
+        }
+
+        _recordingErrorMessage = "Could not open a video writer for the desktop recording path. Tried: "
+            + string.Join(", ", attempts);
+    }
+
+    private static OpenCvSharp.Size NormalizeRecordingSize(int width, int height)
+    {
+        var normalizedWidth = Math.Max(2, width);
+        var normalizedHeight = Math.Max(2, height);
+
+        if ((normalizedWidth & 1) != 0)
+        {
+            normalizedWidth--;
+        }
+
+        if ((normalizedHeight & 1) != 0)
+        {
+            normalizedHeight--;
+        }
+
+        return new OpenCvSharp.Size(normalizedWidth, normalizedHeight);
+    }
+
+    private void WriteRecordingFrame(Mat frame)
+    {
+        if (_writer is null || !_writer.IsOpened())
+        {
+            return;
+        }
+
+        if (frame.Size() == _recordingOutputSize)
+        {
+            _writer.Write(frame);
+        }
+        else
+        {
+            using var resizedFrame = new Mat();
+            Cv2.Resize(frame, resizedFrame, _recordingOutputSize);
+            _writer.Write(resizedFrame);
+        }
+
+        _recordedFrameCount++;
     }
 
     public void Dispose()
     {
         Stop();
+        _latestRecordableFrame?.Dispose();
+        _latestRecordableFrame = null;
     }
 
     private static bool LooksLikeJpeg(IReadOnlyList<byte> packet)

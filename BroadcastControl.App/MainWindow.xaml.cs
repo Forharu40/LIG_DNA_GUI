@@ -16,6 +16,7 @@ public partial class MainWindow : Window
     private readonly MainViewModel _viewModel;
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
     private readonly WebcamCaptureService _irWebcamCaptureService;
+    private readonly ViewportRecordingService _viewportRecordingService;
 
     private bool _isDraggingZoom;
     private Point _lastZoomDragPoint;
@@ -29,6 +30,7 @@ public partial class MainWindow : Window
         _viewModel = new MainViewModel();
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
         _irWebcamCaptureService = new WebcamCaptureService();
+        _viewportRecordingService = new ViewportRecordingService();
         DataContext = _viewModel;
 
         Loaded += OnLoaded;
@@ -69,7 +71,7 @@ public partial class MainWindow : Window
             _viewModel.AppendImportantLog("Could not connect the laptop camera to the temporary IR panel.");
         }
 
-        _ = _viewModel.StartJetsonExampleProbeAsync();
+        _viewModel.StartJetsonHelloLoop();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -190,15 +192,26 @@ public partial class MainWindow : Window
     {
         if (_viewModel.IsManualRecordingEnabled)
         {
-            var filePath = _eoUdpCaptureService.StartRecordingToDesktop();
-            _viewModel.AppendImportantLog($"Manual recording started: {System.IO.Path.GetFileName(filePath)}");
+            var filePath = _viewportRecordingService.StartRecordingToDesktop(CameraPanel);
+            _viewModel.AppendImportantLog($"Manual recording started: {filePath}");
             return;
         }
 
-        var savedPath = _eoUdpCaptureService.StopRecording();
+        var savedPath = _viewportRecordingService.StopRecording();
         if (!string.IsNullOrWhiteSpace(savedPath))
         {
-            _viewModel.AppendImportantLog($"Video saved: {System.IO.Path.GetFileName(savedPath)}");
+            if (System.IO.File.Exists(savedPath))
+            {
+                _viewModel.AppendImportantLog($"Video saved: {savedPath} ({_viewportRecordingService.RecordedFrameCount} frames)");
+            }
+            else if (!string.IsNullOrWhiteSpace(_viewportRecordingService.LastRecordingErrorMessage))
+            {
+                _viewModel.AppendImportantLog($"Video save failed: {_viewportRecordingService.LastRecordingErrorMessage}");
+            }
+            else
+            {
+                _viewModel.AppendImportantLog($"Video file was not created: {savedPath} ({_viewportRecordingService.RecordedFrameCount} frames)");
+            }
         }
     }
 
@@ -275,9 +288,11 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        _viewModel.StopJetsonHelloLoop();
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _irWebcamCaptureService.FrameReady -= OnIrFrameReady;
+        _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
         _irWebcamCaptureService.Dispose();
     }

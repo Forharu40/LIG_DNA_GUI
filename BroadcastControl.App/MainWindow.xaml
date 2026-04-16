@@ -290,7 +290,8 @@
 
                 <!-- 카메라 패널:
                      EO 주 화면, IR 인셋 화면, 모터 조작 버튼, 전자 줌 UI를 포함함. -->
-                <Border Grid.Column="0"
+                <Border x:Name="CameraPanel"
+                        Grid.Column="0"
                         Margin="0,0,12,0"
                         Style="{StaticResource GlassCardBorder}"
                         BorderBrush="#00000000"
