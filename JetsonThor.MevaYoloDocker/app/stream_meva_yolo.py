@@ -15,6 +15,11 @@ MODEL_PATH = os.getenv("MODEL_PATH", "yolo11n.pt").strip()
 CONFIDENCE = float(os.getenv("CONFIDENCE", "0.25"))
 JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "85"))
 LOOP_VIDEO = os.getenv("LOOP_VIDEO", "true").lower() in {"1", "true", "yes", "on"}
+CLIP_START_SECONDS = float(os.getenv("CLIP_START_SECONDS", "0"))
+CLIP_DURATION_SECONDS = float(os.getenv("CLIP_DURATION_SECONDS", "20"))
+BOX_THICKNESS = int(os.getenv("BOX_THICKNESS", "2"))
+FONT_SCALE = float(os.getenv("FONT_SCALE", "0.6"))
+LABEL_THICKNESS = int(os.getenv("LABEL_THICKNESS", "2"))
 
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".m4v"}
 
@@ -46,6 +51,10 @@ def main() -> None:
     print(f"Using video: {video_path}")
     print(f"Streaming to GUI: {GUI_HOST}:{GUI_PORT}")
     print(f"Using model: {MODEL_PATH}")
+    print(
+        f"Clip settings: start={CLIP_START_SECONDS:.1f}s, "
+        f"duration={CLIP_DURATION_SECONDS:.1f}s"
+    )
 
     model = YOLO(MODEL_PATH)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -58,8 +67,20 @@ def main() -> None:
 
             fps = capture.get(cv2.CAP_PROP_FPS)
             frame_delay = 1.0 / fps if fps and fps > 0 else 0.04
+            clip_start_msec = max(0.0, CLIP_START_SECONDS * 1000.0)
+            clip_end_msec = None
+            if CLIP_DURATION_SECONDS > 0:
+                clip_end_msec = clip_start_msec + (CLIP_DURATION_SECONDS * 1000.0)
+
+            if clip_start_msec > 0:
+                capture.set(cv2.CAP_PROP_POS_MSEC, clip_start_msec)
 
             while True:
+                if clip_end_msec is not None:
+                    current_msec = capture.get(cv2.CAP_PROP_POS_MSEC)
+                    if current_msec >= clip_end_msec:
+                        break
+
                 ok, frame = capture.read()
                 if not ok:
                     break
@@ -83,16 +104,46 @@ def main() -> None:
                             class_name = names.get(cls_id, str(cls_id))
                             label = build_label(class_name, track_id, index)
 
-                            cv2.rectangle(annotated, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                            text_origin_y = y1 - 8 if y1 > 24 else y1 + 18
+                            cv2.rectangle(
+                                annotated,
+                                (x1, y1),
+                                (x2, y2),
+                                (0, 255, 0),
+                                BOX_THICKNESS,
+                            )
+
+                            text_origin_y = y1 - 10 if y1 > 30 else y1 + 22
+                            (text_width, text_height), baseline = cv2.getTextSize(
+                                label,
+                                cv2.FONT_HERSHEY_SIMPLEX,
+                                FONT_SCALE,
+                                LABEL_THICKNESS,
+                            )
+                            text_box_top = max(0, text_origin_y - text_height - baseline - 4)
+                            text_box_bottom = min(
+                                annotated.shape[0],
+                                text_origin_y + baseline + 4,
+                            )
+                            text_box_right = min(
+                                annotated.shape[1],
+                                x1 + text_width + 10,
+                            )
+
+                            cv2.rectangle(
+                                annotated,
+                                (x1, text_box_top),
+                                (text_box_right, text_box_bottom),
+                                (0, 96, 0),
+                                -1,
+                            )
                             cv2.putText(
                                 annotated,
                                 label,
                                 (x1, text_origin_y),
                                 cv2.FONT_HERSHEY_SIMPLEX,
-                                0.5,
+                                FONT_SCALE,
                                 (255, 255, 255),
-                                1,
+                                LABEL_THICKNESS,
                                 cv2.LINE_AA,
                             )
 

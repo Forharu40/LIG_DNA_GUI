@@ -76,6 +76,16 @@ sudo docker run --rm \
   - 전송 JPEG 품질
 - `LOOP_VIDEO`
   - 끝까지 재생 후 다시 반복할지 여부
+- `CLIP_START_SECONDS`
+  - 영상에서 시작할 시점(초)
+- `CLIP_DURATION_SECONDS`
+  - 한 번에 반복 재생할 길이(초)
+- `BOX_THICKNESS`
+  - 바운딩 박스 두께
+- `FONT_SCALE`
+  - 라벨 글자 크기
+- `LABEL_THICKNESS`
+  - 라벨 글자 두께
 
 ## 객체 라벨 방식
 
@@ -87,6 +97,30 @@ sudo docker run --rm \
 
 추적 ID가 있으면 그 값을 `objectN`에 사용하고,
 없으면 프레임 내 순서로 번호를 붙입니다.
+
+## 짧은 구간만 반복 확인하기
+
+긴 CCTV 전체 대신 예를 들어 30초 지점부터 15초만 반복 확인하고 싶으면:
+
+```bash
+sudo docker run --rm \
+  --runtime nvidia \
+  --network host \
+  -e GUI_HOST=192.168.2.91 \
+  -e GUI_PORT=5000 \
+  -e SOURCE_ROOT=/data/MEVA \
+  -e MODEL_PATH=yolo11n.pt \
+  -e CLIP_START_SECONDS=30 \
+  -e CLIP_DURATION_SECONDS=15 \
+  -e BOX_THICKNESS=3 \
+  -e FONT_SCALE=0.75 \
+  -e LABEL_THICKNESS=2 \
+  -v ~/datashets/MEVA:/data/MEVA:ro \
+  meva-yolo-demo
+```
+
+이렇게 하면 긴 원본 전체를 보지 않고, 원하는 구간만 반복 재생하면서
+바운딩 박스와 라벨을 더 쉽게 확인할 수 있습니다.
 
 ## SSH 사용 예시
 
