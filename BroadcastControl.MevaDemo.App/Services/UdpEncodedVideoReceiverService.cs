@@ -12,7 +12,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
     private const int DefaultPort = 5000;
     private const int LegacyHeaderSize = 20;
-    private const int MetadataHeaderSize = 32;
+    private const int MetadataHeaderSize = 36;
 
     private readonly Dispatcher _dispatcher;
 
@@ -34,7 +34,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     private double _viewportWidth = 1;
     private double _viewportHeight = 1;
     private string? _lastSegmentSignature;
-    private uint? _lastPlaybackSeconds;
+    private uint? _lastCycleIndex;
 
     public UdpEncodedVideoReceiverService()
     {
@@ -67,7 +67,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             _udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, port));
 
             _lastSegmentSignature = null;
-            _lastPlaybackSeconds = null;
+            _lastCycleIndex = null;
             _cancellationTokenSource = new CancellationTokenSource();
             _receiveLoopTask = Task.Run(() => ReceiveLoopAsync(_cancellationTokenSource.Token));
             return true;
@@ -106,7 +106,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         _cancellationTokenSource?.Dispose();
         _cancellationTokenSource = null;
         _lastSegmentSignature = null;
-        _lastPlaybackSeconds = null;
+        _lastCycleIndex = null;
         StopRecording();
     }
 
@@ -502,20 +502,20 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         if (!string.Equals(_lastSegmentSignature, signature, StringComparison.Ordinal))
         {
             _lastSegmentSignature = signature;
-            _lastPlaybackSeconds = segmentInfo.Value.CurrentPlaybackSeconds;
+            _lastCycleIndex = segmentInfo.Value.CycleIndex;
             _dispatcher.BeginInvoke(() => SegmentChanged?.Invoke(segmentInfo.Value));
             return;
         }
 
-        if (_lastPlaybackSeconds.HasValue &&
-            segmentInfo.Value.CurrentPlaybackSeconds + 1 < _lastPlaybackSeconds.Value)
+        if (_lastCycleIndex.HasValue &&
+            segmentInfo.Value.CycleIndex > _lastCycleIndex.Value)
         {
-            _lastPlaybackSeconds = segmentInfo.Value.CurrentPlaybackSeconds;
+            _lastCycleIndex = segmentInfo.Value.CycleIndex;
             _dispatcher.BeginInvoke(() => SegmentLoopRestarted?.Invoke(segmentInfo.Value));
             return;
         }
 
-        _lastPlaybackSeconds = segmentInfo.Value.CurrentPlaybackSeconds;
+        _lastCycleIndex = segmentInfo.Value.CycleIndex;
     }
 
     private static bool TryExtractMetadataEncodedFrame(byte[] packet, out MetadataEncodedFrame frame)
@@ -546,6 +546,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         var segmentStartSeconds = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(20, 4));
         var segmentEndSeconds = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(24, 4));
         var currentPlaybackSeconds = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(28, 4));
+        var cycleIndex = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(32, 4));
 
         if (imageByteLength == 0 || imageByteLength > payload.Length)
         {
@@ -573,7 +574,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             clipCount,
             segmentStartSeconds,
             segmentEndSeconds,
-            currentPlaybackSeconds);
+            currentPlaybackSeconds,
+            cycleIndex);
 
         frame = new MetadataEncodedFrame(encodedBytes, declaredWidth, declaredHeight, segmentInfo);
         return true;
@@ -641,7 +643,8 @@ public readonly record struct PlaybackSegmentInfo(
     uint ClipCount,
     uint SegmentStartSeconds,
     uint SegmentEndSeconds,
-    uint CurrentPlaybackSeconds)
+    uint CurrentPlaybackSeconds,
+    uint CycleIndex)
 {
     public string ToLogMessage()
     {

@@ -57,9 +57,10 @@ def build_video_packet(
     segment_start_seconds: float,
     segment_end_seconds: float,
     current_playback_seconds: float,
+    cycle_index: int,
 ) -> bytes:
     header = struct.pack(
-        ">4sIHHIIIII",
+        ">4sIHHIIIIII",
         b"MEVA",
         len(jpeg_bytes),
         frame_width,
@@ -69,6 +70,7 @@ def build_video_packet(
         int(max(0, segment_start_seconds)),
         int(max(0, segment_end_seconds)),
         int(max(0, current_playback_seconds)),
+        max(0, cycle_index),
     )
     return header + jpeg_bytes
 
@@ -107,6 +109,7 @@ def main() -> None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     try:
+        cycle_index = 0
         while True:
             capture = cv2.VideoCapture(str(video_path))
             if not capture.isOpened():
@@ -222,6 +225,7 @@ def main() -> None:
                             clip_start_seconds,
                             clip_start_seconds + CLIP_DURATION_SECONDS,
                             current_playback_seconds,
+                            cycle_index,
                         )
                         sock.sendto(packet, (GUI_HOST, GUI_PORT))
 
@@ -233,6 +237,7 @@ def main() -> None:
                 break
 
             print("MEVA video segment cycle completed. Restarting from the first sampled 15-second video segment.")
+            cycle_index += 1
     finally:
         sock.close()
 
