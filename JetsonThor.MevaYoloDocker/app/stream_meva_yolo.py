@@ -17,6 +17,7 @@ JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "85"))
 LOOP_VIDEO = os.getenv("LOOP_VIDEO", "true").lower() in {"1", "true", "yes", "on"}
 CLIP_START_SECONDS = float(os.getenv("CLIP_START_SECONDS", "0"))
 CLIP_DURATION_SECONDS = float(os.getenv("CLIP_DURATION_SECONDS", "20"))
+SAMPLE_INTERVAL_SECONDS = float(os.getenv("SAMPLE_INTERVAL_SECONDS", "1800"))
 BOX_THICKNESS = int(os.getenv("BOX_THICKNESS", "2"))
 FONT_SCALE = float(os.getenv("FONT_SCALE", "0.6"))
 LABEL_THICKNESS = int(os.getenv("LABEL_THICKNESS", "2"))
@@ -46,6 +47,25 @@ def build_label(class_name: str, track_id: int | None, fallback_index: int) -> s
     return f"{class_name} object{object_index}"
 
 
+def build_clip_start_times(video_duration_seconds: float) -> list[float]:
+    if video_duration_seconds <= 0:
+        return [max(0.0, CLIP_START_SECONDS)]
+
+    if SAMPLE_INTERVAL_SECONDS <= 0:
+        return [max(0.0, min(CLIP_START_SECONDS, video_duration_seconds))]
+
+    start_times: list[float] = []
+    current_start = max(0.0, CLIP_START_SECONDS)
+    while current_start < video_duration_seconds:
+        start_times.append(current_start)
+        current_start += SAMPLE_INTERVAL_SECONDS
+
+    if not start_times:
+        start_times.append(0.0)
+
+    return start_times
+
+
 def main() -> None:
     video_path = find_video_file()
     print(f"Using video: {video_path}")
@@ -53,7 +73,8 @@ def main() -> None:
     print(f"Using model: {MODEL_PATH}")
     print(
         f"Clip settings: start={CLIP_START_SECONDS:.1f}s, "
-        f"duration={CLIP_DURATION_SECONDS:.1f}s"
+        f"duration={CLIP_DURATION_SECONDS:.1f}s, "
+        f"interval={SAMPLE_INTERVAL_SECONDS:.1f}s"
     )
 
     model = YOLO(MODEL_PATH)
@@ -67,102 +88,114 @@ def main() -> None:
 
             fps = capture.get(cv2.CAP_PROP_FPS)
             frame_delay = 1.0 / fps if fps and fps > 0 else 0.04
-            clip_start_msec = max(0.0, CLIP_START_SECONDS * 1000.0)
-            clip_end_msec = None
-            if CLIP_DURATION_SECONDS > 0:
-                clip_end_msec = clip_start_msec + (CLIP_DURATION_SECONDS * 1000.0)
+            frame_count = capture.get(cv2.CAP_PROP_FRAME_COUNT)
+            video_duration_seconds = 0.0
+            if fps and fps > 0 and frame_count and frame_count > 0:
+                video_duration_seconds = frame_count / fps
 
-            if clip_start_msec > 0:
+            clip_start_times = build_clip_start_times(video_duration_seconds)
+
+            for clip_index, clip_start_seconds in enumerate(clip_start_times, start=1):
+                clip_start_msec = max(0.0, clip_start_seconds * 1000.0)
+                clip_end_msec = None
+                if CLIP_DURATION_SECONDS > 0:
+                    clip_end_msec = clip_start_msec + (CLIP_DURATION_SECONDS * 1000.0)
+
+                print(
+                    f"Playing clip {clip_index}/{len(clip_start_times)} "
+                    f"from {clip_start_seconds:.1f}s"
+                )
+
                 capture.set(cv2.CAP_PROP_POS_MSEC, clip_start_msec)
 
-            while True:
-                if clip_end_msec is not None:
-                    current_msec = capture.get(cv2.CAP_PROP_POS_MSEC)
-                    if current_msec >= clip_end_msec:
+                while True:
+                    if clip_end_msec is not None:
+                        current_msec = capture.get(cv2.CAP_PROP_POS_MSEC)
+                        if current_msec >= clip_end_msec:
+                            break
+
+                    ok, frame = capture.read()
+                    if not ok:
                         break
 
-                ok, frame = capture.read()
-                if not ok:
-                    break
+                    results = model.track(frame, persist=True, conf=CONFIDENCE, verbose=False)
+                    annotated = frame.copy()
 
-                results = model.track(frame, persist=True, conf=CONFIDENCE, verbose=False)
-                annotated = frame.copy()
+                    if results:
+                        result = results[0]
+                        boxes = result.boxes
+                        names = result.names
 
-                if results:
-                    result = results[0]
-                    boxes = result.boxes
-                    names = result.names
+                        if boxes is not None and len(boxes) > 0:
+                            xyxy = boxes.xyxy.cpu().numpy().astype(int)
+                            cls_ids = boxes.cls.cpu().numpy().astype(int)
+                            track_ids = boxes.id.cpu().numpy().astype(int) if boxes.id is not None else None
 
-                    if boxes is not None and len(boxes) > 0:
-                        xyxy = boxes.xyxy.cpu().numpy().astype(int)
-                        cls_ids = boxes.cls.cpu().numpy().astype(int)
-                        track_ids = boxes.id.cpu().numpy().astype(int) if boxes.id is not None else None
+                            for index, (box, cls_id) in enumerate(zip(xyxy, cls_ids), start=1):
+                                x1, y1, x2, y2 = box.tolist()
+                                track_id = int(track_ids[index - 1]) if track_ids is not None else None
+                                class_name = names.get(cls_id, str(cls_id))
+                                label = build_label(class_name, track_id, index)
 
-                        for index, (box, cls_id) in enumerate(zip(xyxy, cls_ids), start=1):
-                            x1, y1, x2, y2 = box.tolist()
-                            track_id = int(track_ids[index - 1]) if track_ids is not None else None
-                            class_name = names.get(cls_id, str(cls_id))
-                            label = build_label(class_name, track_id, index)
+                                cv2.rectangle(
+                                    annotated,
+                                    (x1, y1),
+                                    (x2, y2),
+                                    (0, 255, 0),
+                                    BOX_THICKNESS,
+                                )
 
-                            cv2.rectangle(
-                                annotated,
-                                (x1, y1),
-                                (x2, y2),
-                                (0, 255, 0),
-                                BOX_THICKNESS,
-                            )
+                                text_origin_y = y1 - 10 if y1 > 30 else y1 + 22
+                                (text_width, text_height), baseline = cv2.getTextSize(
+                                    label,
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    FONT_SCALE,
+                                    LABEL_THICKNESS,
+                                )
+                                text_box_top = max(0, text_origin_y - text_height - baseline - 4)
+                                text_box_bottom = min(
+                                    annotated.shape[0],
+                                    text_origin_y + baseline + 4,
+                                )
+                                text_box_right = min(
+                                    annotated.shape[1],
+                                    x1 + text_width + 10,
+                                )
 
-                            text_origin_y = y1 - 10 if y1 > 30 else y1 + 22
-                            (text_width, text_height), baseline = cv2.getTextSize(
-                                label,
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                FONT_SCALE,
-                                LABEL_THICKNESS,
-                            )
-                            text_box_top = max(0, text_origin_y - text_height - baseline - 4)
-                            text_box_bottom = min(
-                                annotated.shape[0],
-                                text_origin_y + baseline + 4,
-                            )
-                            text_box_right = min(
-                                annotated.shape[1],
-                                x1 + text_width + 10,
-                            )
+                                cv2.rectangle(
+                                    annotated,
+                                    (x1, text_box_top),
+                                    (text_box_right, text_box_bottom),
+                                    (0, 96, 0),
+                                    -1,
+                                )
+                                cv2.putText(
+                                    annotated,
+                                    label,
+                                    (x1, text_origin_y),
+                                    cv2.FONT_HERSHEY_SIMPLEX,
+                                    FONT_SCALE,
+                                    (255, 255, 255),
+                                    LABEL_THICKNESS,
+                                    cv2.LINE_AA,
+                                )
 
-                            cv2.rectangle(
-                                annotated,
-                                (x1, text_box_top),
-                                (text_box_right, text_box_bottom),
-                                (0, 96, 0),
-                                -1,
-                            )
-                            cv2.putText(
-                                annotated,
-                                label,
-                                (x1, text_origin_y),
-                                cv2.FONT_HERSHEY_SIMPLEX,
-                                FONT_SCALE,
-                                (255, 255, 255),
-                                LABEL_THICKNESS,
-                                cv2.LINE_AA,
-                            )
+                    ok, encoded = cv2.imencode(
+                        ".jpg",
+                        annotated,
+                        [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
+                    )
+                    if ok:
+                        sock.sendto(encoded.tobytes(), (GUI_HOST, GUI_PORT))
 
-                ok, encoded = cv2.imencode(
-                    ".jpg",
-                    annotated,
-                    [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
-                )
-                if ok:
-                    sock.sendto(encoded.tobytes(), (GUI_HOST, GUI_PORT))
-
-                time.sleep(frame_delay)
+                    time.sleep(frame_delay)
 
             capture.release()
 
             if not LOOP_VIDEO:
                 break
 
-            print("Reached end of video. Restarting playback...")
+            print("Reached end of clip cycle. Restarting from the first sampled clip...")
     finally:
         sock.close()
 

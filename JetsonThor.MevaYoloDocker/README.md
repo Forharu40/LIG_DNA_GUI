@@ -4,19 +4,19 @@ Jetson Thor에서 Docker로 실행하는 MEVA 데모영상 YOLO 처리 서비스
 
 이 서비스는 다음 순서로 동작합니다.
 
-1. `~/datashets/MEVA`에 있는 데모영상을 읽음
-2. YOLO로 객체 탐지 및 추적 수행
-3. 바운딩 박스와 작은 글씨 라벨을 그림
-4. 라벨 형식은 `person object1`, `car object2`처럼 표시
-5. 처리된 프레임을 UDP JPEG 형태로 운용통제 GUI에 전송
+1. `~/datashets/MEVA` 아래의 데모영상을 읽습니다.
+2. YOLO로 객체 탐지와 추적을 수행합니다.
+3. 바운딩 박스와 작은 라벨을 프레임 위에 그립니다.
+4. 라벨은 `person object1`, `car object2`처럼 표시됩니다.
+5. 처리된 프레임을 UDP JPEG 형식으로 운용통제 GUI에 전송합니다.
 
 ## 폴더 역할
 
 - `BroadcastControl.MevaDemo.App`
-  - 기존 GUI를 복제한 데모 전용 앱
-  - EO 카메라 영역에서 Jetson이 보내는 YOLO 처리 영상을 표시
+  - 기존 GUI를 복제한 데모 전용 앱입니다.
+  - Jetson이 보내는 YOLO 처리 영상을 EO 화면에 표시합니다.
 - `JetsonThor.MevaYoloDocker`
-  - Jetson Thor에서 Docker로 실행할 YOLO 처리 서비스
+  - Jetson Thor에서 Docker로 실행할 YOLO 처리 서비스입니다.
 
 ## GUI 실행
 
@@ -89,11 +89,14 @@ sudo docker run --rm \
 - `JPEG_QUALITY`
   - 전송 JPEG 품질
 - `LOOP_VIDEO`
-  - 끝까지 재생 후 다시 반복할지 여부
+  - 샘플 구간 재생이 끝난 뒤 다시 처음 구간부터 반복할지 여부
 - `CLIP_START_SECONDS`
-  - 영상에서 시작할 시점(초)
+  - 첫 샘플 구간 시작 시점(초)
 - `CLIP_DURATION_SECONDS`
-  - 한 번에 반복 재생할 길이(초)
+  - 한 번에 재생할 샘플 구간 길이(초)
+- `SAMPLE_INTERVAL_SECONDS`
+  - 샘플 구간 시작 간격(초)
+  - 기본값 `1800` = 30분마다
 - `BOX_THICKNESS`
   - 바운딩 박스 두께
 - `FONT_SCALE`
@@ -112,9 +115,21 @@ sudo docker run --rm \
 추적 ID가 있으면 그 값을 `objectN`에 사용하고,
 없으면 프레임 내 순서로 번호를 붙입니다.
 
-## 짧은 구간만 반복 확인하기
+## 30분마다 20초씩 재생하기
 
-긴 CCTV 전체 대신 예를 들어 30초 지점부터 15초만 반복 확인하고 싶으면:
+기본 동작은 다음과 같습니다.
+
+- 30분마다
+- 20초씩
+- 순서대로 재생 후 다시 첫 구간부터 반복
+
+즉 영상이 길다면 아래처럼 샘플 구간만 재생합니다.
+
+- 0분 00초 ~ 0분 20초
+- 30분 00초 ~ 30분 20초
+- 60분 00초 ~ 60분 20초
+
+예를 들어 10분 지점부터 시작해서 30분 간격으로 20초씩 확인하고 싶으면:
 
 ```bash
 sudo docker run --rm \
@@ -123,8 +138,9 @@ sudo docker run --rm \
   -e GUI_HOST=192.168.2.91 \
   -e GUI_PORT=5000 \
   -e SOURCE_ROOT=/data/MEVA \
-  -e CLIP_START_SECONDS=30 \
-  -e CLIP_DURATION_SECONDS=15 \
+  -e CLIP_START_SECONDS=600 \
+  -e CLIP_DURATION_SECONDS=20 \
+  -e SAMPLE_INTERVAL_SECONDS=1800 \
   -e BOX_THICKNESS=3 \
   -e FONT_SCALE=0.75 \
   -e LABEL_THICKNESS=2 \
@@ -132,7 +148,8 @@ sudo docker run --rm \
   meva-yolo-demo
 ```
 
-이렇게 하면 긴 원본 전체를 보지 않고, 원하는 구간만 반복 재생하면서
+이렇게 하면 긴 원본 전체를 보지 않고,
+10분 이후 30분 간격 샘플 구간만 반복 재생하면서
 바운딩 박스와 라벨을 더 쉽게 확인할 수 있습니다.
 
 ## SSH 사용 예시
