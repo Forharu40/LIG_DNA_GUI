@@ -96,7 +96,7 @@ sudo docker run --rm \
   - 한 번에 재생할 샘플 구간 길이(초)
 - `SAMPLE_INTERVAL_SECONDS`
   - 샘플 구간 시작 간격(초)
-  - 기본값 `1800` = 30분마다
+  - 기본값 `43200` = 12시간마다
 - `BOX_THICKNESS`
   - 바운딩 박스 두께
 - `FONT_SCALE`
@@ -115,21 +115,21 @@ sudo docker run --rm \
 추적 ID가 있으면 그 값을 `objectN`에 사용하고,
 없으면 프레임 내 순서로 번호를 붙입니다.
 
-## 30분마다 20초씩 재생하기
+## 12시간마다 15초씩 재생하기
 
 기본 동작은 다음과 같습니다.
 
-- 30분마다
-- 20초씩
+- 12시간마다
+- 15초씩
 - 순서대로 재생 후 다시 첫 구간부터 반복
 
 즉 영상이 길다면 아래처럼 샘플 구간만 재생합니다.
 
-- 0분 00초 ~ 0분 20초
-- 30분 00초 ~ 30분 20초
-- 60분 00초 ~ 60분 20초
+- 0시간 00분 00초 ~ 0시간 00분 15초
+- 12시간 00분 00초 ~ 12시간 00분 15초
+- 24시간 00분 00초 ~ 24시간 00분 15초
 
-예를 들어 10분 지점부터 시작해서 30분 간격으로 20초씩 확인하고 싶으면:
+예를 들어 12시간 간격으로 15초씩 확인하려면:
 
 ```bash
 sudo docker run --rm \
@@ -138,9 +138,9 @@ sudo docker run --rm \
   -e GUI_HOST=192.168.2.91 \
   -e GUI_PORT=5000 \
   -e SOURCE_ROOT=/data/MEVA \
-  -e CLIP_START_SECONDS=600 \
-  -e CLIP_DURATION_SECONDS=20 \
-  -e SAMPLE_INTERVAL_SECONDS=1800 \
+  -e CLIP_START_SECONDS=0 \
+  -e CLIP_DURATION_SECONDS=15 \
+  -e SAMPLE_INTERVAL_SECONDS=43200 \
   -e BOX_THICKNESS=3 \
   -e FONT_SCALE=0.75 \
   -e LABEL_THICKNESS=2 \
@@ -149,7 +149,7 @@ sudo docker run --rm \
 ```
 
 이렇게 하면 긴 원본 전체를 보지 않고,
-10분 이후 30분 간격 샘플 구간만 반복 재생하면서
+12시간 간격 샘플 구간만 반복 재생하면서
 바운딩 박스와 라벨을 더 쉽게 확인할 수 있습니다.
 
 ## SSH 사용 예시
