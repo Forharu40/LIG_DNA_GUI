@@ -41,6 +41,20 @@ sudo docker build -t meva-yolo-demo .
 기본 베이스 이미지는 `ultralytics/ultralytics:latest-nvidia-arm64`입니다.
 필요하면 빌드 시 `--build-arg BASE_IMAGE=...`로 바꿀 수 있습니다.
 
+현재 Docker 빌드 단계에서 아래 두 가지를 미리 처리합니다.
+
+- `lap>=0.5.12` 설치
+- `yolo11n.pt` 모델 다운로드
+
+즉, 한 번 이미지를 만들고 나면 컨테이너 실행 시마다 다시 모델을 받거나
+추적 패키지를 설치하지 않아도 됩니다.
+
+다른 모델을 이미지에 포함하고 싶으면:
+
+```bash
+sudo docker build --build-arg MODEL_NAME=yolo11s.pt -t meva-yolo-demo .
+```
+
 ## Jetson에서 Docker 실행
 
 아래 예시는 `~/datashets/MEVA`를 컨테이너 안의 `/data/MEVA`로 마운트합니다.
@@ -53,7 +67,6 @@ sudo docker run --rm \
   -e GUI_HOST=192.168.0.10 \
   -e GUI_PORT=5000 \
   -e SOURCE_ROOT=/data/MEVA \
-  -e MODEL_PATH=yolo11n.pt \
   -v ~/datashets/MEVA:/data/MEVA:ro \
   meva-yolo-demo
 ```
@@ -70,6 +83,7 @@ sudo docker run --rm \
   - 특정 파일만 지정하고 싶을 때 사용
 - `MODEL_PATH`
   - 사용할 YOLO 모델 파일 또는 모델명
+  - 기본값은 Docker 이미지 안에 포함된 `/opt/models/yolo11n.pt`
 - `CONFIDENCE`
   - 탐지 confidence threshold
 - `JPEG_QUALITY`
@@ -109,7 +123,6 @@ sudo docker run --rm \
   -e GUI_HOST=192.168.2.91 \
   -e GUI_PORT=5000 \
   -e SOURCE_ROOT=/data/MEVA \
-  -e MODEL_PATH=yolo11n.pt \
   -e CLIP_START_SECONDS=30 \
   -e CLIP_DURATION_SECONDS=15 \
   -e BOX_THICKNESS=3 \
