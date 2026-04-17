@@ -59,7 +59,7 @@ def build_video_packet(
     current_playback_seconds: float,
 ) -> bytes:
     header = struct.pack(
-        ">4sIHHIIII",
+        ">4sIHHIIIII",
         b"MEVA",
         len(jpeg_bytes),
         frame_width,
