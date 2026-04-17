@@ -34,6 +34,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     private double _viewportWidth = 1;
     private double _viewportHeight = 1;
     private string? _lastSegmentSignature;
+    private uint? _lastPlaybackSeconds;
 
     public UdpEncodedVideoReceiverService()
     {
@@ -42,6 +43,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
     public event Action<BitmapSource>? FrameReady;
     public event Action<PlaybackSegmentInfo>? SegmentChanged;
+    public event Action<PlaybackSegmentInfo>? SegmentLoopRestarted;
 
     public int ListeningPort { get; private set; } = DefaultPort;
 
@@ -65,6 +67,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             _udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, port));
 
             _lastSegmentSignature = null;
+            _lastPlaybackSeconds = null;
             _cancellationTokenSource = new CancellationTokenSource();
             _receiveLoopTask = Task.Run(() => ReceiveLoopAsync(_cancellationTokenSource.Token));
             return true;
@@ -103,6 +106,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         _cancellationTokenSource?.Dispose();
         _cancellationTokenSource = null;
         _lastSegmentSignature = null;
+        _lastPlaybackSeconds = null;
         StopRecording();
     }
 
@@ -495,13 +499,23 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         }
 
         var signature = segmentInfo.Value.GetSignature();
-        if (string.Equals(_lastSegmentSignature, signature, StringComparison.Ordinal))
+        if (!string.Equals(_lastSegmentSignature, signature, StringComparison.Ordinal))
         {
+            _lastSegmentSignature = signature;
+            _lastPlaybackSeconds = segmentInfo.Value.CurrentPlaybackSeconds;
+            _dispatcher.BeginInvoke(() => SegmentChanged?.Invoke(segmentInfo.Value));
             return;
         }
 
-        _lastSegmentSignature = signature;
-        _dispatcher.BeginInvoke(() => SegmentChanged?.Invoke(segmentInfo.Value));
+        if (_lastPlaybackSeconds.HasValue &&
+            segmentInfo.Value.CurrentPlaybackSeconds + 1 < _lastPlaybackSeconds.Value)
+        {
+            _lastPlaybackSeconds = segmentInfo.Value.CurrentPlaybackSeconds;
+            _dispatcher.BeginInvoke(() => SegmentLoopRestarted?.Invoke(segmentInfo.Value));
+            return;
+        }
+
+        _lastPlaybackSeconds = segmentInfo.Value.CurrentPlaybackSeconds;
     }
 
     private static bool TryExtractMetadataEncodedFrame(byte[] packet, out MetadataEncodedFrame frame)
@@ -632,6 +646,11 @@ public readonly record struct PlaybackSegmentInfo(
     public string ToLogMessage()
     {
         return $"MEVA video segment changed: clip {ClipIndex}/{ClipCount} now playing {FormatTime(SegmentStartSeconds)} ~ {FormatTime(SegmentEndSeconds)}";
+    }
+
+    public string ToLoopRestartLogMessage()
+    {
+        return $"MEVA video segment replay restarted: clip {ClipIndex}/{ClipCount} now replaying {FormatTime(SegmentStartSeconds)} ~ {FormatTime(SegmentEndSeconds)}";
     }
 
     public string GetSignature()

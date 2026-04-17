@@ -44,6 +44,7 @@ public partial class MainWindow : Window
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
         _eoUdpCaptureService.SegmentChanged += OnEoSegmentChanged;
+        _eoUdpCaptureService.SegmentLoopRestarted += OnEoSegmentLoopRestarted;
         _irWebcamCaptureService.FrameReady += OnIrFrameReady;
 
         _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
@@ -183,6 +184,11 @@ public partial class MainWindow : Window
         _viewModel.AppendImportantLog(segmentInfo.ToLogMessage());
     }
 
+    private void OnEoSegmentLoopRestarted(PlaybackSegmentInfo segmentInfo)
+    {
+        _viewModel.AppendImportantLog(segmentInfo.ToLoopRestartLogMessage());
+    }
+
     private void UpdateRecordingViewportState()
     {
         _eoUdpCaptureService.UpdateViewportTransform(
@@ -296,6 +302,7 @@ public partial class MainWindow : Window
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _eoUdpCaptureService.SegmentChanged -= OnEoSegmentChanged;
+        _eoUdpCaptureService.SegmentLoopRestarted -= OnEoSegmentLoopRestarted;
         _irWebcamCaptureService.FrameReady -= OnIrFrameReady;
         _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
