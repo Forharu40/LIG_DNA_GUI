@@ -1,5 +1,6 @@
 import os
 import socket
+import struct
 import time
 from pathlib import Path
 
@@ -9,7 +10,6 @@ from ultralytics import YOLO
 
 GUI_HOST = os.getenv("GUI_HOST", "127.0.0.1")
 GUI_PORT = int(os.getenv("GUI_PORT", "5000"))
-GUI_STATUS_PORT = int(os.getenv("GUI_STATUS_PORT", "5001"))
 SOURCE_ROOT = Path(os.getenv("SOURCE_ROOT", "/data/MEVA"))
 VIDEO_PATH = os.getenv("VIDEO_PATH", "").strip()
 MODEL_PATH = os.getenv("MODEL_PATH", "yolo11n.pt").strip()
@@ -48,12 +48,29 @@ def build_label(class_name: str, track_id: int | None, fallback_index: int) -> s
     return f"{class_name} object{object_index}"
 
 
-def format_hms(total_seconds: float) -> str:
-    total_seconds = max(0, int(total_seconds))
-    hours = total_seconds // 3600
-    minutes = (total_seconds % 3600) // 60
-    seconds = total_seconds % 60
-    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
+def build_video_packet(
+    jpeg_bytes: bytes,
+    frame_width: int,
+    frame_height: int,
+    clip_index: int,
+    clip_count: int,
+    segment_start_seconds: float,
+    segment_end_seconds: float,
+    current_playback_seconds: float,
+) -> bytes:
+    header = struct.pack(
+        ">4sIHHIIII",
+        b"MEVA",
+        len(jpeg_bytes),
+        frame_width,
+        frame_height,
+        clip_index,
+        clip_count,
+        int(max(0, segment_start_seconds)),
+        int(max(0, segment_end_seconds)),
+        int(max(0, current_playback_seconds)),
+    )
+    return header + jpeg_bytes
 
 
 def build_clip_start_times(video_duration_seconds: float) -> list[float]:
@@ -79,7 +96,6 @@ def main() -> None:
     video_path = find_video_file()
     print(f"Using video: {video_path}")
     print(f"Streaming to GUI: {GUI_HOST}:{GUI_PORT}")
-    print(f"Streaming clip status to GUI: {GUI_HOST}:{GUI_STATUS_PORT}")
     print(f"Using model: {MODEL_PATH}")
     print(
         f"Clip settings: start={CLIP_START_SECONDS:.1f}s, "
@@ -89,7 +105,6 @@ def main() -> None:
 
     model = YOLO(MODEL_PATH)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    status_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
 
     try:
         while True:
@@ -116,13 +131,6 @@ def main() -> None:
                     f"Playing clip {clip_index}/{len(clip_start_times)} "
                     f"from {clip_start_seconds:.1f}s"
                 )
-                clip_start_text = format_hms(clip_start_seconds)
-                clip_end_text = format_hms(clip_start_seconds + CLIP_DURATION_SECONDS)
-                status_message = (
-                    f"MEVA video segment changed: clip {clip_index}/{len(clip_start_times)} "
-                    f"now playing {clip_start_text} ~ {clip_end_text}"
-                )
-                status_sock.sendto(status_message.encode("utf-8"), (GUI_HOST, GUI_STATUS_PORT))
 
                 capture.set(cv2.CAP_PROP_POS_MSEC, clip_start_msec)
 
@@ -204,7 +212,18 @@ def main() -> None:
                         [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
                     )
                     if ok:
-                        sock.sendto(encoded.tobytes(), (GUI_HOST, GUI_PORT))
+                        current_playback_seconds = capture.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
+                        packet = build_video_packet(
+                            encoded.tobytes(),
+                            annotated.shape[1],
+                            annotated.shape[0],
+                            clip_index,
+                            len(clip_start_times),
+                            clip_start_seconds,
+                            clip_start_seconds + CLIP_DURATION_SECONDS,
+                            current_playback_seconds,
+                        )
+                        sock.sendto(packet, (GUI_HOST, GUI_PORT))
 
                     time.sleep(frame_delay)
 
@@ -213,14 +232,9 @@ def main() -> None:
             if not LOOP_VIDEO:
                 break
 
-            cycle_message = (
-                "MEVA video segment cycle completed. Restarting from the first sampled 15-second video segment."
-            )
-            print(cycle_message)
-            status_sock.sendto(cycle_message.encode("utf-8"), (GUI_HOST, GUI_STATUS_PORT))
+            print("MEVA video segment cycle completed. Restarting from the first sampled 15-second video segment.")
     finally:
         sock.close()
-        status_sock.close()
 
 
 if __name__ == "__main__":

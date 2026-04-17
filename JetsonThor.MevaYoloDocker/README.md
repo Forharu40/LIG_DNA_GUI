@@ -9,14 +9,14 @@ Jetson Thor에서 Docker로 실행하는 MEVA 데모영상 YOLO 처리 서비스
 3. 바운딩 박스와 라벨을 프레임 위에 그립니다.
 4. 라벨은 `person object1`, `car object2`처럼 표시합니다.
 5. 처리된 프레임은 UDP JPEG 형식으로 운용통제 GUI에 전송합니다.
-6. 구간이 바뀔 때마다 별도 UDP 상태 메시지를 보내 GUI 시스템 로그에 표시합니다.
+6. 같은 UDP 패킷 헤더 안에 구간 시작/종료/현재 재생 시점 정보를 함께 넣어 보냅니다.
 
 ## 역할
 
 - `BroadcastControl.MevaDemo.App`
   - 운용통제 PC에서 실행되는 데모 GUI입니다.
   - Jetson 컨테이너가 보내는 YOLO 처리 영상을 EO 화면에 표시합니다.
-  - Jetson이 보내는 구간 전환 메시지를 시스템 로그에 표시합니다.
+  - 영상 패킷 헤더에 들어 있는 구간 시간 정보를 읽어 시스템 로그에 표시합니다.
 - `JetsonThor.MevaYoloDocker`
   - Jetson Thor에서 Docker로 실행되는 YOLO 처리 서비스입니다.
   - MEVA 영상의 지정 구간을 실제 영상으로 재생하면서 탐지 결과를 전송합니다.
@@ -30,10 +30,7 @@ dotnet build BroadcastControl.MevaDemo.slnx -c Debug
 dotnet run --project .\BroadcastControl.MevaDemo.App\BroadcastControl.MevaDemo.App.csproj
 ```
 
-GUI는 기본적으로 아래 두 포트를 기다립니다.
-
-- UDP `5000`: YOLO 처리 영상 수신
-- UDP `5001`: 구간 전환 상태 메시지 수신
+GUI는 UDP `5000` 포트에서 YOLO 처리 영상과 구간 시간 메타데이터를 함께 받습니다.
 
 ## Jetson에서 Docker 빌드
 
@@ -75,7 +72,6 @@ sudo docker run --rm \
   --network host \
   -e GUI_HOST=192.168.2.91 \
   -e GUI_PORT=5000 \
-  -e GUI_STATUS_PORT=5001 \
   -e SOURCE_ROOT=/data/MEVA \
   -e CLIP_START_SECONDS=0 \
   -e CLIP_DURATION_SECONDS=15 \
@@ -92,9 +88,7 @@ sudo docker run --rm \
 - `GUI_HOST`
   - 운용통제 PC IP
 - `GUI_PORT`
-  - GUI가 YOLO 처리 영상을 받는 UDP 포트, 기본값 `5000`
-- `GUI_STATUS_PORT`
-  - GUI가 구간 전환 로그를 받는 UDP 포트, 기본값 `5001`
+  - GUI가 YOLO 처리 영상과 메타데이터를 함께 받는 UDP 포트, 기본값 `5000`
 - `SOURCE_ROOT`
   - MEVA 영상 루트 폴더
 - `VIDEO_PATH`
@@ -149,6 +143,9 @@ sudo docker run --rm \
 
 - `MEVA video segment changed: clip 1/3 now playing 00:00:00 ~ 00:00:15`
 - `MEVA video segment changed: clip 2/3 now playing 12:00:00 ~ 12:00:15`
+
+이 로그는 별도 포트에서 받는 문자열이 아니라,
+영상 UDP 패킷 헤더에 같이 들어 있는 시간 메타데이터를 GUI가 읽어서 표시하는 방식입니다.
 
 ## SSH 예시
 

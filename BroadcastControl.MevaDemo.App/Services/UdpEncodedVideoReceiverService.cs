@@ -11,8 +11,8 @@ namespace BroadcastControl.App.Services;
 public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
     private const int DefaultPort = 5000;
-    // 송신기 쪽에서 JPEG 데이터 앞에 20바이트 길이의 사용자 정의 헤더를 붙일 수 있다.
-    private const int HeaderSize = 20;
+    private const int LegacyHeaderSize = 20;
+    private const int MetadataHeaderSize = 32;
 
     private readonly Dispatcher _dispatcher;
 
@@ -33,6 +33,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     private double _zoomPanY;
     private double _viewportWidth = 1;
     private double _viewportHeight = 1;
+    private string? _lastSegmentSignature;
 
     public UdpEncodedVideoReceiverService()
     {
@@ -40,6 +41,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     }
 
     public event Action<BitmapSource>? FrameReady;
+    public event Action<PlaybackSegmentInfo>? SegmentChanged;
 
     public int ListeningPort { get; private set; } = DefaultPort;
 
@@ -58,11 +60,11 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         {
             ListeningPort = port;
             _udpClient = new UdpClient();
-            // 로컬 테스트를 반복 실행하거나 재시작했을 때 포트 바인딩 실패를 줄이기 위한 설정이다.
             _udpClient.Client.ExclusiveAddressUse = false;
             _udpClient.Client.ReceiveBufferSize = 4 * 1024 * 1024;
             _udpClient.Client.Bind(new IPEndPoint(IPAddress.Any, port));
 
+            _lastSegmentSignature = null;
             _cancellationTokenSource = new CancellationTokenSource();
             _receiveLoopTask = Task.Run(() => ReceiveLoopAsync(_cancellationTokenSource.Token));
             return true;
@@ -100,6 +102,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         _receiveLoopTask = null;
         _cancellationTokenSource?.Dispose();
         _cancellationTokenSource = null;
+        _lastSegmentSignature = null;
         StopRecording();
     }
 
@@ -202,38 +205,47 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             return;
         }
 
-        // 가장 단순한 경우는 헤더 없이 JPEG 원본만 바로 들어오는 경우다.
         if (LooksLikeJpeg(packet))
         {
-            TryDecodeFrame(packet, 0, 0);
+            TryDecodeFrame(packet, 0, 0, null);
             return;
         }
 
-        if (packet.Length <= HeaderSize)
+        if (TryExtractMetadataEncodedFrame(packet, out var metadataFrame))
+        {
+            TryDecodeFrame(
+                metadataFrame.EncodedBytes,
+                metadataFrame.DeclaredWidth,
+                metadataFrame.DeclaredHeight,
+                metadataFrame.SegmentInfo);
+            return;
+        }
+
+        if (packet.Length <= LegacyHeaderSize)
         {
             return;
         }
 
-        // 송신기 구현에 따라 헤더의 바이트 순서가 달라질 수 있어서
-        // big-endian / little-endian 두 형식을 모두 시도한다.
         if (TryExtractEncodedFrame(packet, useBigEndian: true, out var bigEndianFrame))
         {
-            TryDecodeFrame(bigEndianFrame.EncodedBytes, bigEndianFrame.DeclaredWidth, bigEndianFrame.DeclaredHeight);
+            TryDecodeFrame(bigEndianFrame.EncodedBytes, bigEndianFrame.DeclaredWidth, bigEndianFrame.DeclaredHeight, null);
             return;
         }
 
         if (TryExtractEncodedFrame(packet, useBigEndian: false, out var littleEndianFrame))
         {
-            TryDecodeFrame(littleEndianFrame.EncodedBytes, littleEndianFrame.DeclaredWidth, littleEndianFrame.DeclaredHeight);
+            TryDecodeFrame(littleEndianFrame.EncodedBytes, littleEndianFrame.DeclaredWidth, littleEndianFrame.DeclaredHeight, null);
         }
     }
 
-    private void TryDecodeFrame(byte[] encodedFrame, ushort declaredWidth, ushort declaredHeight)
+    private void TryDecodeFrame(
+        byte[] encodedFrame,
+        ushort declaredWidth,
+        ushort declaredHeight,
+        PlaybackSegmentInfo? segmentInfo)
     {
         try
         {
-            // 먼저 JPEG 디코딩이 실제로 되는지 확인한다.
-            // 헤더에 적힌 크기와 조금 달라도 디코딩에 성공한 프레임은 화면에 표시한다.
             using var decoded = Cv2.ImDecode(encodedFrame, ImreadModes.Color);
             if (decoded.Empty())
             {
@@ -243,8 +255,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             if (declaredWidth > 0 && declaredHeight > 0 &&
                 (decoded.Width != declaredWidth || decoded.Height != declaredHeight))
             {
-                // 헤더상의 크기 정보가 실제 영상 크기와 다르더라도,
-                // 디코딩된 영상 자체는 정상일 수 있으므로 계속 사용한다.
             }
 
             using var adjusted = new Mat();
@@ -257,8 +267,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
             if (_isRecording)
             {
-                // 녹화는 항상 원본 전체 화면이 아니라,
-                // 사용자가 현재 보고 있는 줌/이동 상태의 화면 기준으로 맞춘다.
                 using var recordingFrame = CreateRecordedFrame(adjusted);
                 EnsureVideoWriter(recordingFrame.Width, recordingFrame.Height);
                 WriteRecordingFrame(recordingFrame);
@@ -282,6 +290,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 stride);
 
             bitmap.Freeze();
+            NotifySegmentChanged(segmentInfo);
             _dispatcher.BeginInvoke(() => FrameReady?.Invoke(bitmap));
         }
         catch
@@ -301,7 +310,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         double baseWidth;
         double baseHeight;
 
-        // 먼저 현재 화면 비율과 맞는 기준 영역(base 영역)을 계산한다.
         if (sourceAspect > viewportAspect)
         {
             baseHeight = sourceHeight;
@@ -327,8 +335,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         var offsetX = GetViewportOffset(_zoomPanX, maxPanX, remainingX);
         var offsetY = GetViewportOffset(_zoomPanY, maxPanY, remainingY);
 
-        // 그 다음 줌/이동 값에 따라 잘라내고,
-        // 최종 저장 영상의 해상도가 흔들리지 않도록 기준 크기로 다시 맞춘다.
         var cropRect = new Rect(
             (int)Math.Clamp(Math.Round(baseX + offsetX), 0, sourceWidth - 1),
             (int)Math.Clamp(Math.Round(baseY + offsetY), 0, sourceHeight - 1),
@@ -481,22 +487,96 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             && packet[^1] == 0xD9;
     }
 
-    private static bool TryExtractEncodedFrame(byte[] packet, bool useBigEndian, out EncodedFrame frame)
+    private void NotifySegmentChanged(PlaybackSegmentInfo? segmentInfo)
+    {
+        if (!segmentInfo.HasValue)
+        {
+            return;
+        }
+
+        var signature = segmentInfo.Value.GetSignature();
+        if (string.Equals(_lastSegmentSignature, signature, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastSegmentSignature = signature;
+        _dispatcher.BeginInvoke(() => SegmentChanged?.Invoke(segmentInfo.Value));
+    }
+
+    private static bool TryExtractMetadataEncodedFrame(byte[] packet, out MetadataEncodedFrame frame)
     {
         frame = default;
 
-        if (packet.Length <= HeaderSize)
+        if (packet.Length <= MetadataHeaderSize)
         {
             return false;
         }
 
-        var header = packet.AsSpan(0, HeaderSize);
-        var payload = packet.AsSpan(HeaderSize);
+        var header = packet.AsSpan(0, MetadataHeaderSize);
+        if (header[0] != (byte)'M' ||
+            header[1] != (byte)'E' ||
+            header[2] != (byte)'V' ||
+            header[3] != (byte)'A')
+        {
+            return false;
+        }
 
-        // 헤더 구조는 다음과 같이 해석한다.
-        // [12..15] JPEG 데이터 길이
-        // [16..17] 선언된 영상 너비
-        // [18..19] 선언된 영상 높이
+        var payload = packet.AsSpan(MetadataHeaderSize);
+
+        var imageByteLength = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(4, 4));
+        var declaredWidth = BinaryPrimitives.ReadUInt16BigEndian(header.Slice(8, 2));
+        var declaredHeight = BinaryPrimitives.ReadUInt16BigEndian(header.Slice(10, 2));
+        var clipIndex = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(12, 4));
+        var clipCount = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(16, 4));
+        var segmentStartSeconds = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(20, 4));
+        var segmentEndSeconds = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(24, 4));
+        var currentPlaybackSeconds = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(28, 4));
+
+        if (imageByteLength == 0 || imageByteLength > payload.Length)
+        {
+            return false;
+        }
+
+        if (declaredWidth == 0 || declaredHeight == 0)
+        {
+            return false;
+        }
+
+        if (declaredWidth > 10000 || declaredHeight > 10000)
+        {
+            return false;
+        }
+
+        var encodedBytes = payload[..checked((int)imageByteLength)].ToArray();
+        if (!LooksLikeJpeg(encodedBytes))
+        {
+            return false;
+        }
+
+        var segmentInfo = new PlaybackSegmentInfo(
+            clipIndex,
+            clipCount,
+            segmentStartSeconds,
+            segmentEndSeconds,
+            currentPlaybackSeconds);
+
+        frame = new MetadataEncodedFrame(encodedBytes, declaredWidth, declaredHeight, segmentInfo);
+        return true;
+    }
+
+    private static bool TryExtractEncodedFrame(byte[] packet, bool useBigEndian, out EncodedFrame frame)
+    {
+        frame = default;
+
+        if (packet.Length <= LegacyHeaderSize)
+        {
+            return false;
+        }
+
+        var header = packet.AsSpan(0, LegacyHeaderSize);
+        var payload = packet.AsSpan(LegacyHeaderSize);
+
         var imageByteLength = useBigEndian
             ? BinaryPrimitives.ReadUInt32BigEndian(header.Slice(12, 4))
             : BinaryPrimitives.ReadUInt32LittleEndian(header.Slice(12, 4));
@@ -524,7 +604,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             return false;
         }
 
-        // 헤더 값이 멀쩡해 보여도 실제 JPEG가 아니면 잘못된 패킷으로 보고 버린다.
         var encodedBytes = payload[..checked((int)imageByteLength)].ToArray();
         if (!LooksLikeJpeg(encodedBytes))
         {
@@ -536,4 +615,35 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     }
 
     private readonly record struct EncodedFrame(byte[] EncodedBytes, ushort DeclaredWidth, ushort DeclaredHeight);
+    private readonly record struct MetadataEncodedFrame(
+        byte[] EncodedBytes,
+        ushort DeclaredWidth,
+        ushort DeclaredHeight,
+        PlaybackSegmentInfo SegmentInfo);
+}
+
+public readonly record struct PlaybackSegmentInfo(
+    uint ClipIndex,
+    uint ClipCount,
+    uint SegmentStartSeconds,
+    uint SegmentEndSeconds,
+    uint CurrentPlaybackSeconds)
+{
+    public string ToLogMessage()
+    {
+        return $"MEVA video segment changed: clip {ClipIndex}/{ClipCount} now playing {FormatTime(SegmentStartSeconds)} ~ {FormatTime(SegmentEndSeconds)}";
+    }
+
+    public string GetSignature()
+    {
+        return $"{ClipIndex}:{ClipCount}:{SegmentStartSeconds}:{SegmentEndSeconds}";
+    }
+
+    private static string FormatTime(uint totalSeconds)
+    {
+        var hours = totalSeconds / 3600;
+        var minutes = (totalSeconds % 3600) / 60;
+        var seconds = totalSeconds % 60;
+        return $"{hours:00}:{minutes:00}:{seconds:00}";
+    }
 }
