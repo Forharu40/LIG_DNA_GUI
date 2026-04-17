@@ -1,7 +1,10 @@
 import os
+import re
 import socket
 import struct
 import time
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import cv2
@@ -24,28 +27,119 @@ FONT_SCALE = float(os.getenv("FONT_SCALE", "0.6"))
 LABEL_THICKNESS = int(os.getenv("LABEL_THICKNESS", "2"))
 
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".m4v"}
+TIMESTAMP_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})\.(\d{2})-(\d{2})-(\d{2})")
 
 
-def find_video_file() -> Path:
+@dataclass(frozen=True)
+class VideoEntry:
+    path: Path
+    start_time: datetime | None
+    relative_start_seconds: float
+
+
+def parse_video_start_time(path: Path) -> datetime | None:
+    match = TIMESTAMP_PATTERN.search(path.name)
+    if not match:
+        return None
+
+    date_part, hour, minute, second = match.groups()
+    try:
+        return datetime.strptime(
+            f"{date_part} {hour}:{minute}:{second}",
+            "%Y-%m-%d %H:%M:%S",
+        )
+    except ValueError:
+        return None
+
+
+def collect_video_paths() -> list[Path]:
     if VIDEO_PATH:
         path = Path(VIDEO_PATH)
         if not path.exists():
             raise FileNotFoundError(f"VIDEO_PATH does not exist: {path}")
-        return path
+        return [path]
 
     if not SOURCE_ROOT.exists():
         raise FileNotFoundError(f"SOURCE_ROOT does not exist: {SOURCE_ROOT}")
 
-    for path in sorted(SOURCE_ROOT.rglob("*")):
-        if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS:
-            return path
+    video_paths = [
+        path
+        for path in sorted(SOURCE_ROOT.rglob("*"))
+        if path.is_file() and path.suffix.lower() in VIDEO_EXTENSIONS
+    ]
 
-    raise FileNotFoundError(f"No video file was found under {SOURCE_ROOT}")
+    if not video_paths:
+        raise FileNotFoundError(f"No video file was found under {SOURCE_ROOT}")
+
+    return video_paths
+
+
+def build_sampled_entries() -> list[VideoEntry]:
+    video_paths = collect_video_paths()
+
+    if len(video_paths) == 1:
+        return [VideoEntry(video_paths[0], None, 0.0)]
+
+    entries_with_time = []
+    for path in video_paths:
+        start_time = parse_video_start_time(path)
+        if start_time is not None:
+            entries_with_time.append((path, start_time))
+
+    if len(entries_with_time) < 2:
+        return [VideoEntry(video_paths[0], None, 0.0)]
+
+    entries_with_time.sort(key=lambda item: item[1])
+    timeline_origin = entries_with_time[0][1]
+
+    sampled_entries: list[VideoEntry] = []
+    current_index = 0
+    next_target_time = timeline_origin
+
+    while current_index < len(entries_with_time):
+        while (
+            current_index < len(entries_with_time)
+            and entries_with_time[current_index][1] < next_target_time
+        ):
+            current_index += 1
+
+        if current_index >= len(entries_with_time):
+            break
+
+        selected_path, selected_time = entries_with_time[current_index]
+        relative_start_seconds = (selected_time - timeline_origin).total_seconds()
+        sampled_entries.append(
+            VideoEntry(
+                path=selected_path,
+                start_time=selected_time,
+                relative_start_seconds=max(0.0, relative_start_seconds),
+            )
+        )
+
+        if SAMPLE_INTERVAL_SECONDS <= 0:
+            current_index += 1
+            next_target_time = selected_time
+        else:
+            next_target_time = selected_time + timedelta(seconds=SAMPLE_INTERVAL_SECONDS)
+            current_index += 1
+
+    if not sampled_entries:
+        return [VideoEntry(video_paths[0], None, 0.0)]
+
+    return sampled_entries
 
 
 def build_label(class_name: str, track_id: int | None, fallback_index: int) -> str:
     object_index = track_id if track_id is not None else fallback_index
     return f"{class_name} object{object_index}"
+
+
+def format_hms(total_seconds: float) -> str:
+    total_seconds = max(0, int(total_seconds))
+    hours = total_seconds // 3600
+    minutes = (total_seconds % 3600) // 60
+    seconds = total_seconds % 60
+    return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
 
 
 def build_video_packet(
@@ -75,28 +169,88 @@ def build_video_packet(
     return header + jpeg_bytes
 
 
-def build_clip_start_times(video_duration_seconds: float) -> list[float]:
-    if video_duration_seconds <= 0:
-        return [max(0.0, CLIP_START_SECONDS)]
+def annotate_frame(model: YOLO, frame) -> any:
+    results = model.track(frame, persist=True, conf=CONFIDENCE, verbose=False)
+    annotated = frame.copy()
 
-    if SAMPLE_INTERVAL_SECONDS <= 0:
-        return [max(0.0, min(CLIP_START_SECONDS, video_duration_seconds))]
+    if not results:
+        return annotated
 
-    start_times: list[float] = []
-    current_start = max(0.0, CLIP_START_SECONDS)
-    while current_start < video_duration_seconds:
-        start_times.append(current_start)
-        current_start += SAMPLE_INTERVAL_SECONDS
+    result = results[0]
+    boxes = result.boxes
+    names = result.names
 
-    if not start_times:
-        start_times.append(0.0)
+    if boxes is None or len(boxes) == 0:
+        return annotated
 
-    return start_times
+    xyxy = boxes.xyxy.cpu().numpy().astype(int)
+    cls_ids = boxes.cls.cpu().numpy().astype(int)
+    track_ids = boxes.id.cpu().numpy().astype(int) if boxes.id is not None else None
+
+    for index, (box, cls_id) in enumerate(zip(xyxy, cls_ids), start=1):
+        x1, y1, x2, y2 = box.tolist()
+        track_id = int(track_ids[index - 1]) if track_ids is not None else None
+        class_name = names.get(cls_id, str(cls_id))
+        label = build_label(class_name, track_id, index)
+
+        cv2.rectangle(
+            annotated,
+            (x1, y1),
+            (x2, y2),
+            (0, 255, 0),
+            BOX_THICKNESS,
+        )
+
+        text_origin_y = y1 - 10 if y1 > 30 else y1 + 22
+        (text_width, text_height), baseline = cv2.getTextSize(
+            label,
+            cv2.FONT_HERSHEY_SIMPLEX,
+            FONT_SCALE,
+            LABEL_THICKNESS,
+        )
+        text_box_top = max(0, text_origin_y - text_height - baseline - 4)
+        text_box_bottom = min(
+            annotated.shape[0],
+            text_origin_y + baseline + 4,
+        )
+        text_box_right = min(
+            annotated.shape[1],
+            x1 + text_width + 10,
+        )
+
+        cv2.rectangle(
+            annotated,
+            (x1, text_box_top),
+            (text_box_right, text_box_bottom),
+            (0, 96, 0),
+            -1,
+        )
+        cv2.putText(
+            annotated,
+            label,
+            (x1, text_origin_y),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            FONT_SCALE,
+            (255, 255, 255),
+            LABEL_THICKNESS,
+            cv2.LINE_AA,
+        )
+
+    return annotated
 
 
 def main() -> None:
-    video_path = find_video_file()
-    print(f"Using video: {video_path}")
+    sampled_entries = build_sampled_entries()
+    print(f"Selected {len(sampled_entries)} sampled video entries from {SOURCE_ROOT}")
+    for index, entry in enumerate(sampled_entries, start=1):
+        if entry.start_time is None:
+            print(f"  [{index}] {entry.path}")
+        else:
+            print(
+                f"  [{index}] {entry.path} "
+                f"(timeline {format_hms(entry.relative_start_seconds)})"
+            )
+
     print(f"Streaming to GUI: {GUI_HOST}:{GUI_PORT}")
     print(f"Using model: {MODEL_PATH}")
     print(
@@ -111,132 +265,72 @@ def main() -> None:
     try:
         cycle_index = 0
         while True:
-            capture = cv2.VideoCapture(str(video_path))
-            if not capture.isOpened():
-                raise RuntimeError(f"Could not open video: {video_path}")
+            for clip_index, entry in enumerate(sampled_entries, start=1):
+                capture = cv2.VideoCapture(str(entry.path))
+                if not capture.isOpened():
+                    raise RuntimeError(f"Could not open video: {entry.path}")
 
-            fps = capture.get(cv2.CAP_PROP_FPS)
-            frame_delay = 1.0 / fps if fps and fps > 0 else 0.04
-            frame_count = capture.get(cv2.CAP_PROP_FRAME_COUNT)
-            video_duration_seconds = 0.0
-            if fps and fps > 0 and frame_count and frame_count > 0:
-                video_duration_seconds = frame_count / fps
+                try:
+                    fps = capture.get(cv2.CAP_PROP_FPS)
+                    frame_delay = 1.0 / fps if fps and fps > 0 else 0.04
+                    clip_start_msec = max(0.0, CLIP_START_SECONDS * 1000.0)
+                    clip_end_msec = None
+                    if CLIP_DURATION_SECONDS > 0:
+                        clip_end_msec = clip_start_msec + (CLIP_DURATION_SECONDS * 1000.0)
 
-            clip_start_times = build_clip_start_times(video_duration_seconds)
+                    timeline_segment_start = entry.relative_start_seconds + CLIP_START_SECONDS
+                    timeline_segment_end = timeline_segment_start + CLIP_DURATION_SECONDS
 
-            for clip_index, clip_start_seconds in enumerate(clip_start_times, start=1):
-                clip_start_msec = max(0.0, clip_start_seconds * 1000.0)
-                clip_end_msec = None
-                if CLIP_DURATION_SECONDS > 0:
-                    clip_end_msec = clip_start_msec + (CLIP_DURATION_SECONDS * 1000.0)
+                    print(
+                        f"Playing sampled clip {clip_index}/{len(sampled_entries)} "
+                        f"from {entry.path.name} at timeline {format_hms(timeline_segment_start)}"
+                    )
 
-                print(
-                    f"Playing clip {clip_index}/{len(clip_start_times)} "
-                    f"from {clip_start_seconds:.1f}s"
-                )
+                    capture.set(cv2.CAP_PROP_POS_MSEC, clip_start_msec)
 
-                capture.set(cv2.CAP_PROP_POS_MSEC, clip_start_msec)
+                    while True:
+                        if clip_end_msec is not None:
+                            current_msec = capture.get(cv2.CAP_PROP_POS_MSEC)
+                            if current_msec >= clip_end_msec:
+                                break
 
-                while True:
-                    if clip_end_msec is not None:
-                        current_msec = capture.get(cv2.CAP_PROP_POS_MSEC)
-                        if current_msec >= clip_end_msec:
+                        ok, frame = capture.read()
+                        if not ok:
                             break
 
-                    ok, frame = capture.read()
-                    if not ok:
-                        break
+                        annotated = annotate_frame(model, frame)
 
-                    results = model.track(frame, persist=True, conf=CONFIDENCE, verbose=False)
-                    annotated = frame.copy()
-
-                    if results:
-                        result = results[0]
-                        boxes = result.boxes
-                        names = result.names
-
-                        if boxes is not None and len(boxes) > 0:
-                            xyxy = boxes.xyxy.cpu().numpy().astype(int)
-                            cls_ids = boxes.cls.cpu().numpy().astype(int)
-                            track_ids = boxes.id.cpu().numpy().astype(int) if boxes.id is not None else None
-
-                            for index, (box, cls_id) in enumerate(zip(xyxy, cls_ids), start=1):
-                                x1, y1, x2, y2 = box.tolist()
-                                track_id = int(track_ids[index - 1]) if track_ids is not None else None
-                                class_name = names.get(cls_id, str(cls_id))
-                                label = build_label(class_name, track_id, index)
-
-                                cv2.rectangle(
-                                    annotated,
-                                    (x1, y1),
-                                    (x2, y2),
-                                    (0, 255, 0),
-                                    BOX_THICKNESS,
-                                )
-
-                                text_origin_y = y1 - 10 if y1 > 30 else y1 + 22
-                                (text_width, text_height), baseline = cv2.getTextSize(
-                                    label,
-                                    cv2.FONT_HERSHEY_SIMPLEX,
-                                    FONT_SCALE,
-                                    LABEL_THICKNESS,
-                                )
-                                text_box_top = max(0, text_origin_y - text_height - baseline - 4)
-                                text_box_bottom = min(
-                                    annotated.shape[0],
-                                    text_origin_y + baseline + 4,
-                                )
-                                text_box_right = min(
-                                    annotated.shape[1],
-                                    x1 + text_width + 10,
-                                )
-
-                                cv2.rectangle(
-                                    annotated,
-                                    (x1, text_box_top),
-                                    (text_box_right, text_box_bottom),
-                                    (0, 96, 0),
-                                    -1,
-                                )
-                                cv2.putText(
-                                    annotated,
-                                    label,
-                                    (x1, text_origin_y),
-                                    cv2.FONT_HERSHEY_SIMPLEX,
-                                    FONT_SCALE,
-                                    (255, 255, 255),
-                                    LABEL_THICKNESS,
-                                    cv2.LINE_AA,
-                                )
-
-                    ok, encoded = cv2.imencode(
-                        ".jpg",
-                        annotated,
-                        [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
-                    )
-                    if ok:
-                        current_playback_seconds = capture.get(cv2.CAP_PROP_POS_MSEC) / 1000.0
-                        packet = build_video_packet(
-                            encoded.tobytes(),
-                            annotated.shape[1],
-                            annotated.shape[0],
-                            clip_index,
-                            len(clip_start_times),
-                            clip_start_seconds,
-                            clip_start_seconds + CLIP_DURATION_SECONDS,
-                            current_playback_seconds,
-                            cycle_index,
+                        ok, encoded = cv2.imencode(
+                            ".jpg",
+                            annotated,
+                            [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
                         )
-                        sock.sendto(packet, (GUI_HOST, GUI_PORT))
+                        if ok:
+                            current_playback_seconds = (
+                                entry.relative_start_seconds
+                                + (capture.get(cv2.CAP_PROP_POS_MSEC) / 1000.0)
+                            )
+                            packet = build_video_packet(
+                                encoded.tobytes(),
+                                annotated.shape[1],
+                                annotated.shape[0],
+                                clip_index,
+                                len(sampled_entries),
+                                timeline_segment_start,
+                                timeline_segment_end,
+                                current_playback_seconds,
+                                cycle_index,
+                            )
+                            sock.sendto(packet, (GUI_HOST, GUI_PORT))
 
-                    time.sleep(frame_delay)
-
-            capture.release()
+                        time.sleep(frame_delay)
+                finally:
+                    capture.release()
 
             if not LOOP_VIDEO:
                 break
 
-            print("MEVA video segment cycle completed. Restarting from the first sampled 15-second video segment.")
+            print("MEVA video segment cycle completed. Restarting from the first sampled timeline entry.")
             cycle_index += 1
     finally:
         sock.close()
