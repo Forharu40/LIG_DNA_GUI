@@ -15,6 +15,7 @@ public partial class MainWindow : Window
 
     private readonly MainViewModel _viewModel;
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
+    private readonly MevaClipStatusReceiverService _mevaClipStatusReceiverService;
     private readonly WebcamCaptureService _irWebcamCaptureService;
     private readonly ViewportRecordingService _viewportRecordingService;
 
@@ -29,6 +30,7 @@ public partial class MainWindow : Window
 
         _viewModel = new MainViewModel();
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
+        _mevaClipStatusReceiverService = new MevaClipStatusReceiverService();
         _irWebcamCaptureService = new WebcamCaptureService();
         _viewportRecordingService = new ViewportRecordingService();
         DataContext = _viewModel;
@@ -43,6 +45,7 @@ public partial class MainWindow : Window
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
+        _mevaClipStatusReceiverService.StatusMessageReceived += OnMevaClipStatusMessageReceived;
         _irWebcamCaptureService.FrameReady += OnIrFrameReady;
 
         _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
@@ -60,6 +63,15 @@ public partial class MainWindow : Window
         else
         {
             _viewModel.AppendImportantLog("Failed to start the MEVA YOLO UDP stream receiver.");
+        }
+
+        if (_mevaClipStatusReceiverService.Start())
+        {
+            _viewModel.AppendImportantLog($"MEVA clip status receiver is waiting on port {_mevaClipStatusReceiverService.ListeningPort}.");
+        }
+        else
+        {
+            _viewModel.AppendImportantLog("Failed to start the MEVA clip status receiver.");
         }
 
         if (_irWebcamCaptureService.Start())
@@ -177,6 +189,11 @@ public partial class MainWindow : Window
         _viewModel.UpdateIrFrame(frame);
     }
 
+    private void OnMevaClipStatusMessageReceived(string message)
+    {
+        _viewModel.AppendImportantLog(message);
+    }
+
     private void UpdateRecordingViewportState()
     {
         _eoUdpCaptureService.UpdateViewportTransform(
@@ -289,7 +306,9 @@ public partial class MainWindow : Window
     {
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
+        _mevaClipStatusReceiverService.StatusMessageReceived -= OnMevaClipStatusMessageReceived;
         _irWebcamCaptureService.FrameReady -= OnIrFrameReady;
+        _mevaClipStatusReceiverService.Dispose();
         _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
         _irWebcamCaptureService.Dispose();
