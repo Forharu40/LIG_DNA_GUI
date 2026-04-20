@@ -3,14 +3,19 @@ import re
 import socket
 import struct
 import time
+import math
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
+import json
 
 import cv2
 from ultralytics import YOLO
 
 
+LEGACY_IMAGE_HEADER_SIZE = 20
+DETECTION_PACKET_MAGIC = b"DETS"
+STATUS_PACKET_MAGIC = b"STAT"
 GUI_HOST = os.getenv("GUI_HOST", "127.0.0.1")
 GUI_PORT = int(os.getenv("GUI_PORT", "5000"))
 SOURCE_ROOT = Path(os.getenv("SOURCE_ROOT", "/data/MEVA"))
@@ -20,8 +25,9 @@ CONFIDENCE = float(os.getenv("CONFIDENCE", "0.25"))
 JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "85"))
 LOOP_VIDEO = os.getenv("LOOP_VIDEO", "true").lower() in {"1", "true", "yes", "on"}
 CLIP_START_SECONDS = float(os.getenv("CLIP_START_SECONDS", "0"))
-CLIP_DURATION_SECONDS = float(os.getenv("CLIP_DURATION_SECONDS", "15"))
-SAMPLE_INTERVAL_SECONDS = float(os.getenv("SAMPLE_INTERVAL_SECONDS", "43200"))
+CLIP_DURATION_SECONDS = float(os.getenv("CLIP_DURATION_SECONDS", "10"))
+SAMPLE_INTERVAL_SECONDS = float(os.getenv("SAMPLE_INTERVAL_SECONDS", "1800"))
+SAMPLE_START_RATIO = float(os.getenv("SAMPLE_START_RATIO", "0.8"))
 BOX_THICKNESS = int(os.getenv("BOX_THICKNESS", "2"))
 FONT_SCALE = float(os.getenv("FONT_SCALE", "0.6"))
 LABEL_THICKNESS = int(os.getenv("LABEL_THICKNESS", "2"))
@@ -130,6 +136,21 @@ def build_sampled_entries() -> list[VideoEntry]:
     return sampled_entries
 
 
+def reorder_entries_by_start_ratio(sampled_entries: list[VideoEntry]) -> tuple[list[VideoEntry], int]:
+    if not sampled_entries:
+        return sampled_entries, 0
+
+    normalized_ratio = min(max(SAMPLE_START_RATIO, 0.0), 1.0)
+    start_index = math.floor(len(sampled_entries) * normalized_ratio)
+    if start_index >= len(sampled_entries):
+        start_index = len(sampled_entries) - 1
+
+    if start_index <= 0:
+        return sampled_entries, 0
+
+    return sampled_entries[start_index:] + sampled_entries[:start_index], start_index
+
+
 def build_label(class_name: str, track_id: int | None, fallback_index: int) -> str:
     object_index = track_id if track_id is not None else fallback_index
     return f"{class_name} object{object_index}"
@@ -166,7 +187,64 @@ def build_video_packet(
     )
 
 
+def build_image_packet(
+    encoded_bytes: bytes,
+    width: int,
+    height: int,
+    frame_index: int,
+    frame_stamp_ns: int,
+) -> bytes:
+    header = struct.pack(
+        "!QIIHH",
+        max(0, frame_stamp_ns),
+        max(0, frame_index),
+        len(encoded_bytes),
+        max(0, width),
+        max(0, height),
+    )
+    return header + encoded_bytes
+
+
+def build_detection_packet(
+    frame_stamp_ns: int,
+    frame_index: int,
+    width: int,
+    height: int,
+    detections: list[dict],
+) -> bytes:
+    payload = {
+        "stampNs": max(0, frame_stamp_ns),
+        "frameId": max(0, frame_index),
+        "width": max(0, width),
+        "height": max(0, height),
+        "detections": detections,
+    }
+    return DETECTION_PACKET_MAGIC + json.dumps(payload, separators=(",", ":")).encode("utf-8")
+
+
+def build_status_packet(
+    enabled: bool,
+    model_loaded: bool,
+    conf_threshold: float,
+    last_error: str,
+    source: str,
+    frame_stamp_ns: int = 0,
+    frame_index: int = 0,
+) -> bytes:
+    payload = {
+        "enabled": enabled,
+        "modelLoaded": model_loaded,
+        "confThreshold": conf_threshold,
+        "lastError": last_error,
+        "source": source,
+        "stampNs": max(0, frame_stamp_ns),
+        "frameId": max(0, frame_index),
+    }
+    return STATUS_PACKET_MAGIC + json.dumps(payload, separators=(",", ":")).encode("utf-8")
+
+
 def encode_frame_for_udp(frame) -> bytes | None:
+    max_image_payload_bytes = max(1024, MAX_UDP_BYTES - LEGACY_IMAGE_HEADER_SIZE)
     quality_attempts = [
         max(25, JPEG_QUALITY),
         max(25, min(JPEG_QUALITY, 70)),
@@ -188,85 +266,57 @@ def encode_frame_for_udp(frame) -> bytes | None:
                 working_frame,
                 [int(cv2.IMWRITE_JPEG_QUALITY), quality],
             )
-            if ok and len(encoded) <= MAX_UDP_BYTES:
+            if ok and len(encoded) <= max_image_payload_bytes:
                 return encoded.tobytes()
 
     return None
 
 
-def annotate_frame(model: YOLO, frame) -> any:
+def detect_objects(model: YOLO, frame) -> list[dict]:
     results = model.track(frame, persist=True, conf=CONFIDENCE, verbose=False)
-    annotated = frame.copy()
-
     if not results:
-        return annotated
+        return []
 
     result = results[0]
     boxes = result.boxes
     names = result.names
 
     if boxes is None or len(boxes) == 0:
-        return annotated
+        return []
 
     xyxy = boxes.xyxy.cpu().numpy().astype(int)
     cls_ids = boxes.cls.cpu().numpy().astype(int)
+    scores = boxes.conf.cpu().numpy().astype(float)
     track_ids = boxes.id.cpu().numpy().astype(int) if boxes.id is not None else None
+    detections: list[dict] = []
 
-    for index, (box, cls_id) in enumerate(zip(xyxy, cls_ids), start=1):
+    for index, (box, cls_id, score) in enumerate(zip(xyxy, cls_ids, scores), start=1):
         x1, y1, x2, y2 = box.tolist()
         track_id = int(track_ids[index - 1]) if track_ids is not None else None
         class_name = names.get(cls_id, str(cls_id))
-        label = build_label(class_name, track_id, index)
-
-        cv2.rectangle(
-            annotated,
-            (x1, y1),
-            (x2, y2),
-            (0, 255, 0),
-            BOX_THICKNESS,
+        detections.append(
+            {
+                "className": class_name,
+                "score": float(score),
+                "x1": float(x1),
+                "y1": float(y1),
+                "x2": float(x2),
+                "y2": float(y2),
+                "objectId": track_id if track_id is not None else index,
+            }
         )
 
-        text_origin_y = y1 - 10 if y1 > 30 else y1 + 22
-        (text_width, text_height), baseline = cv2.getTextSize(
-            label,
-            cv2.FONT_HERSHEY_SIMPLEX,
-            FONT_SCALE,
-            LABEL_THICKNESS,
-        )
-        text_box_top = max(0, text_origin_y - text_height - baseline - 4)
-        text_box_bottom = min(
-            annotated.shape[0],
-            text_origin_y + baseline + 4,
-        )
-        text_box_right = min(
-            annotated.shape[1],
-            x1 + text_width + 10,
-        )
-
-        cv2.rectangle(
-            annotated,
-            (x1, text_box_top),
-            (text_box_right, text_box_bottom),
-            (0, 96, 0),
-            -1,
-        )
-        cv2.putText(
-            annotated,
-            label,
-            (x1, text_origin_y),
-            cv2.FONT_HERSHEY_SIMPLEX,
-            FONT_SCALE,
-            (255, 255, 255),
-            LABEL_THICKNESS,
-            cv2.LINE_AA,
-        )
-
-    return annotated
+    return detections
 
 
 def main() -> None:
     sampled_entries = build_sampled_entries()
+    sampled_entries, start_index = reorder_entries_by_start_ratio(sampled_entries)
     print(f"Selected {len(sampled_entries)} sampled video entries from {SOURCE_ROOT}")
+    print(
+        f"Starting playback from sampled entry {start_index + 1}/{len(sampled_entries)} "
+        f"(ratio {SAMPLE_START_RATIO:.2f})"
+    )
     for index, entry in enumerate(sampled_entries, start=1):
         if entry.start_time is None:
             print(f"  [{index}] {entry.path}")
@@ -283,13 +333,17 @@ def main() -> None:
         f"duration={CLIP_DURATION_SECONDS:.1f}s, "
         f"interval={SAMPLE_INTERVAL_SECONDS:.1f}s"
     )
+    print(f"Sample start ratio: {SAMPLE_START_RATIO:.2f}")
     print(f"Max UDP payload target: {MAX_UDP_BYTES} bytes")
 
     model = YOLO(MODEL_PATH)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    status_packet = build_status_packet(True, True, CONFIDENCE, "", str(SOURCE_ROOT))
+    sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
 
     try:
         cycle_index = 0
+        frame_index = 0
         while True:
             for clip_index, entry in enumerate(sampled_entries, start=1):
                 capture = cv2.VideoCapture(str(entry.path))
@@ -334,11 +388,30 @@ def main() -> None:
                         if not ok:
                             break
 
-                        annotated = annotate_frame(model, frame)
+                        detections = detect_objects(model, frame)
+                        encoded_bytes = encode_frame_for_udp(frame)
+                        if encoded_bytes is None:
+                            time.sleep(frame_delay)
+                            continue
 
-                        encoded_bytes = encode_frame_for_udp(annotated)
-                        if encoded_bytes is not None:
-                            sock.sendto(encoded_bytes, (GUI_HOST, GUI_PORT))
+                        frame_index += 1
+                        current_frame_stamp_ns = time.time_ns()
+                        image_packet = build_image_packet(
+                            encoded_bytes,
+                            frame.shape[1],
+                            frame.shape[0],
+                            frame_index,
+                            current_frame_stamp_ns,
+                        )
+                        detection_packet = build_detection_packet(
+                            current_frame_stamp_ns,
+                            frame_index,
+                            frame.shape[1],
+                            frame.shape[0],
+                            detections,
+                        )
+                        sock.sendto(image_packet, (GUI_HOST, GUI_PORT))
+                        sock.sendto(detection_packet, (GUI_HOST, GUI_PORT))
 
                         time.sleep(frame_delay)
                 finally:

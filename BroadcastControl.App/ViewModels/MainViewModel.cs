@@ -50,7 +50,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     // 프레임 수신 전에도 화면이 비지 않도록 EO/IR 기본 안내 이미지를 준비함.
     private ImageSource? _eoFrame;
     private ImageSource? _irFrame;
-    private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame("EO UDP", Color.FromRgb(51, 94, 160));
+    private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame("MEVA DEMO", Color.FromRgb(51, 94, 160));
     private readonly ImageSource _irPlaceholderFrame = CreateCameraPlaceholderFrame("IR TEMP", Color.FromRgb(192, 109, 40));
 
     public MainViewModel()
@@ -157,6 +157,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
         }
     }
+
+    public bool IsEoPrimary => _isEoPrimary;
 
     // 상단 전원 버튼은 프로그램 종료 버튼으로 사용함.
     public string PowerButtonText => "전원 종료";
@@ -284,7 +286,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public string IrTitle => "IR cam";
 
-    public string EoSubtitle => "외부 UDP 카메라 입력";
+    public string EoSubtitle => "Jetson YOLO MEVA demo stream";
 
     public string IrSubtitle => "노트북 카메라 임시 입력";
 
@@ -429,6 +431,20 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         _irFrame = frame;
         OnPropertyChanged(nameof(LargeFeedImage));
         OnPropertyChanged(nameof(InsetFeedImage));
+    }
+
+    public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
+    {
+        if (detections.Count == 0)
+        {
+            SelectedPrimaryTarget = "복합";
+            CurrentThreatLevel = "낮음";
+            return;
+        }
+
+        var primaryDetection = detections[0];
+        SelectedPrimaryTarget = $"{primaryDetection.ClassName} object{primaryDetection.ObjectId}";
+        CurrentThreatLevel = detections.Count >= 3 ? "높음" : "중간";
     }
 
     /// <summary>
@@ -619,6 +635,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private void SwapFeeds()
     {
         _isEoPrimary = !_isEoPrimary;
+        OnPropertyChanged(nameof(IsEoPrimary));
         OnPropertyChanged(nameof(LargeFeedImage));
         OnPropertyChanged(nameof(InsetFeedImage));
         OnPropertyChanged(nameof(LargeFeedTitle));
