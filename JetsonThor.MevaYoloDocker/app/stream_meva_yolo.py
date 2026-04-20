@@ -34,6 +34,14 @@ FONT_SCALE = float(os.getenv("FONT_SCALE", "0.6"))
 LABEL_THICKNESS = int(os.getenv("LABEL_THICKNESS", "2"))
 MAX_UDP_BYTES = int(os.getenv("MAX_UDP_BYTES", "60000"))
 TILE_OVERLAP_RATIO = float(os.getenv("TILE_OVERLAP_RATIO", "0.15"))
+ALLOWED_CLASSES = {
+    name.strip().lower()
+    for name in os.getenv(
+        "ALLOWED_CLASSES",
+        "person,bicycle,car,motorcycle,bus,truck",
+    ).split(",")
+    if name.strip()
+}
 
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".m4v"}
 TIMESTAMP_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})\.(\d{2})-(\d{2})-(\d{2})")
@@ -366,6 +374,17 @@ def suppress_duplicate_detections(detections: list[dict]) -> list[dict]:
     return filtered
 
 
+def filter_allowed_detections(detections: list[dict]) -> list[dict]:
+    if not ALLOWED_CLASSES:
+        return detections
+
+    return [
+        detection
+        for detection in detections
+        if str(detection["className"]).lower() in ALLOWED_CLASSES
+    ]
+
+
 def detect_objects(model: YOLO, frame) -> list[dict]:
     source_height, source_width = frame.shape[:2]
     detections: list[dict] = []
@@ -407,7 +426,8 @@ def detect_objects(model: YOLO, frame) -> list[dict]:
         if bottom >= source_height:
             break
 
-    return suppress_duplicate_detections(detections)
+    filtered = filter_allowed_detections(detections)
+    return suppress_duplicate_detections(filtered)
 
 
 def main() -> None:
@@ -438,6 +458,7 @@ def main() -> None:
     print(f"Sample start ratio: {SAMPLE_START_RATIO:.2f}")
     print(f"YOLO confidence threshold: {CONFIDENCE:.2f}")
     print(f"YOLO inference size: {INFERENCE_SIZE}")
+    print(f"Allowed classes: {', '.join(sorted(ALLOWED_CLASSES))}")
     print(f"Max UDP payload target: {MAX_UDP_BYTES} bytes")
 
     model = YOLO(MODEL_PATH)

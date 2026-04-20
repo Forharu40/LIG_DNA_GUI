@@ -497,14 +497,12 @@ public partial class MainWindow : Window
     {
         var accentBrush = new SolidColorBrush(Color.FromRgb(105, 255, 132));
         accentBrush.Freeze();
-        var fillBrush = new SolidColorBrush(Color.FromArgb(36, 105, 255, 132));
-        fillBrush.Freeze();
         var shadowBrush = new SolidColorBrush(Color.FromArgb(96, 0, 0, 0));
         shadowBrush.Freeze();
         var textBrush = Brushes.White;
 
-        drawingContext.DrawRectangle(fillBrush, new Pen(shadowBrush, 4), new Rect(rectLeft, rectTop, rectWidth, rectHeight));
-        drawingContext.DrawRectangle(fillBrush, new Pen(accentBrush, 2), new Rect(rectLeft, rectTop, rectWidth, rectHeight));
+        drawingContext.DrawRectangle(null, new Pen(shadowBrush, 4), new Rect(rectLeft, rectTop, rectWidth, rectHeight));
+        drawingContext.DrawRectangle(null, new Pen(accentBrush, 2), new Rect(rectLeft, rectTop, rectWidth, rectHeight));
 
         var cornerLength = Math.Max(12, Math.Min(rectWidth, rectHeight) * 0.18);
         DrawCorner(drawingContext, rectLeft, rectTop, cornerLength, true, true, accentBrush);
