@@ -301,13 +301,13 @@ public partial class MainWindow : Window
                 return;
             }
 
-            if (!TryGetRenderableDetectionPacket(_latestEoFrame.Value.FrameIndex, out var detectionPacket))
+            if (!TryGetRenderableFrameAndDetection(out var frameToRender, out var detectionPacket))
             {
                 _viewModel.UpdateEoFrame(_latestEoFrame.Value.Bitmap);
                 return;
             }
 
-            var composedBitmap = ComposeDetectionOverlayBitmap(_latestEoFrame.Value, detectionPacket);
+            var composedBitmap = ComposeDetectionOverlayBitmap(frameToRender, detectionPacket);
             _viewModel.UpdateEoFrame(composedBitmap);
 
             if (!_hasRenderedDetectionOverlay)
@@ -415,6 +415,39 @@ public partial class MainWindow : Window
             return true;
         }
 
+        detectionPacket = default;
+        return false;
+    }
+
+    private bool TryGetRenderableFrameAndDetection(out ReceivedVideoFrame frame, out DetectionPacket detectionPacket)
+    {
+        if (_latestEoFrame is not null &&
+            _detectionCache.TryGetValue(_latestEoFrame.Value.FrameIndex, out detectionPacket))
+        {
+            frame = _latestEoFrame.Value;
+            return true;
+        }
+
+        var exactPairs = _detectionCache
+            .Where(pair => pair.Value.Detections.Count > 0 && _eoFrameCache.ContainsKey(pair.Key))
+            .OrderByDescending(pair => pair.Key)
+            .ToArray();
+
+        foreach (var pair in exactPairs)
+        {
+            frame = _eoFrameCache[pair.Key];
+            detectionPacket = pair.Value;
+            return true;
+        }
+
+        if (_latestEoFrame is not null &&
+            TryGetRenderableDetectionPacket(_latestEoFrame.Value.FrameIndex, out detectionPacket))
+        {
+            frame = _latestEoFrame.Value;
+            return true;
+        }
+
+        frame = default;
         detectionPacket = default;
         return false;
     }
