@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Globalization;
 using System.Windows;
 using System.Windows.Controls;
@@ -43,6 +43,41 @@ public partial class MainWindow : Window
     private string? _lastFilteredOutTargetSignature;
     private const int OverlayCacheLimit = 48;
     private const uint OverlayFrameTolerance = 12;
+    private const float DisplayScoreThreshold = 0.60f;
+    private static readonly HashSet<string> NonMilitaryTargetClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "chair",
+        "dining table",
+        "tv",
+        "laptop",
+        "cell phone",
+        "bottle",
+        "couch",
+        "bench",
+        "refrigerator"
+    };
+
+    private static readonly HashSet<string> CompositeTargetClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "person",
+        "airplane",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "bus",
+        "truck",
+        "train",
+        "boat",
+        "cell phone",
+        "laptop",
+        "chair",
+        "dining table",
+        "tv",
+        "couch",
+        "bench",
+        "bottle",
+        "refrigerator"
+    };
 
     public MainWindow()
     {
@@ -321,45 +356,23 @@ public partial class MainWindow : Window
                 return;
             }
 
-            _viewModel.UpdateEoFrame(_latestEoFrame.Value.Bitmap);
-
             if (!TryGetRenderableFrameAndDetection(out var frameToRender, out var detectionPacket))
             {
+                _viewModel.UpdateEoFrame(_latestEoFrame.Value.Bitmap);
                 return;
             }
-
-            var sourceWidth = detectionPacket.Width > 0 ? detectionPacket.Width : frameToRender.Width;
-            var sourceHeight = detectionPacket.Height > 0 ? detectionPacket.Height : frameToRender.Height;
-            if (sourceWidth <= 0 || sourceHeight <= 0)
-            {
-                return;
-            }
-
-            var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
-            var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
-            var baseScale = Math.Max(viewportWidth / sourceWidth, viewportHeight / sourceHeight);
-            var scaledWidth = sourceWidth * baseScale;
-            var scaledHeight = sourceHeight * baseScale;
-            var baseLeft = (viewportWidth - scaledWidth) / 2.0;
-            var baseTop = (viewportHeight - scaledHeight) / 2.0;
 
             var displayDetections = FilterDisplayDetections(detectionPacket.Detections);
-            foreach (var detection in displayDetections)
+            if (displayDetections.Count == 0)
             {
-                var rectLeft = baseLeft + (detection.X1 * baseScale);
-                var rectTop = baseTop + (detection.Y1 * baseScale);
-                var rectWidth = Math.Max(2, (detection.X2 - detection.X1) * baseScale);
-                var rectHeight = Math.Max(2, (detection.Y2 - detection.Y1) * baseScale);
-
-                if (rectWidth < 2 || rectHeight < 2)
-                {
-                    continue;
-                }
-
-                AddDetectionVisualToCanvas(rectLeft, rectTop, rectWidth, rectHeight, detection);
+                _viewModel.UpdateEoFrame(frameToRender.Bitmap);
+                return;
             }
 
-            if (!_hasRenderedDetectionOverlay && DetectionOverlayCanvas.Children.Count > 0)
+            var compositedFrame = ComposeDetectionOverlayFrame(frameToRender, detectionPacket, displayDetections);
+            _viewModel.UpdateEoFrame(compositedFrame);
+
+            if (!_hasRenderedDetectionOverlay)
             {
                 _hasRenderedDetectionOverlay = true;
                 _viewModel.AppendImportantLog("YOLO overlay rendered on GUI.");
@@ -369,6 +382,98 @@ public partial class MainWindow : Window
         {
             _isRenderingOverlay = false;
         }
+    }
+
+    private ImageSource ComposeDetectionOverlayFrame(
+        ReceivedVideoFrame frameToRender,
+        DetectionPacket detectionPacket,
+        IReadOnlyList<DetectionInfo> detections)
+    {
+        var bitmap = frameToRender.Bitmap;
+        var bitmapWidth = Math.Max(1, bitmap.PixelWidth);
+        var bitmapHeight = Math.Max(1, bitmap.PixelHeight);
+        var sourceWidth = Math.Max(1, detectionPacket.Width > 0 ? detectionPacket.Width : frameToRender.Width);
+        var sourceHeight = Math.Max(1, detectionPacket.Height > 0 ? detectionPacket.Height : frameToRender.Height);
+        var scaleX = (double)bitmapWidth / sourceWidth;
+        var scaleY = (double)bitmapHeight / sourceHeight;
+        var dpiX = bitmap.DpiX > 0 ? bitmap.DpiX : 96;
+        var dpiY = bitmap.DpiY > 0 ? bitmap.DpiY : 96;
+
+        var drawingVisual = new DrawingVisual();
+        using var drawingContext = drawingVisual.RenderOpen();
+        drawingContext.DrawImage(bitmap, new Rect(0, 0, bitmapWidth, bitmapHeight));
+
+        var accentBrush = new SolidColorBrush(Color.FromRgb(105, 255, 132));
+        accentBrush.Freeze();
+        var accentPen = new Pen(accentBrush, 2);
+        accentPen.Freeze();
+        var typeface = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+
+        foreach (var detection in detections)
+        {
+            var x = Math.Clamp(detection.X1 * scaleX, 0, bitmapWidth - 1);
+            var y = Math.Clamp(detection.Y1 * scaleY, 0, bitmapHeight - 1);
+            var width = Math.Clamp((detection.X2 - detection.X1) * scaleX, 2, bitmapWidth);
+            var height = Math.Clamp((detection.Y2 - detection.Y1) * scaleY, 2, bitmapHeight);
+            var rect = new Rect(x, y, Math.Min(width, bitmapWidth - x), Math.Min(height, bitmapHeight - y));
+            if (rect.Width < 2 || rect.Height < 2)
+            {
+                continue;
+            }
+
+            drawingContext.DrawRectangle(null, accentPen, rect);
+
+            if (rect.Width < 40 || rect.Height < 28)
+            {
+                continue;
+            }
+
+            var formattedText = new FormattedText(
+                detection.LabelText,
+                CultureInfo.InvariantCulture,
+                FlowDirection.LeftToRight,
+                typeface,
+                12,
+                accentBrush,
+                1.0);
+            var labelWidth = formattedText.Width + 2;
+            var labelHeight = formattedText.Height + 2;
+            var labelX = Math.Max(0, Math.Min(rect.Left, bitmapWidth - labelWidth - 4));
+            var preferredY = rect.Top - labelHeight - 6;
+            var labelY = preferredY >= 0 ? preferredY : Math.Min(bitmapHeight - labelHeight - 4, rect.Top + 2);
+            drawingContext.DrawText(formattedText, new Point(labelX, Math.Max(0, labelY)));
+        }
+
+        var renderTarget = new RenderTargetBitmap(bitmapWidth, bitmapHeight, dpiX, dpiY, PixelFormats.Pbgra32);
+        renderTarget.Render(drawingVisual);
+        renderTarget.Freeze();
+        return renderTarget;
+    }
+
+    private static void DrawCorner(
+        DrawingContext drawingContext,
+        double anchorX,
+        double anchorY,
+        bool isLeft,
+        bool isTop,
+        Rect rect,
+        Brush strokeBrush)
+    {
+        var length = Math.Max(12, Math.Min(rect.Width, rect.Height) * 0.18);
+        var pen = new Pen(strokeBrush, 3)
+        {
+            StartLineCap = PenLineCap.Square,
+            EndLineCap = PenLineCap.Square
+        };
+
+        drawingContext.DrawLine(
+            pen,
+            new Point(anchorX, anchorY),
+            new Point(anchorX + (isLeft ? length : -length), anchorY));
+        drawingContext.DrawLine(
+            pen,
+            new Point(anchorX, anchorY),
+            new Point(anchorX, anchorY + (isTop ? length : -length)));
     }
 
     private void CacheEoFrame(ReceivedVideoFrame frame)
@@ -460,71 +565,63 @@ public partial class MainWindow : Window
     private IReadOnlyList<DetectionInfo> FilterDisplayDetections(IReadOnlyList<DetectionInfo> detections)
     {
         var filtered = detections
-            .Where(ShouldDisplayDetection)
+            .Where(ShouldDisplayDetectionSafe)
             .ToArray();
         return filtered;
     }
 
-    private bool ShouldDisplayDetection(DetectionInfo detection)
+    private bool ShouldDisplayDetectionSafe(DetectionInfo detection)
     {
         var className = detection.ClassName.ToLowerInvariant();
-        if (string.Equals(_viewModel.SelectedPrimaryTarget, "복합", StringComparison.Ordinal))
+        var primaryTarget = _viewModel.SelectedPrimaryTarget;
+        var scoreThreshold = primaryTarget == "\uBCF5\uD569" || primaryTarget == "\uBE44\uAD70\uC0AC \uD45C\uC801"
+            ? 0.90f
+            : DisplayScoreThreshold;
+
+        if (detection.Score < scoreThreshold)
         {
-            return true;
+            return false;
         }
 
-        if (string.Equals(_viewModel.SelectedPrimaryTarget, "사람", StringComparison.Ordinal))
+        if (primaryTarget == "\uBCF5\uD569")
+        {
+            return CompositeTargetClasses.Contains(className);
+        }
+
+        if (primaryTarget == "\uC0AC\uB78C")
         {
             return className == "person";
         }
 
-        if (string.Equals(_viewModel.SelectedPrimaryTarget, "공중 무기체계", StringComparison.Ordinal))
+        if (primaryTarget == "\uACF5\uC911 \uBB34\uAE30\uCCB4\uACC4")
         {
             return className == "airplane";
         }
 
-        if (string.Equals(_viewModel.SelectedPrimaryTarget, "육상 무기체계", StringComparison.Ordinal))
+        if (primaryTarget == "\uC721\uC0C1 \uBB34\uAE30\uCCB4\uACC4")
         {
             return className is "bicycle" or "car" or "motorcycle" or "bus" or "truck" or "train";
         }
 
-        if (string.Equals(_viewModel.SelectedPrimaryTarget, "해상 무기체계", StringComparison.Ordinal))
+        if (primaryTarget == "\uD574\uC0C1 \uBB34\uAE30\uCCB4\uACC4")
         {
             return className == "boat";
         }
 
-        if (string.Equals(_viewModel.SelectedPrimaryTarget, "통신 장비", StringComparison.Ordinal))
+        if (primaryTarget == "\uD1B5\uC2E0 \uC7A5\uBE44")
         {
             return className is "cell phone" or "laptop";
         }
 
-        return _viewModel.SelectedPrimaryTarget switch
+        if (primaryTarget == "\uBE44\uAD70\uC0AC \uD45C\uC801")
         {
-            "복합" => IsCompositeTargetClass(className),
-            "사람" => className == "person",
-            "공중 무기체계" => className == "airplane",
-            "육상 무기체계" => className is "bicycle" or "car" or "motorcycle" or "bus" or "truck" or "train",
-            "해상 무기체계" => className == "boat",
-            "통신 장비" => className is "cell phone" or "laptop",
-            _ => false,
-        };
+            return NonMilitaryTargetClasses.Contains(className);
+        }
+
+        return true;
     }
 
-    private static bool IsCompositeTargetClass(string className)
-    {
-        return className is
-            "person" or
-            "airplane" or
-            "bicycle" or
-            "car" or
-            "motorcycle" or
-            "bus" or
-            "truck" or
-            "train" or
-            "boat" or
-            "cell phone" or
-            "laptop";
-    }
+    private bool ShouldDisplayDetection(DetectionInfo detection) => ShouldDisplayDetectionSafe(detection);
 
     private void NotifyDetectionAlertIfNeeded(uint frameId, IReadOnlyList<DetectionInfo> detections)
     {
@@ -839,3 +936,4 @@ public partial class MainWindow : Window
         _irWebcamCaptureService.Dispose();
     }
 }
+

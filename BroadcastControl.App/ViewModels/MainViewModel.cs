@@ -30,9 +30,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private bool _isEoPrimary = true;
     private bool _isSettingsOpen;
     private bool _isSystemPoweredOn = true;
-    private string _currentMode = "?먮룞";
-    private string _selectedPrimaryTarget = "蹂듯빀";
-    private string _currentThreatLevel = "??쓬";
+    private string _currentMode = "\uC790\uB3D9";
+    private string _selectedPrimaryTarget = "\uBCF5\uD569";
+    private string _currentThreatLevel = "\uB0AE\uC74C";
     // ?꾨줈洹몃옩 ?쒖옉 ??諛앷린 湲곕낯媛믪? 以묐┰媛?50%濡??쒖옉??
     private double _brightness = 50;
     private double _contrast = 50;
@@ -63,27 +63,27 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         AnalysisItems = new ObservableCollection<AnalysisItem>
         {
-            new("10:05:00", "?쒖뒪??珥덇린???④퀎?먯꽌??湲곕낯 ?꾪뿕 ?깃툒????쓬?쇰줈 ?좎??⑸땲??"),
-            new("10:05:03", "?꾩옱 二??먯?泥대뒗 蹂듯빀?대ŉ ?댁슜?먭? ?먯? 議곌굔??議곗젙?????덉뒿?덈떎."),
-            new("10:05:05", "VLM 怨좎쐞??遺꾩꽍 寃곌낵媛 ?ㅼ뼱?ㅺ린 ?꾧퉴吏 寃쎈낫 ?④퀎???곸듅?섏? ?딆뒿?덈떎."),
+            new("10:05:00", "\uC2DC\uC2A4\uD15C \uCD08\uAE30\uD654 \uB2E8\uACC4\uC5D0\uC11C\uB294 \uAE30\uBCF8 \uC704\uD5D8 \uB4F1\uAE09\uC744 \uB0AE\uC74C\uC73C\uB85C \uC720\uC9C0\uD569\uB2C8\uB2E4."),
+            new("10:05:03", "\uD604\uC7AC \uC8FC \uD0D0\uC9C0\uCCB4\uB294 \uBCF5\uD569\uC774\uBA70 \uC6B4\uC6A9\uC790\uAC00 \uD0D0\uC9C0 \uC870\uAC74\uC744 \uC870\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."),
+            new("10:05:05", "VLM \uACE0\uC704\uD5D8 \uBD84\uC11D \uACB0\uACFC\uAC00 \uB4E4\uC5B4\uC624\uAE30 \uC804\uAE4C\uC9C0 \uACBD\uBCF4 \uB2E8\uACC4\uB294 \uC0C1\uC2B9\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."),
         };
 
         SystemLogs = new ObservableCollection<SystemLogItem>
         {
-            new("10:05:00", "?쒖뒪???꾩썝??耳쒖죱?듬땲??"),
-            new("10:05:02", "移대찓???쒖뼱 紐⑤뱶媛 ?먮룞?쇰줈 ?ㅼ젙?섏뿀?듬땲??"),
-            new("10:05:04", "珥덇린 ?꾪뿕 ?깃툒? ??쓬?쇰줈 ?ㅼ젙?섏뿀?듬땲??"),
+            new("10:05:00", "\uC2DC\uC2A4\uD15C \uC804\uC6D0\uC744 \uCF1C\uC2B5\uB2C8\uB2E4."),
+            new("10:05:02", "\uCE74\uBA54\uB77C \uC81C\uC5B4 \uBAA8\uB4DC\uAC00 \uC790\uB3D9\uC73C\uB85C \uC124\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4."),
+            new("10:05:04", "\uCD08\uAE30 \uC704\uD5D8 \uB4F1\uAE09\uC740 \uB0AE\uC74C\uC73C\uB85C \uC124\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4."),
         };
 
         PrimaryTargets = new ReadOnlyCollection<string>(new[]
         {
-            "?щ엺",
-            "蹂듯빀",
-            "怨듭쨷 臾닿린泥닿퀎",
-            "?≪긽 臾닿린泥닿퀎",
-            "?댁긽 臾닿린泥닿퀎",
-            "?듭떊 ?λ퉬",
-            "鍮꾧뎔???쒖쟻",
+            "\uBCF5\uD569",
+            "\uC0AC\uB78C",
+            "\uACF5\uC911 \uBB34\uAE30\uCCB4\uACC4",
+            "\uC721\uC0C1 \uBB34\uAE30\uCCB4\uACC4",
+            "\uD574\uC0C1 \uBB34\uAE30\uCCB4\uACC4",
+            "\uD1B5\uC2E0 \uC7A5\uBE44",
+            "\uBE44\uAD70\uC0AC \uD45C\uC801",
         });
 
         // ?붾㈃??紐⑤뱺 踰꾪듉? Command 諛붿씤?⑹쑝濡??곌껐?섎?濡??앹꽦?먯뿉????踰덉뿉 ?깅줉??
@@ -162,7 +162,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public bool IsEoPrimary => _isEoPrimary;
 
     // ?곷떒 ?꾩썝 踰꾪듉? ?꾨줈洹몃옩 醫낅즺 踰꾪듉?쇰줈 ?ъ슜??
-    public string PowerButtonText => "?꾩썝 醫낅즺";
+    public string PowerButtonText => "\uC804\uC6D0 \uC885\uB8CC";
 
     public string CurrentMode
     {
@@ -186,19 +186,19 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string CurrentModeText => $"移대찓??紐⑤뱶: {CurrentMode}";
+    public string CurrentModeText => $"\uCE74\uBA54\uB77C \uBAA8\uB4DC: {CurrentMode}";
 
     // ?꾩옱 紐⑤뱶 踰꾪듉留??좊챸?섍쾶 蹂댁뿬 蹂꾨룄 ?띿뒪???놁씠 ?곹깭瑜??쎄쾶 ??
-    public double AutoModeOpacity => CurrentMode == "?먮룞" ? 1.0 : 0.35;
+    public double AutoModeOpacity => CurrentMode == "\uC790\uB3D9" ? 1.0 : 0.35;
 
-    public double ManualModeOpacity => CurrentMode == "?섎룞" ? 1.0 : 0.35;
+    public double ManualModeOpacity => CurrentMode == "\uC218\uB3D9" ? 1.0 : 0.35;
 
     // ?꾪뿕 ?깃툒 ?곸듅 ???ν썑 ?먮룞 ?뱁솕 ?쒖떆? ?곌껐???곹깭媛믪엫.
     // ?뱁솕 ?쒖떆?깆? ?꾪뿕 ?곹솴 ?먮룞 ?뱁솕? ?섎룞 ?뱁솕瑜?紐⑤몢 諛섏쁺??
 
     public bool IsRecordingActive =>
         IsManualRecordingEnabled ||
-        (IsSystemPoweredOn && CurrentMode == "?먮룞" && CurrentThreatLevel == "?믪쓬");
+        (IsSystemPoweredOn && CurrentMode == "\uC790\uB3D9" && CurrentThreatLevel == "\uB192\uC74C");
 
     public Brush RecordingIndicatorBrush => IsRecordingActive ? RecordingOnBrush : RecordingOffBrush;
 
@@ -206,11 +206,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double RecordingIndicatorOpacity => IsRecordingActive ? 1.0 : 0.42;
 
-    public bool IsManualMode => IsSystemPoweredOn && CurrentMode == "?섎룞";
+    public bool IsManualMode => IsSystemPoweredOn && CurrentMode == "\uC218\uB3D9";
 
-    public bool CanSelectAutoMode => IsSystemPoweredOn && CurrentMode != "?먮룞";
+    public bool CanSelectAutoMode => IsSystemPoweredOn && CurrentMode != "\uC790\uB3D9";
 
-    public bool CanSelectManualMode => IsSystemPoweredOn && CurrentMode != "?섎룞";
+    public bool CanSelectManualMode => IsSystemPoweredOn && CurrentMode != "\uC218\uB3D9";
 
     public bool CanUseMotorControls => IsManualMode;
 
@@ -243,7 +243,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ManualRecordingButtonText => IsManualRecordingEnabled ? "?뱁솕 醫낅즺" : "?뱁솕 ?쒖옉";
+    public string ManualRecordingButtonText => IsManualRecordingEnabled ? "\uB179\uD654 \uC885\uB8CC" : "\uB179\uD654 \uC2DC\uC791";
 
     public string CurrentThreatLevel
     {
@@ -262,12 +262,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string CurrentThreatText => $"?꾪뿕 ?깃툒: {CurrentThreatLevel}";
+    public string CurrentThreatText => $"\uC704\uD5D8 \uB4F1\uAE09: {CurrentThreatLevel}";
 
     public Brush CurrentThreatBrush => CurrentThreatLevel switch
     {
-        "??쓬" => LowThreatBrush,
-        "以묎컙" => MediumThreatBrush,
+        "\uB0AE\uC74C" => LowThreatBrush,
+        "\uC911\uAC04" => MediumThreatBrush,
         _ => HighThreatBrush,
     };
 
@@ -283,7 +283,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string PrimaryTargetText => $"二??먯?泥? {SelectedPrimaryTarget}";
+    public string PrimaryTargetText => $"\uC8FC \uD0D0\uC9C0\uCCB4: {SelectedPrimaryTarget}";
 
     // ?곸긽 ???쇰꺼? 吏㏐쾶 ?좎????ㅼ젣 ?붾㈃????媛由щ룄濡???
     public string EoTitle => "EO cam";
@@ -292,7 +292,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public string EoSubtitle => "Jetson YOLO MEVA demo stream";
 
-    public string IrSubtitle => "?명듃遺?移대찓???꾩떆 ?낅젰";
+    public string IrSubtitle => "\uB178\uD2B8\uBD81 \uCE74\uBA54\uB77C \uC784\uC2DC \uC785\uB825";
 
     public ImageSource? LargeFeedImage => _isEoPrimary
         ? _eoFrame ?? _eoPlaceholderFrame
@@ -323,7 +323,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string BrightnessText => $"諛앷린 {Brightness:0}%";
+    public string BrightnessText => $"\uBC1D\uAE30 {Brightness:0}%";
 
     public double Contrast
     {
@@ -338,7 +338,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ContrastText => $"?議곕퉬 {Contrast:0}%";
+    public string ContrastText => $"\uB300\uC870\uBE44 {Contrast:0}%";
 
     public double ZoomLevel
     {
@@ -439,13 +439,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
     {
-        if (detections.Count == 0)
-        {
-            CurrentThreatLevel = "??쓬";
-            return;
-        }
-
-        CurrentThreatLevel = detections.Count >= 3 ? "?믪쓬" : "以묎컙";
+        // VLM 도입 전까지는 YOLO 탐지 개수만으로 위험 등급을 바꾸지 않는다.
+        // 현재 위험 등급은 기본값(낮음)을 유지하고, 이후 VLM 판단이 들어오면 그때 반영한다.
     }
 
     /// <summary>
@@ -520,11 +515,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
 
             File.WriteAllText(filePath, builder.ToString(), new UTF8Encoding(false));
-            AppendImportantLog($"?쒖뒪??濡쒓렇瑜???ν뻽?듬땲?? {Path.GetFileName(filePath)}");
+            AppendImportantLog($"\uC2DC\uC2A4\uD15C \uB85C\uADF8\uB97C \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4: {Path.GetFileName(filePath)}");
         }
         catch (Exception ex)
         {
-            AppendImportantLog($"?쒖뒪??濡쒓렇 ??μ뿉 ?ㅽ뙣?덉뒿?덈떎: {ex.Message}");
+            AppendImportantLog($"\uC2DC\uC2A4\uD15C \uB85C\uADF8 \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4: {ex.Message}");
         }
     }
 
@@ -535,9 +530,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private void TogglePower()
     {
         // ?꾪뿕 ?깃툒???믪쓬?대㈃ ?댁슜 以묒씤 ?꾨줈洹몃옩 醫낅즺瑜?李⑤떒??
-        if (CurrentThreatLevel == "?믪쓬")
+        if (CurrentThreatLevel == "\uB192\uC74C")
         {
-            AppendImportantLog("?꾪뿕 ?깃툒???믪쓬 ?곹깭?ъ꽌 ?꾨줈洹몃옩??醫낅즺?????놁뒿?덈떎.");
+            AppendImportantLog("\uC704\uD5D8 \uB4F1\uAE09\uC774 \uB192\uC74C \uC0C1\uD0DC\uC5EC\uC11C \uD504\uB85C\uADF8\uB7A8\uC744 \uC885\uB8CC\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
             return;
         }
 
@@ -577,7 +572,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             OnPropertyChanged(nameof(MotorTiltText));
         }
 
-        AppendImportantLog($"移대찓???쒖뼱 紐⑤뱶媛 {CurrentMode}?쇰줈 ?꾪솚?섏뿀?듬땲??");
+        AppendImportantLog($"\uCE74\uBA54\uB77C \uC81C\uC5B4 \uBAA8\uB4DC\uAC00 {CurrentMode}(\uC73C)\uB85C \uC804\uD658\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
     }
 
     /// <summary>
@@ -611,7 +606,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(IsLightThemeActive));
         OnPropertyChanged(nameof(DarkThemeButtonOpacity));
         OnPropertyChanged(nameof(LightThemeButtonOpacity));
-        AppendImportantLog($"?뚮쭏媛 {(nextTheme == AppThemeMode.Dark ? "?대몢???뚮쭏" : "諛앹? ?뚮쭏")}濡?蹂寃쎈릺?덉뒿?덈떎.");
+        AppendImportantLog($"\uD14C\uB9C8\uAC00 {(nextTheme == AppThemeMode.Dark ? "\uC5B4\uB450\uC6B4 \uD14C\uB9C8" : "\uBC1D\uC740 \uD14C\uB9C8")}(\uC73C)\uB85C \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
     }
 
     /// <summary>
@@ -626,7 +621,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
 
         SelectedPrimaryTarget = target;
-        AppendImportantLog($"二??먯?泥닿? {SelectedPrimaryTarget}?쇰줈 蹂寃쎈릺?덉뒿?덈떎.");
+        AppendImportantLog($"\uC8FC \uD0D0\uC9C0\uCCB4\uAC00 {SelectedPrimaryTarget}(\uC73C)\uB85C \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
     }
 
     /// <summary>
@@ -644,7 +639,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(LargeFeedSubtitle));
         OnPropertyChanged(nameof(InsetFeedSubtitle));
 
-        AppendImportantLog($"{LargeFeedTitle}??媛) 硫붿씤 ?붾㈃?쇰줈 ?꾪솚?섏뿀?듬땲??");
+        AppendImportantLog($"{LargeFeedTitle}\uAC00 \uBA54\uC778 \uD654\uBA74\uC73C\uB85C \uC804\uD658\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
     }
 
     /// <summary>
