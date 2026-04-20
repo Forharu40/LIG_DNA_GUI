@@ -50,6 +50,9 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     private long _nonEmptyDetectionPacketCount;
     private long _decodeFailureCount;
     private long _unknownPacketCount;
+    private readonly object _frameDispatchLock = new();
+    private ReceivedVideoFrame? _pendingFrame;
+    private bool _frameDispatchScheduled;
 
     public UdpEncodedVideoReceiverService()
     {
@@ -428,12 +431,48 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 declaredWidth > 0 ? declaredWidth : checked((ushort)decoded.Width),
                 declaredHeight > 0 ? declaredHeight : checked((ushort)decoded.Height),
                 bitmap);
-            _dispatcher.BeginInvoke(() => FrameReady?.Invoke(receivedFrame));
+            QueueLatestFrame(receivedFrame);
             return true;
         }
         catch
         {
             return false;
+        }
+    }
+
+    private void QueueLatestFrame(ReceivedVideoFrame frame)
+    {
+        lock (_frameDispatchLock)
+        {
+            _pendingFrame = frame;
+            if (_frameDispatchScheduled)
+            {
+                return;
+            }
+
+            _frameDispatchScheduled = true;
+        }
+
+        _dispatcher.BeginInvoke(DispatcherPriority.Render, new Action(DrainLatestFrame));
+    }
+
+    private void DrainLatestFrame()
+    {
+        while (true)
+        {
+            ReceivedVideoFrame? frameToPublish;
+            lock (_frameDispatchLock)
+            {
+                frameToPublish = _pendingFrame;
+                _pendingFrame = null;
+                if (frameToPublish is null)
+                {
+                    _frameDispatchScheduled = false;
+                    return;
+                }
+            }
+
+            FrameReady?.Invoke(frameToPublish.Value);
         }
     }
 
