@@ -42,6 +42,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     private uint? _lastCycleIndex;
     private long _receivedPacketCount;
     private long _metadataPacketCount;
+    private long _detectionPacketCount;
+    private long _nonEmptyDetectionPacketCount;
     private long _decodeFailureCount;
     private long _unknownPacketCount;
 
@@ -82,6 +84,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             _lastCycleIndex = null;
             _receivedPacketCount = 0;
             _metadataPacketCount = 0;
+            _detectionPacketCount = 0;
+            _nonEmptyDetectionPacketCount = 0;
             _decodeFailureCount = 0;
             _unknownPacketCount = 0;
             _cancellationTokenSource = new CancellationTokenSource();
@@ -125,6 +129,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         _lastCycleIndex = null;
         _receivedPacketCount = 0;
         _metadataPacketCount = 0;
+        _detectionPacketCount = 0;
+        _nonEmptyDetectionPacketCount = 0;
         _decodeFailureCount = 0;
         _unknownPacketCount = 0;
         StopRecording();
@@ -252,6 +258,23 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
         if (TryExtractDetectionPacket(packet, out var detectionPacket))
         {
+            _detectionPacketCount++;
+            if (_detectionPacketCount == 1)
+            {
+                PublishDiagnosticMessage(
+                    $"MEVA DETS packet received. frameId={detectionPacket.FrameId}, objects={detectionPacket.Detections.Count}, bytes={packet.Length}");
+            }
+
+            if (detectionPacket.Detections.Count > 0)
+            {
+                _nonEmptyDetectionPacketCount++;
+                if (_nonEmptyDetectionPacketCount == 1 || _nonEmptyDetectionPacketCount % 20 == 0)
+                {
+                    PublishDiagnosticMessage(
+                        $"MEVA non-empty DETS packet received. frameId={detectionPacket.FrameId}, objects={detectionPacket.Detections.Count}, count={_nonEmptyDetectionPacketCount}");
+                }
+            }
+
             _dispatcher.BeginInvoke(() => DetectionsReceived?.Invoke(detectionPacket));
             return;
         }

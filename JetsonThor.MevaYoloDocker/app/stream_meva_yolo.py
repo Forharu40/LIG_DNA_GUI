@@ -528,6 +528,11 @@ def main() -> None:
                         sock.sendto(image_packet, (GUI_HOST, GUI_PORT))
                         sock.sendto(detection_packet, (GUI_HOST, GUI_PORT))
 
+                        if detections:
+                            print(
+                                f"[DETS] frame={frame_index} objects={len(detections)} bytes={len(detection_packet)}"
+                            )
+
                         time.sleep(frame_delay)
                 finally:
                     capture.release()
