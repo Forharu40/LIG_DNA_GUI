@@ -18,6 +18,10 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     private const int MetadataPacketSize = 36;
     private static readonly byte[] DetectionPacketMagic = "DETS"u8.ToArray();
     private static readonly byte[] StatusPacketMagic = "STAT"u8.ToArray();
+    private static readonly JsonSerializerOptions PacketJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
 
     private readonly Dispatcher _dispatcher;
 
@@ -769,7 +773,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         try
         {
             var json = Encoding.UTF8.GetString(packet, DetectionPacketMagic.Length, packet.Length - DetectionPacketMagic.Length);
-            var payload = JsonSerializer.Deserialize<DetectionPacketPayload>(json);
+            var payload = JsonSerializer.Deserialize<DetectionPacketPayload>(json, PacketJsonOptions);
             if (payload is null)
             {
                 return false;
@@ -812,7 +816,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         try
         {
             var json = Encoding.UTF8.GetString(packet, StatusPacketMagic.Length, packet.Length - StatusPacketMagic.Length);
-            var payload = JsonSerializer.Deserialize<YoloStatusPacketPayload>(json);
+            var payload = JsonSerializer.Deserialize<YoloStatusPacketPayload>(json, PacketJsonOptions);
             if (payload is null)
             {
                 return false;
