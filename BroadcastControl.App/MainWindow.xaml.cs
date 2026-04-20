@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<uint, ReceivedVideoFrame> _eoFrameCache = new();
     private readonly Dictionary<uint, DetectionPacket> _detectionCache = new();
     private bool _hasReceivedDetectionPacket;
+    private bool _hasReceivedNonEmptyDetectionPacket;
     private string? _lastDetectionAlertSignature;
     private const int OverlayCacheLimit = 48;
     private const uint OverlayFrameTolerance = 12;
@@ -205,6 +206,13 @@ public partial class MainWindow : Window
             _hasReceivedDetectionPacket = true;
             _viewModel.AppendImportantLog(
                 $"YOLO detection stream connected. first frameId={detectionPacket.FrameId}");
+        }
+
+        if (!_hasReceivedNonEmptyDetectionPacket && detectionPacket.Detections.Count > 0)
+        {
+            _hasReceivedNonEmptyDetectionPacket = true;
+            _viewModel.AppendImportantLog(
+                $"YOLO non-empty detection received. frameId={detectionPacket.FrameId}, objects={detectionPacket.Detections.Count}");
         }
 
         NotifyDetectionAlertIfNeeded(detectionPacket);

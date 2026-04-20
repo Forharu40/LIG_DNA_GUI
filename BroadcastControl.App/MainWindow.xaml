@@ -373,6 +373,12 @@
                         </Border>
 
                         <Canvas x:Name="DetectionOverlayCanvas"
+                                Width="{Binding ElementName=CameraViewport, Path=ActualWidth}"
+                                Height="{Binding ElementName=CameraViewport, Path=ActualHeight}"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Stretch"
+                                Panel.ZIndex="5"
+                                ClipToBounds="True"
                                 IsHitTestVisible="False" />
 
                         <!-- IR/EO 인셋 화면:
