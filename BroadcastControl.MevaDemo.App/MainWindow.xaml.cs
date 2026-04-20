@@ -12,6 +12,8 @@ namespace BroadcastControl.App;
 public partial class MainWindow : Window
 {
     private const double SettingsDrawerClosedOffset = 320;
+    private const double WindowedWidth = 1600;
+    private const double WindowedHeight = 900;
 
     private readonly MainViewModel _viewModel;
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
@@ -22,6 +24,7 @@ public partial class MainWindow : Window
     private Point _lastZoomDragPoint;
     private bool _hasReceivedEoFrame;
     private bool _hasReceivedIrFrame;
+    private bool _isFullscreenMode = true;
 
     public MainWindow()
     {
@@ -40,6 +43,7 @@ public partial class MainWindow : Window
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Maximized;
+        UpdateWindowModeButtonText();
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
@@ -232,6 +236,49 @@ public partial class MainWindow : Window
         {
             _viewModel.IsSettingsOpen = false;
         }
+    }
+
+    private void WindowModeToggleButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        ToggleWindowMode();
+    }
+
+    private void ToggleWindowMode()
+    {
+        if (_isFullscreenMode)
+        {
+            WindowStyle = WindowStyle.SingleBorderWindow;
+            ResizeMode = ResizeMode.CanResize;
+            WindowState = WindowState.Normal;
+            Width = WindowedWidth;
+            Height = WindowedHeight;
+            Left = Math.Max(0, (SystemParameters.WorkArea.Width - Width) / 2);
+            Top = Math.Max(0, (SystemParameters.WorkArea.Height - Height) / 2);
+            _isFullscreenMode = false;
+            _viewModel.AppendImportantLog("화면 모드가 창모드로 전환되었습니다.");
+        }
+        else
+        {
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            WindowState = WindowState.Maximized;
+            _isFullscreenMode = true;
+            _viewModel.AppendImportantLog("화면 모드가 전체화면으로 전환되었습니다.");
+        }
+
+        UpdateWindowModeButtonText();
+    }
+
+    private void UpdateWindowModeButtonText()
+    {
+        if (WindowModeToggleButton is null)
+        {
+            return;
+        }
+
+        WindowModeToggleButton.Content = _isFullscreenMode
+            ? "창모드로 전환"
+            : "전체화면으로 전환";
     }
 
     private void AnimateSettingsDrawer(bool isOpen, bool animate)

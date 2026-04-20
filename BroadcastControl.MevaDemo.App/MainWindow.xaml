@@ -684,6 +684,8 @@
                     <RowDefinition Height="*" />
                     <RowDefinition Height="Auto" />
                     <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
                 </Grid.RowDefinitions>
 
                 <TextBlock Text="설정창"
@@ -745,6 +747,23 @@
                             Style="{StaticResource SettingsActionButton}"
                             Content="밝은 테마" />
                 </Grid>
+
+                <Border Grid.Row="5"
+                        Margin="0,18,0,12"
+                        BorderBrush="{DynamicResource DrawerBorderBrush}"
+                        BorderThickness="0,1,0,0">
+                    <TextBlock Margin="0,12,0,0"
+                               Text="?붾㈃ 紐⑤뱶"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource DrawerTextBrush}" />
+                </Border>
+
+                <Button x:Name="WindowModeToggleButton"
+                        Grid.Row="6"
+                        Click="WindowModeToggleButton_OnClick"
+                        Style="{StaticResource SettingsActionButton}"
+                        Content="李⑤え?쒕줈 ?꾪솚" />
             </Grid>
         </Border>
     </Grid>
