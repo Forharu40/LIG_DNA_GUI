@@ -379,7 +379,17 @@
                                 VerticalAlignment="Stretch"
                                 Panel.ZIndex="5"
                                 ClipToBounds="True"
-                                IsHitTestVisible="False" />
+                                RenderTransformOrigin="0.5,0.5"
+                                IsHitTestVisible="False">
+                            <Canvas.RenderTransform>
+                                <TransformGroup>
+                                    <ScaleTransform ScaleX="{Binding LargeFeedScale}"
+                                                    ScaleY="{Binding LargeFeedScale}" />
+                                    <TranslateTransform X="{Binding ZoomTransformX}"
+                                                        Y="{Binding ZoomTransformY}" />
+                                </TransformGroup>
+                            </Canvas.RenderTransform>
+                        </Canvas>
 
                         <!-- IR/EO 인셋 화면:
                              작은 화면 클릭 시 큰 화면과 스왑되는 입력 영역임. -->

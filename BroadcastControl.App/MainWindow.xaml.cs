@@ -35,6 +35,7 @@ public partial class MainWindow : Window
     private readonly Dictionary<uint, DetectionPacket> _detectionCache = new();
     private bool _hasReceivedDetectionPacket;
     private bool _hasReceivedNonEmptyDetectionPacket;
+    private bool _hasRenderedDetectionOverlay;
     private string? _lastDetectionAlertSignature;
     private const int OverlayCacheLimit = 48;
     private const uint OverlayFrameTolerance = 12;
@@ -310,16 +311,14 @@ public partial class MainWindow : Window
         var scaledHeight = sourceHeight * baseScale;
         var baseLeft = (viewportWidth - scaledWidth) / 2.0;
         var baseTop = (viewportHeight - scaledHeight) / 2.0;
-        var viewportCenter = new Point(viewportWidth / 2.0, viewportHeight / 2.0);
-
         foreach (var detection in detectionPacket.Detections)
         {
-            var topLeft = TransformOverlayPoint(
-                new Point(baseLeft + (detection.X1 * baseScale), baseTop + (detection.Y1 * baseScale)),
-                viewportCenter);
-            var bottomRight = TransformOverlayPoint(
-                new Point(baseLeft + (detection.X2 * baseScale), baseTop + (detection.Y2 * baseScale)),
-                viewportCenter);
+            var topLeft = new Point(
+                baseLeft + (detection.X1 * baseScale),
+                baseTop + (detection.Y1 * baseScale));
+            var bottomRight = new Point(
+                baseLeft + (detection.X2 * baseScale),
+                baseTop + (detection.Y2 * baseScale));
 
             var rectLeft = Math.Min(topLeft.X, bottomRight.X);
             var rectTop = Math.Min(topLeft.Y, bottomRight.Y);
@@ -332,6 +331,12 @@ public partial class MainWindow : Window
             }
 
             AddDetectionVisual(rectLeft, rectTop, rectWidth, rectHeight, detection);
+        }
+
+        if (!_hasRenderedDetectionOverlay && DetectionOverlayCanvas.Children.Count > 0)
+        {
+            _hasRenderedDetectionOverlay = true;
+            _viewModel.AppendImportantLog("YOLO overlay rendered on GUI.");
         }
     }
 
@@ -533,14 +538,6 @@ public partial class MainWindow : Window
 
         DetectionOverlayCanvas.Children.Add(horizontal);
         DetectionOverlayCanvas.Children.Add(vertical);
-    }
-
-    private Point TransformOverlayPoint(Point point, Point viewportCenter)
-    {
-        var zoom = _viewModel.ZoomLevel;
-        var x = viewportCenter.X + ((point.X - viewportCenter.X) * zoom) + _viewModel.ZoomTransformX;
-        var y = viewportCenter.Y + ((point.Y - viewportCenter.Y) * zoom) + _viewModel.ZoomTransformY;
-        return new Point(x, y);
     }
 
     private void HandleManualRecordingStateChanged()
