@@ -40,9 +40,9 @@ public partial class MainWindow : Window
     private bool _hasRenderedDetectionOverlay;
     private bool _isRenderingOverlay;
     private string? _lastDetectionAlertSignature;
+    private string? _lastFilteredOutTargetSignature;
     private const int OverlayCacheLimit = 48;
     private const uint OverlayFrameTolerance = 12;
-    private const float DetectionDisplayThreshold = 0.60f;
 
     public MainWindow()
     {
@@ -220,6 +220,21 @@ public partial class MainWindow : Window
             _hasReceivedNonEmptyDetectionPacket = true;
             _viewModel.AppendImportantLog(
                 $"YOLO non-empty detection received. frameId={detectionPacket.FrameId}, objects={displayDetections.Count}");
+        }
+
+        if (detectionPacket.Detections.Count > 0 && displayDetections.Count == 0)
+        {
+            var filteredSignature = $"{_viewModel.SelectedPrimaryTarget}:{detectionPacket.FrameId}";
+            if (!string.Equals(_lastFilteredOutTargetSignature, filteredSignature, StringComparison.Ordinal))
+            {
+                _lastFilteredOutTargetSignature = filteredSignature;
+                _viewModel.AppendImportantLog(
+                    $"YOLO detections received, but none match the current primary target: {_viewModel.SelectedPrimaryTarget}");
+            }
+        }
+        else
+        {
+            _lastFilteredOutTargetSignature = null;
         }
 
         NotifyDetectionAlertIfNeeded(detectionPacket.FrameId, displayDetections);
@@ -445,7 +460,6 @@ public partial class MainWindow : Window
     private IReadOnlyList<DetectionInfo> FilterDisplayDetections(IReadOnlyList<DetectionInfo> detections)
     {
         var filtered = detections
-            .Where(d => d.Score >= DetectionDisplayThreshold)
             .Where(ShouldDisplayDetection)
             .ToArray();
         return filtered;
@@ -457,6 +471,31 @@ public partial class MainWindow : Window
         if (string.Equals(_viewModel.SelectedPrimaryTarget, "복합", StringComparison.Ordinal))
         {
             return true;
+        }
+
+        if (string.Equals(_viewModel.SelectedPrimaryTarget, "사람", StringComparison.Ordinal))
+        {
+            return className == "person";
+        }
+
+        if (string.Equals(_viewModel.SelectedPrimaryTarget, "공중 무기체계", StringComparison.Ordinal))
+        {
+            return className == "airplane";
+        }
+
+        if (string.Equals(_viewModel.SelectedPrimaryTarget, "육상 무기체계", StringComparison.Ordinal))
+        {
+            return className is "bicycle" or "car" or "motorcycle" or "bus" or "truck" or "train";
+        }
+
+        if (string.Equals(_viewModel.SelectedPrimaryTarget, "해상 무기체계", StringComparison.Ordinal))
+        {
+            return className == "boat";
+        }
+
+        if (string.Equals(_viewModel.SelectedPrimaryTarget, "통신 장비", StringComparison.Ordinal))
+        {
+            return className is "cell phone" or "laptop";
         }
 
         return _viewModel.SelectedPrimaryTarget switch

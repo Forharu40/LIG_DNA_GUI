@@ -414,7 +414,7 @@ def detect_objects(model: YOLO, frame) -> list[dict]:
 
             tile_results = model.predict(
                 tile,
-                conf=max(0.05, CONFIDENCE * 0.8),
+                conf=CONFIDENCE,
                 imgsz=INFERENCE_SIZE,
                 verbose=False,
             )
