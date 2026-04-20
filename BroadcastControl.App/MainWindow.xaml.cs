@@ -38,6 +38,7 @@ public partial class MainWindow : Window
     private bool _hasReceivedDetectionPacket;
     private bool _hasReceivedNonEmptyDetectionPacket;
     private bool _hasRenderedDetectionOverlay;
+    private bool _isRenderingOverlay;
     private string? _lastDetectionAlertSignature;
     private const int OverlayCacheLimit = 48;
     private const uint OverlayFrameTolerance = 12;
@@ -118,7 +119,6 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.ZoomTransformX):
             case nameof(MainViewModel.ZoomTransformY):
             case nameof(MainViewModel.IsEoPrimary):
-            case nameof(MainViewModel.LargeFeedImage):
                 UpdateRecordingViewportState();
                 RenderDetectionOverlay();
                 break;
@@ -281,31 +281,44 @@ public partial class MainWindow : Window
 
     private void RenderDetectionOverlay()
     {
+        if (_isRenderingOverlay)
+        {
+            return;
+        }
+
         if (DetectionOverlayCanvas is null)
         {
             return;
         }
 
-        DetectionOverlayCanvas.Children.Clear();
-
-        if (_latestEoFrame is null)
+        _isRenderingOverlay = true;
+        try
         {
-            return;
+            DetectionOverlayCanvas.Children.Clear();
+
+            if (_latestEoFrame is null)
+            {
+                return;
+            }
+
+            if (!TryGetRenderableDetectionPacket(_latestEoFrame.Value.FrameIndex, out var detectionPacket))
+            {
+                _viewModel.UpdateEoFrame(_latestEoFrame.Value.Bitmap);
+                return;
+            }
+
+            var composedBitmap = ComposeDetectionOverlayBitmap(_latestEoFrame.Value, detectionPacket);
+            _viewModel.UpdateEoFrame(composedBitmap);
+
+            if (!_hasRenderedDetectionOverlay)
+            {
+                _hasRenderedDetectionOverlay = true;
+                _viewModel.AppendImportantLog("YOLO overlay rendered on GUI.");
+            }
         }
-
-        if (!TryGetRenderableDetectionPacket(_latestEoFrame.Value.FrameIndex, out var detectionPacket))
+        finally
         {
-            _viewModel.UpdateEoFrame(_latestEoFrame.Value.Bitmap);
-            return;
-        }
-
-        var composedBitmap = ComposeDetectionOverlayBitmap(_latestEoFrame.Value, detectionPacket);
-        _viewModel.UpdateEoFrame(composedBitmap);
-
-        if (!_hasRenderedDetectionOverlay)
-        {
-            _hasRenderedDetectionOverlay = true;
-            _viewModel.AppendImportantLog("YOLO overlay rendered on GUI.");
+            _isRenderingOverlay = false;
         }
     }
 
