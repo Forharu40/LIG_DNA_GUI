@@ -42,6 +42,7 @@ public partial class MainWindow : Window
     private string? _lastDetectionAlertSignature;
     private const int OverlayCacheLimit = 48;
     private const uint OverlayFrameTolerance = 12;
+    private const float DetectionDisplayThreshold = 0.60f;
 
     public MainWindow()
     {
@@ -119,6 +120,7 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.ZoomTransformX):
             case nameof(MainViewModel.ZoomTransformY):
             case nameof(MainViewModel.IsEoPrimary):
+            case nameof(MainViewModel.SelectedPrimaryTarget):
                 UpdateRecordingViewportState();
                 RenderDetectionOverlay();
                 break;
@@ -211,15 +213,17 @@ public partial class MainWindow : Window
                 $"YOLO detection stream connected. first frameId={detectionPacket.FrameId}");
         }
 
-        if (!_hasReceivedNonEmptyDetectionPacket && detectionPacket.Detections.Count > 0)
+        var displayDetections = FilterDisplayDetections(detectionPacket.Detections);
+
+        if (!_hasReceivedNonEmptyDetectionPacket && displayDetections.Count > 0)
         {
             _hasReceivedNonEmptyDetectionPacket = true;
             _viewModel.AppendImportantLog(
-                $"YOLO non-empty detection received. frameId={detectionPacket.FrameId}, objects={detectionPacket.Detections.Count}");
+                $"YOLO non-empty detection received. frameId={detectionPacket.FrameId}, objects={displayDetections.Count}");
         }
 
-        NotifyDetectionAlertIfNeeded(detectionPacket);
-        _viewModel.UpdateDetectionSummary(detectionPacket.Detections);
+        NotifyDetectionAlertIfNeeded(detectionPacket.FrameId, displayDetections);
+        _viewModel.UpdateDetectionSummary(displayDetections);
         RenderDetectionOverlay();
     }
 
@@ -324,7 +328,8 @@ public partial class MainWindow : Window
             var baseLeft = (viewportWidth - scaledWidth) / 2.0;
             var baseTop = (viewportHeight - scaledHeight) / 2.0;
 
-            foreach (var detection in detectionPacket.Detections)
+            var displayDetections = FilterDisplayDetections(detectionPacket.Detections);
+            foreach (var detection in displayDetections)
             {
                 var rectLeft = baseLeft + (detection.X1 * baseScale);
                 var rectTop = baseTop + (detection.Y1 * baseScale);
@@ -437,9 +442,49 @@ public partial class MainWindow : Window
         return false;
     }
 
-    private void NotifyDetectionAlertIfNeeded(DetectionPacket detectionPacket)
+    private IReadOnlyList<DetectionInfo> FilterDisplayDetections(IReadOnlyList<DetectionInfo> detections)
     {
-        if (detectionPacket.Detections.Count == 0)
+        var filtered = detections
+            .Where(d => d.Score >= DetectionDisplayThreshold)
+            .Where(ShouldDisplayDetection)
+            .ToArray();
+        return filtered;
+    }
+
+    private bool ShouldDisplayDetection(DetectionInfo detection)
+    {
+        var className = detection.ClassName.ToLowerInvariant();
+        return _viewModel.SelectedPrimaryTarget switch
+        {
+            "복합" => IsCompositeTargetClass(className),
+            "사람" => className == "person",
+            "공중 무기체계" => className == "airplane",
+            "육상 무기체계" => className is "bicycle" or "car" or "motorcycle" or "bus" or "truck" or "train",
+            "해상 무기체계" => className == "boat",
+            "통신 장비" => className is "cell phone" or "laptop",
+            _ => false,
+        };
+    }
+
+    private static bool IsCompositeTargetClass(string className)
+    {
+        return className is
+            "person" or
+            "airplane" or
+            "bicycle" or
+            "car" or
+            "motorcycle" or
+            "bus" or
+            "truck" or
+            "train" or
+            "boat" or
+            "cell phone" or
+            "laptop";
+    }
+
+    private void NotifyDetectionAlertIfNeeded(uint frameId, IReadOnlyList<DetectionInfo> detections)
+    {
+        if (detections.Count == 0)
         {
             _lastDetectionAlertSignature = null;
             return;
@@ -447,18 +492,18 @@ public partial class MainWindow : Window
 
         var preview = string.Join(
             ", ",
-            detectionPacket.Detections
+            detections
                 .Take(3)
                 .Select(d => $"{d.ClassName} object{d.ObjectId}"));
-        var signature = $"{detectionPacket.FrameId}:{preview}:{detectionPacket.Detections.Count}";
+        var signature = $"{frameId}:{preview}:{detections.Count}";
         if (string.Equals(_lastDetectionAlertSignature, signature, StringComparison.Ordinal))
         {
             return;
         }
 
         _lastDetectionAlertSignature = signature;
-        var suffix = detectionPacket.Detections.Count > 3
-            ? $" 외 {detectionPacket.Detections.Count - 3}개"
+        var suffix = detections.Count > 3
+            ? $" 외 {detections.Count - 3}개"
             : string.Empty;
         _viewModel.AppendImportantLog($"YOLO detected: {preview}{suffix}");
     }
