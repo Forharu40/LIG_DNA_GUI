@@ -8,6 +8,7 @@ using System.Windows.Media.Effects;
 using System.Windows.Shapes;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels;
+using System.Collections.Generic;
 
 namespace BroadcastControl.App;
 
@@ -30,6 +31,12 @@ public partial class MainWindow : Window
     private ReceivedVideoFrame? _latestEoFrame;
     private DetectionPacket? _latestDetectionPacket;
     private string? _lastStatusSignature;
+    private readonly Dictionary<uint, ReceivedVideoFrame> _eoFrameCache = new();
+    private readonly Dictionary<uint, DetectionPacket> _detectionCache = new();
+    private bool _hasReceivedDetectionPacket;
+    private string? _lastDetectionAlertSignature;
+    private const int OverlayCacheLimit = 48;
+    private const uint OverlayFrameTolerance = 12;
 
     public MainWindow()
     {
@@ -176,6 +183,7 @@ public partial class MainWindow : Window
     private void OnEoFrameReady(ReceivedVideoFrame frame)
     {
         _latestEoFrame = frame;
+        CacheEoFrame(frame);
 
         if (!_hasReceivedEoFrame)
         {
@@ -190,6 +198,16 @@ public partial class MainWindow : Window
     private void OnEoDetectionsReceived(DetectionPacket detectionPacket)
     {
         _latestDetectionPacket = detectionPacket;
+        CacheDetectionPacket(detectionPacket);
+
+        if (!_hasReceivedDetectionPacket)
+        {
+            _hasReceivedDetectionPacket = true;
+            _viewModel.AppendImportantLog(
+                $"YOLO detection stream connected. first frameId={detectionPacket.FrameId}");
+        }
+
+        NotifyDetectionAlertIfNeeded(detectionPacket);
         _viewModel.UpdateDetectionSummary(detectionPacket.Detections);
         RenderDetectionOverlay();
     }
@@ -260,18 +278,18 @@ public partial class MainWindow : Window
 
         DetectionOverlayCanvas.Children.Clear();
 
-        if (!_viewModel.IsEoPrimary || _latestEoFrame is null || _latestDetectionPacket is null)
+        if (!_viewModel.IsEoPrimary || _latestEoFrame is null)
         {
             return;
         }
 
-        if (_latestDetectionPacket.Value.FrameId != _latestEoFrame.Value.FrameIndex)
+        if (!TryGetRenderableDetectionPacket(_latestEoFrame.Value.FrameIndex, out var detectionPacket))
         {
             return;
         }
 
-        var sourceWidth = _latestDetectionPacket.Value.Width > 0 ? _latestDetectionPacket.Value.Width : _latestEoFrame.Value.Width;
-        var sourceHeight = _latestDetectionPacket.Value.Height > 0 ? _latestDetectionPacket.Value.Height : _latestEoFrame.Value.Height;
+        var sourceWidth = detectionPacket.Width > 0 ? detectionPacket.Width : _latestEoFrame.Value.Width;
+        var sourceHeight = detectionPacket.Height > 0 ? detectionPacket.Height : _latestEoFrame.Value.Height;
         if (sourceWidth <= 0 || sourceHeight <= 0)
         {
             return;
@@ -286,7 +304,7 @@ public partial class MainWindow : Window
         var baseTop = (viewportHeight - scaledHeight) / 2.0;
         var viewportCenter = new Point(viewportWidth / 2.0, viewportHeight / 2.0);
 
-        foreach (var detection in _latestDetectionPacket.Value.Detections)
+        foreach (var detection in detectionPacket.Detections)
         {
             var topLeft = TransformOverlayPoint(
                 new Point(baseLeft + (detection.X1 * baseScale), baseTop + (detection.Y1 * baseScale)),
@@ -306,6 +324,85 @@ public partial class MainWindow : Window
             }
 
             AddDetectionVisual(rectLeft, rectTop, rectWidth, rectHeight, detection);
+        }
+    }
+
+    private void CacheEoFrame(ReceivedVideoFrame frame)
+    {
+        _eoFrameCache[frame.FrameIndex] = frame;
+        TrimCache(_eoFrameCache);
+    }
+
+    private void CacheDetectionPacket(DetectionPacket detectionPacket)
+    {
+        _detectionCache[detectionPacket.FrameId] = detectionPacket;
+        TrimCache(_detectionCache);
+    }
+
+    private bool TryGetRenderableDetectionPacket(uint currentFrameId, out DetectionPacket detectionPacket)
+    {
+        if (_detectionCache.TryGetValue(currentFrameId, out detectionPacket))
+        {
+            return true;
+        }
+
+        foreach (var candidate in _detectionCache
+                     .Where(pair => pair.Value.Detections.Count > 0 && pair.Key <= currentFrameId)
+                     .OrderByDescending(pair => pair.Key))
+        {
+            if (currentFrameId - candidate.Key > OverlayFrameTolerance)
+            {
+                break;
+            }
+
+            detectionPacket = candidate.Value;
+            return true;
+        }
+
+        foreach (var candidate in _detectionCache
+                     .Where(pair => pair.Value.Detections.Count > 0)
+                     .OrderByDescending(pair => pair.Key))
+        {
+            detectionPacket = candidate.Value;
+            return true;
+        }
+
+        detectionPacket = default;
+        return false;
+    }
+
+    private void NotifyDetectionAlertIfNeeded(DetectionPacket detectionPacket)
+    {
+        if (detectionPacket.Detections.Count == 0)
+        {
+            _lastDetectionAlertSignature = null;
+            return;
+        }
+
+        var preview = string.Join(
+            ", ",
+            detectionPacket.Detections
+                .Take(3)
+                .Select(d => $"{d.ClassName} object{d.ObjectId}"));
+        var signature = $"{detectionPacket.FrameId}:{preview}:{detectionPacket.Detections.Count}";
+        if (string.Equals(_lastDetectionAlertSignature, signature, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastDetectionAlertSignature = signature;
+        var suffix = detectionPacket.Detections.Count > 3
+            ? $" 외 {detectionPacket.Detections.Count - 3}개"
+            : string.Empty;
+        _viewModel.AppendImportantLog($"YOLO detected: {preview}{suffix}");
+    }
+
+    private static void TrimCache<T>(Dictionary<uint, T> cache)
+    {
+        while (cache.Count > OverlayCacheLimit)
+        {
+            var oldestKey = cache.Keys.Min();
+            cache.Remove(oldestKey);
         }
     }
 

@@ -21,7 +21,8 @@ GUI_PORT = int(os.getenv("GUI_PORT", "5000"))
 SOURCE_ROOT = Path(os.getenv("SOURCE_ROOT", "/data/MEVA"))
 VIDEO_PATH = os.getenv("VIDEO_PATH", "").strip()
 MODEL_PATH = os.getenv("MODEL_PATH", "yolo11n.pt").strip()
-CONFIDENCE = float(os.getenv("CONFIDENCE", "0.25"))
+CONFIDENCE = float(os.getenv("CONFIDENCE", "0.10"))
+INFERENCE_SIZE = int(os.getenv("INFERENCE_SIZE", "1280"))
 JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "85"))
 LOOP_VIDEO = os.getenv("LOOP_VIDEO", "true").lower() in {"1", "true", "yes", "on"}
 CLIP_START_SECONDS = float(os.getenv("CLIP_START_SECONDS", "0"))
@@ -32,6 +33,7 @@ BOX_THICKNESS = int(os.getenv("BOX_THICKNESS", "2"))
 FONT_SCALE = float(os.getenv("FONT_SCALE", "0.6"))
 LABEL_THICKNESS = int(os.getenv("LABEL_THICKNESS", "2"))
 MAX_UDP_BYTES = int(os.getenv("MAX_UDP_BYTES", "60000"))
+TILE_OVERLAP_RATIO = float(os.getenv("TILE_OVERLAP_RATIO", "0.15"))
 
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".m4v"}
 TIMESTAMP_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})\.(\d{2})-(\d{2})-(\d{2})")
@@ -148,7 +150,10 @@ def reorder_entries_by_start_ratio(sampled_entries: list[VideoEntry]) -> tuple[l
     if start_index <= 0:
         return sampled_entries, 0
 
-    return sampled_entries[start_index:] + sampled_entries[:start_index], start_index
+    # 시작 비율 이후의 샘플들만 재생 목록으로 사용한다.
+    # 따라서 마지막 샘플까지 재생한 뒤에는 다시 앞쪽 0% 구간이 아니라
+    # 동일한 시작 지점(예: 80%)으로 되돌아와 반복한다.
+    return sampled_entries[start_index:], start_index
 
 
 def build_label(class_name: str, track_id: int | None, fallback_index: int) -> str:
@@ -272,49 +277,146 @@ def encode_frame_for_udp(frame) -> bytes | None:
     return None
 
 
-def detect_objects(model: YOLO, frame) -> list[dict]:
-    results = model.track(frame, persist=True, conf=CONFIDENCE, verbose=False)
+def calculate_iou(a: dict, b: dict) -> float:
+    inter_x1 = max(a["x1"], b["x1"])
+    inter_y1 = max(a["y1"], b["y1"])
+    inter_x2 = min(a["x2"], b["x2"])
+    inter_y2 = min(a["y2"], b["y2"])
+
+    inter_width = max(0.0, inter_x2 - inter_x1)
+    inter_height = max(0.0, inter_y2 - inter_y1)
+    inter_area = inter_width * inter_height
+    if inter_area <= 0:
+        return 0.0
+
+    area_a = max(0.0, a["x2"] - a["x1"]) * max(0.0, a["y2"] - a["y1"])
+    area_b = max(0.0, b["x2"] - b["x1"]) * max(0.0, b["y2"] - b["y1"])
+    denominator = area_a + area_b - inter_area
+    if denominator <= 0:
+        return 0.0
+
+    return inter_area / denominator
+
+
+def append_result_detections(
+    results,
+    output: list[dict],
+    offset_x: int,
+    offset_y: int,
+    source_width: int,
+    source_height: int,
+) -> None:
     if not results:
-        return []
+        return
 
     result = results[0]
     boxes = result.boxes
     names = result.names
 
     if boxes is None or len(boxes) == 0:
-        return []
+        return
 
-    xyxy = boxes.xyxy.cpu().numpy().astype(int)
+    xyxy = boxes.xyxy.cpu().numpy().astype(float)
     cls_ids = boxes.cls.cpu().numpy().astype(int)
     scores = boxes.conf.cpu().numpy().astype(float)
-    track_ids = boxes.id.cpu().numpy().astype(int) if boxes.id is not None else None
-    detections: list[dict] = []
 
-    for index, (box, cls_id, score) in enumerate(zip(xyxy, cls_ids, scores), start=1):
+    for box, cls_id, score in zip(xyxy, cls_ids, scores):
         x1, y1, x2, y2 = box.tolist()
-        track_id = int(track_ids[index - 1]) if track_ids is not None else None
-        class_name = names.get(cls_id, str(cls_id))
-        detections.append(
+        mapped_x1 = max(0.0, min(source_width, x1 + offset_x))
+        mapped_y1 = max(0.0, min(source_height, y1 + offset_y))
+        mapped_x2 = max(0.0, min(source_width, x2 + offset_x))
+        mapped_y2 = max(0.0, min(source_height, y2 + offset_y))
+        if mapped_x2 - mapped_x1 < 2 or mapped_y2 - mapped_y1 < 2:
+            continue
+
+        output.append(
             {
-                "className": class_name,
+                "className": names.get(cls_id, str(cls_id)),
                 "score": float(score),
-                "x1": float(x1),
-                "y1": float(y1),
-                "x2": float(x2),
-                "y2": float(y2),
-                "objectId": track_id if track_id is not None else index,
+                "x1": mapped_x1,
+                "y1": mapped_y1,
+                "x2": mapped_x2,
+                "y2": mapped_y2,
             }
         )
 
-    return detections
+
+def suppress_duplicate_detections(detections: list[dict]) -> list[dict]:
+    if not detections:
+        return []
+
+    sorted_detections = sorted(detections, key=lambda item: item["score"], reverse=True)
+    filtered: list[dict] = []
+    for candidate in sorted_detections:
+        is_duplicate = False
+        for kept in filtered:
+            if kept["className"] != candidate["className"]:
+                continue
+
+            if calculate_iou(kept, candidate) >= 0.45:
+                is_duplicate = True
+                break
+
+        if not is_duplicate:
+            filtered.append(candidate)
+
+    for index, detection in enumerate(filtered, start=1):
+        detection["objectId"] = index
+
+    return filtered
+
+
+def detect_objects(model: YOLO, frame) -> list[dict]:
+    source_height, source_width = frame.shape[:2]
+    detections: list[dict] = []
+
+    full_frame_results = model.predict(
+        frame,
+        conf=CONFIDENCE,
+        imgsz=INFERENCE_SIZE,
+        verbose=False,
+    )
+    append_result_detections(full_frame_results, detections, 0, 0, source_width, source_height)
+
+    overlap_x = int(source_width * TILE_OVERLAP_RATIO)
+    overlap_y = int(source_height * TILE_OVERLAP_RATIO)
+    tile_width = max(64, (source_width // 2) + overlap_x)
+    tile_height = max(64, (source_height // 2) + overlap_y)
+    step_x = max(32, tile_width - overlap_x)
+    step_y = max(32, tile_height - overlap_y)
+
+    for top in range(0, source_height, step_y):
+        for left in range(0, source_width, step_x):
+            bottom = min(source_height, top + tile_height)
+            right = min(source_width, left + tile_width)
+            tile = frame[top:bottom, left:right]
+            if tile.size == 0:
+                continue
+
+            tile_results = model.predict(
+                tile,
+                conf=max(0.05, CONFIDENCE * 0.8),
+                imgsz=INFERENCE_SIZE,
+                verbose=False,
+            )
+            append_result_detections(tile_results, detections, left, top, source_width, source_height)
+
+            if right >= source_width:
+                break
+
+        if bottom >= source_height:
+            break
+
+    return suppress_duplicate_detections(detections)
 
 
 def main() -> None:
     sampled_entries = build_sampled_entries()
+    original_sample_count = len(sampled_entries)
     sampled_entries, start_index = reorder_entries_by_start_ratio(sampled_entries)
-    print(f"Selected {len(sampled_entries)} sampled video entries from {SOURCE_ROOT}")
+    print(f"Selected {original_sample_count} sampled video entries from {SOURCE_ROOT}")
     print(
-        f"Starting playback from sampled entry {start_index + 1}/{len(sampled_entries)} "
+        f"Starting playback from sampled entry {start_index + 1}/{original_sample_count} "
         f"(ratio {SAMPLE_START_RATIO:.2f})"
     )
     for index, entry in enumerate(sampled_entries, start=1):
@@ -334,6 +436,8 @@ def main() -> None:
         f"interval={SAMPLE_INTERVAL_SECONDS:.1f}s"
     )
     print(f"Sample start ratio: {SAMPLE_START_RATIO:.2f}")
+    print(f"YOLO confidence threshold: {CONFIDENCE:.2f}")
+    print(f"YOLO inference size: {INFERENCE_SIZE}")
     print(f"Max UDP payload target: {MAX_UDP_BYTES} bytes")
 
     model = YOLO(MODEL_PATH)
@@ -389,6 +493,17 @@ def main() -> None:
                             break
 
                         detections = detect_objects(model, frame)
+                        if detections:
+                            preview_labels = ", ".join(
+                                f"{item['className']} object{item['objectId']}"
+                                for item in detections[:3]
+                            )
+                            if len(detections) > 3:
+                                preview_labels += f" +{len(detections) - 3}"
+                            print(
+                                f"[YOLO] frame={frame_index + 1} detections={len(detections)} "
+                                f"labels={preview_labels}"
+                            )
                         encoded_bytes = encode_frame_for_udp(frame)
                         if encoded_bytes is None:
                             time.sleep(frame_delay)

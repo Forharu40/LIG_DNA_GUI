@@ -1,7 +1,7 @@
 ARG BASE_IMAGE=ultralytics/ultralytics:latest-nvidia-arm64
 FROM ${BASE_IMAGE}
 
-ARG MODEL_NAME=yolo11n.pt
+ARG MODEL_NAME=yolo11s.pt
 
 WORKDIR /app
 
