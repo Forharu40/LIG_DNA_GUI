@@ -38,7 +38,7 @@ ALLOWED_CLASSES = {
     name.strip().lower()
     for name in os.getenv(
         "ALLOWED_CLASSES",
-        "person,bicycle,car,motorcycle,bus,truck",
+        "",
     ).split(",")
     if name.strip()
 }

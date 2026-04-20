@@ -454,6 +454,11 @@ public partial class MainWindow : Window
     private bool ShouldDisplayDetection(DetectionInfo detection)
     {
         var className = detection.ClassName.ToLowerInvariant();
+        if (string.Equals(_viewModel.SelectedPrimaryTarget, "복합", StringComparison.Ordinal))
+        {
+            return true;
+        }
+
         return _viewModel.SelectedPrimaryTarget switch
         {
             "복합" => IsCompositeTargetClass(className),
