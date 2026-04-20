@@ -25,6 +25,7 @@ SAMPLE_INTERVAL_SECONDS = float(os.getenv("SAMPLE_INTERVAL_SECONDS", "43200"))
 BOX_THICKNESS = int(os.getenv("BOX_THICKNESS", "2"))
 FONT_SCALE = float(os.getenv("FONT_SCALE", "0.6"))
 LABEL_THICKNESS = int(os.getenv("LABEL_THICKNESS", "2"))
+MAX_UDP_BYTES = int(os.getenv("MAX_UDP_BYTES", "60000"))
 
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".m4v"}
 TIMESTAMP_PATTERN = re.compile(r"(\d{4}-\d{2}-\d{2})\.(\d{2})-(\d{2})-(\d{2})")
@@ -165,6 +166,34 @@ def build_video_packet(
     )
 
 
+def encode_frame_for_udp(frame) -> bytes | None:
+    quality_attempts = [
+        max(25, JPEG_QUALITY),
+        max(25, min(JPEG_QUALITY, 70)),
+        55,
+        40,
+    ]
+    scale_attempts = [1.0, 0.85, 0.7, 0.55]
+
+    for scale in scale_attempts:
+        working_frame = frame
+        if scale < 0.999:
+            new_width = max(2, int(frame.shape[1] * scale))
+            new_height = max(2, int(frame.shape[0] * scale))
+            working_frame = cv2.resize(frame, (new_width, new_height))
+
+        for quality in quality_attempts:
+            ok, encoded = cv2.imencode(
+                ".jpg",
+                working_frame,
+                [int(cv2.IMWRITE_JPEG_QUALITY), quality],
+            )
+            if ok and len(encoded) <= MAX_UDP_BYTES:
+                return encoded.tobytes()
+
+    return None
+
+
 def annotate_frame(model: YOLO, frame) -> any:
     results = model.track(frame, persist=True, conf=CONFIDENCE, verbose=False)
     annotated = frame.copy()
@@ -254,6 +283,7 @@ def main() -> None:
         f"duration={CLIP_DURATION_SECONDS:.1f}s, "
         f"interval={SAMPLE_INTERVAL_SECONDS:.1f}s"
     )
+    print(f"Max UDP payload target: {MAX_UDP_BYTES} bytes")
 
     model = YOLO(MODEL_PATH)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -306,13 +336,9 @@ def main() -> None:
 
                         annotated = annotate_frame(model, frame)
 
-                        ok, encoded = cv2.imencode(
-                            ".jpg",
-                            annotated,
-                            [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
-                        )
-                        if ok:
-                            sock.sendto(encoded.tobytes(), (GUI_HOST, GUI_PORT))
+                        encoded_bytes = encode_frame_for_udp(annotated)
+                        if encoded_bytes is not None:
+                            sock.sendto(encoded_bytes, (GUI_HOST, GUI_PORT))
 
                         time.sleep(frame_delay)
                 finally:

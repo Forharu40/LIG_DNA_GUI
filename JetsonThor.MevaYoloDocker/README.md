@@ -84,6 +84,7 @@ sudo docker run --rm \
   -e CLIP_DURATION_SECONDS=15 \
   -e SAMPLE_INTERVAL_SECONDS=43200 \
   -e JPEG_QUALITY=60 \
+  -e MAX_UDP_BYTES=60000 \
   -e BOX_THICKNESS=3 \
   -e FONT_SCALE=0.75 \
   -e LABEL_THICKNESS=2 \
@@ -109,6 +110,10 @@ sudo docker run --rm \
   - 탐지 confidence threshold
 - `JPEG_QUALITY`
   - 전송 JPEG 품질
+- `MAX_UDP_BYTES`
+  - UDP 한 패킷으로 보낼 최대 JPEG 크기 목표
+  - 기본값 `60000`
+  - 프레임이 너무 크면 품질과 해상도를 자동으로 낮춰 이 크기 안으로 맞춥니다
 - `LOOP_VIDEO`
   - 샘플 파일 재생이 끝난 뒤 다시 처음 샘플부터 반복할지 여부
 - `CLIP_START_SECONDS`
