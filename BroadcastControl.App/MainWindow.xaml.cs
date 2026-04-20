@@ -372,11 +372,17 @@ public partial class MainWindow : Window
             return true;
         }
 
-        foreach (var candidate in _detectionCache
-                     .Where(pair => pair.Value.Detections.Count > 0 && pair.Key <= currentFrameId)
-                     .OrderByDescending(pair => pair.Key))
+        var recentCandidates = _detectionCache
+            .Where(pair => pair.Value.Detections.Count > 0 && pair.Key <= currentFrameId)
+            .OrderByDescending(pair => pair.Key)
+            .ToArray();
+
+        foreach (var candidate in recentCandidates)
         {
-            if (currentFrameId - candidate.Key > OverlayFrameTolerance)
+            var frameGap = currentFrameId >= candidate.Key
+                ? currentFrameId - candidate.Key
+                : uint.MaxValue;
+            if (frameGap > OverlayFrameTolerance)
             {
                 break;
             }
@@ -385,9 +391,12 @@ public partial class MainWindow : Window
             return true;
         }
 
-        foreach (var candidate in _detectionCache
-                     .Where(pair => pair.Value.Detections.Count > 0)
-                     .OrderByDescending(pair => pair.Key))
+        var fallbackCandidates = _detectionCache
+            .Where(pair => pair.Value.Detections.Count > 0)
+            .OrderByDescending(pair => pair.Key)
+            .ToArray();
+
+        foreach (var candidate in fallbackCandidates)
         {
             detectionPacket = candidate.Value;
             return true;
