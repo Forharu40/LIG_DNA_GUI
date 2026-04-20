@@ -12,7 +12,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
     private const int DefaultPort = 5000;
     private const int LegacyHeaderSize = 20;
-    private const int MetadataHeaderSize = 36;
+    private const int MetadataPacketSize = 36;
 
     private readonly Dispatcher _dispatcher;
 
@@ -215,13 +215,9 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             return;
         }
 
-        if (TryExtractMetadataEncodedFrame(packet, out var metadataFrame))
+        if (TryExtractMetadataPacket(packet, out var segmentInfo))
         {
-            TryDecodeFrame(
-                metadataFrame.EncodedBytes,
-                metadataFrame.DeclaredWidth,
-                metadataFrame.DeclaredHeight,
-                metadataFrame.SegmentInfo);
+            NotifySegmentChanged(segmentInfo);
             return;
         }
 
@@ -518,16 +514,16 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         _lastCycleIndex = segmentInfo.Value.CycleIndex;
     }
 
-    private static bool TryExtractMetadataEncodedFrame(byte[] packet, out MetadataEncodedFrame frame)
+    private static bool TryExtractMetadataPacket(byte[] packet, out PlaybackSegmentInfo segmentInfo)
     {
-        frame = default;
+        segmentInfo = default;
 
-        if (packet.Length <= MetadataHeaderSize)
+        if (packet.Length != MetadataPacketSize)
         {
             return false;
         }
 
-        var header = packet.AsSpan(0, MetadataHeaderSize);
+        var header = packet.AsSpan(0, MetadataPacketSize);
         if (header[0] != (byte)'M' ||
             header[1] != (byte)'E' ||
             header[2] != (byte)'V' ||
@@ -535,8 +531,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         {
             return false;
         }
-
-        var payload = packet.AsSpan(MetadataHeaderSize);
 
         var imageByteLength = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(4, 4));
         var declaredWidth = BinaryPrimitives.ReadUInt16BigEndian(header.Slice(8, 2));
@@ -548,36 +542,23 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         var currentPlaybackSeconds = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(28, 4));
         var cycleIndex = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(32, 4));
 
-        if (imageByteLength == 0 || imageByteLength > payload.Length)
+        if (imageByteLength != 0)
         {
             return false;
         }
 
-        if (declaredWidth == 0 || declaredHeight == 0)
+        if (declaredWidth != 0 || declaredHeight != 0)
         {
             return false;
         }
 
-        if (declaredWidth > 10000 || declaredHeight > 10000)
-        {
-            return false;
-        }
-
-        var encodedBytes = payload[..checked((int)imageByteLength)].ToArray();
-        if (!LooksLikeJpeg(encodedBytes))
-        {
-            return false;
-        }
-
-        var segmentInfo = new PlaybackSegmentInfo(
+        segmentInfo = new PlaybackSegmentInfo(
             clipIndex,
             clipCount,
             segmentStartSeconds,
             segmentEndSeconds,
             currentPlaybackSeconds,
             cycleIndex);
-
-        frame = new MetadataEncodedFrame(encodedBytes, declaredWidth, declaredHeight, segmentInfo);
         return true;
     }
 
@@ -631,11 +612,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     }
 
     private readonly record struct EncodedFrame(byte[] EncodedBytes, ushort DeclaredWidth, ushort DeclaredHeight);
-    private readonly record struct MetadataEncodedFrame(
-        byte[] EncodedBytes,
-        ushort DeclaredWidth,
-        ushort DeclaredHeight,
-        PlaybackSegmentInfo SegmentInfo);
 }
 
 public readonly record struct PlaybackSegmentInfo(

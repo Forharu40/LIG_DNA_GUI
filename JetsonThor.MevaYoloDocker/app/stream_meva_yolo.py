@@ -143,9 +143,6 @@ def format_hms(total_seconds: float) -> str:
 
 
 def build_video_packet(
-    jpeg_bytes: bytes,
-    frame_width: int,
-    frame_height: int,
     clip_index: int,
     clip_count: int,
     segment_start_seconds: float,
@@ -153,12 +150,12 @@ def build_video_packet(
     current_playback_seconds: float,
     cycle_index: int,
 ) -> bytes:
-    header = struct.pack(
+    return struct.pack(
         ">4sIHHIIIIII",
         b"MEVA",
-        len(jpeg_bytes),
-        frame_width,
-        frame_height,
+        0,
+        0,
+        0,
         clip_index,
         clip_count,
         int(max(0, segment_start_seconds)),
@@ -166,7 +163,6 @@ def build_video_packet(
         int(max(0, current_playback_seconds)),
         max(0, cycle_index),
     )
-    return header + jpeg_bytes
 
 
 def annotate_frame(model: YOLO, frame) -> any:
@@ -286,6 +282,16 @@ def main() -> None:
                         f"from {entry.path.name} at timeline {format_hms(timeline_segment_start)}"
                     )
 
+                    metadata_packet = build_video_packet(
+                        clip_index,
+                        len(sampled_entries),
+                        timeline_segment_start,
+                        timeline_segment_end,
+                        timeline_segment_start,
+                        cycle_index,
+                    )
+                    sock.sendto(metadata_packet, (GUI_HOST, GUI_PORT))
+
                     capture.set(cv2.CAP_PROP_POS_MSEC, clip_start_msec)
 
                     while True:
@@ -306,22 +312,7 @@ def main() -> None:
                             [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
                         )
                         if ok:
-                            current_playback_seconds = (
-                                entry.relative_start_seconds
-                                + (capture.get(cv2.CAP_PROP_POS_MSEC) / 1000.0)
-                            )
-                            packet = build_video_packet(
-                                encoded.tobytes(),
-                                annotated.shape[1],
-                                annotated.shape[0],
-                                clip_index,
-                                len(sampled_entries),
-                                timeline_segment_start,
-                                timeline_segment_end,
-                                current_playback_seconds,
-                                cycle_index,
-                            )
-                            sock.sendto(packet, (GUI_HOST, GUI_PORT))
+                            sock.sendto(encoded.tobytes(), (GUI_HOST, GUI_PORT))
 
                         time.sleep(frame_delay)
                 finally:

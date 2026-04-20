@@ -10,15 +10,14 @@ Jetson Thor에서 Docker로 실행하는 MEVA 데모영상 YOLO 처리 서비스
 4. 각 샘플 파일에서 지정된 길이만큼 실제 영상을 재생합니다.
 5. YOLO로 객체 탐지와 추적을 수행합니다.
 6. 바운딩 박스와 라벨을 프레임 위에 그립니다.
-7. 처리된 프레임을 UDP JPEG 형식으로 운용통제 GUI에 전송합니다.
-8. 같은 UDP 패킷 헤더 안에 구간 시작/종료/현재 재생 시점과 반복 회차 정보를 함께 넣어 보냅니다.
+7. 같은 UDP `5000` 포트로 구간 시작 메타데이터 패킷을 먼저 보내고, 이어서 JPEG 프레임을 계속 전송합니다.
 
 ## 역할
 
 - `BroadcastControl.MevaDemo.App`
   - 운용통제 PC에서 실행되는 데모 GUI입니다.
   - Jetson 컨테이너가 보내는 YOLO 처리 영상을 EO 화면에 표시합니다.
-  - 영상 패킷 헤더에 들어 있는 시간 메타데이터를 읽어 시스템 로그에 표시합니다.
+  - 같은 UDP 포트로 들어오는 메타데이터 패킷을 읽어 시스템 로그에 표시합니다.
 - `JetsonThor.MevaYoloDocker`
   - Jetson Thor에서 Docker로 실행되는 YOLO 처리 서비스입니다.
   - MEVA 폴더 전체에서 시간순 샘플 파일을 골라 실제 영상을 재생합니다.
@@ -45,7 +44,7 @@ dotnet build BroadcastControl.MevaDemo.slnx -c Debug
 dotnet run --project .\BroadcastControl.MevaDemo.App\BroadcastControl.MevaDemo.App.csproj
 ```
 
-GUI는 UDP `5000` 포트에서 YOLO 처리 영상과 시간 메타데이터를 함께 받습니다.
+GUI는 UDP `5000` 포트에서 JPEG 영상과 메타데이터 패킷을 함께 받습니다.
 
 ## Jetson에서 Docker 빌드
 
@@ -84,6 +83,7 @@ sudo docker run --rm \
   -e CLIP_START_SECONDS=0 \
   -e CLIP_DURATION_SECONDS=15 \
   -e SAMPLE_INTERVAL_SECONDS=43200 \
+  -e JPEG_QUALITY=60 \
   -e BOX_THICKNESS=3 \
   -e FONT_SCALE=0.75 \
   -e LABEL_THICKNESS=2 \
@@ -96,7 +96,7 @@ sudo docker run --rm \
 - `GUI_HOST`
   - 운용통제 PC IP
 - `GUI_PORT`
-  - GUI가 YOLO 처리 영상과 메타데이터를 함께 받는 UDP 포트, 기본값 `5000`
+  - GUI가 YOLO 처리 영상과 메타데이터 패킷을 함께 받는 UDP 포트, 기본값 `5000`
 - `SOURCE_ROOT`
   - MEVA 영상 루트 폴더
 - `VIDEO_PATH`
