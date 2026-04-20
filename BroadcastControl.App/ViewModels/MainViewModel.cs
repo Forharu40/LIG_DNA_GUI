@@ -437,13 +437,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     {
         if (detections.Count == 0)
         {
-            SelectedPrimaryTarget = "복합";
             CurrentThreatLevel = "낮음";
             return;
         }
 
-        var primaryDetection = detections[0];
-        SelectedPrimaryTarget = $"{primaryDetection.ClassName} object{primaryDetection.ObjectId}";
         CurrentThreatLevel = detections.Count >= 3 ? "높음" : "중간";
     }
 

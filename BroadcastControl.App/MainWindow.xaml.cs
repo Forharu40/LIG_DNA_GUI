@@ -195,6 +195,7 @@ public partial class MainWindow : Window
             _viewModel.AppendImportantLog("EO UDP camera first frame received.");
         }
 
+        _viewModel.UpdateEoFrame(frame.Bitmap);
         RenderDetectionOverlay();
     }
 
@@ -301,16 +302,44 @@ public partial class MainWindow : Window
                 return;
             }
 
+            _viewModel.UpdateEoFrame(_latestEoFrame.Value.Bitmap);
+
             if (!TryGetRenderableFrameAndDetection(out var frameToRender, out var detectionPacket))
             {
-                _viewModel.UpdateEoFrame(_latestEoFrame.Value.Bitmap);
                 return;
             }
 
-            var composedBitmap = ComposeDetectionOverlayBitmap(frameToRender, detectionPacket);
-            _viewModel.UpdateEoFrame(composedBitmap);
+            var sourceWidth = detectionPacket.Width > 0 ? detectionPacket.Width : frameToRender.Width;
+            var sourceHeight = detectionPacket.Height > 0 ? detectionPacket.Height : frameToRender.Height;
+            if (sourceWidth <= 0 || sourceHeight <= 0)
+            {
+                return;
+            }
 
-            if (!_hasRenderedDetectionOverlay)
+            var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
+            var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
+            var baseScale = Math.Max(viewportWidth / sourceWidth, viewportHeight / sourceHeight);
+            var scaledWidth = sourceWidth * baseScale;
+            var scaledHeight = sourceHeight * baseScale;
+            var baseLeft = (viewportWidth - scaledWidth) / 2.0;
+            var baseTop = (viewportHeight - scaledHeight) / 2.0;
+
+            foreach (var detection in detectionPacket.Detections)
+            {
+                var rectLeft = baseLeft + (detection.X1 * baseScale);
+                var rectTop = baseTop + (detection.Y1 * baseScale);
+                var rectWidth = Math.Max(2, (detection.X2 - detection.X1) * baseScale);
+                var rectHeight = Math.Max(2, (detection.Y2 - detection.Y1) * baseScale);
+
+                if (rectWidth < 2 || rectHeight < 2)
+                {
+                    continue;
+                }
+
+                AddDetectionVisualToCanvas(rectLeft, rectTop, rectWidth, rectHeight, detection);
+            }
+
+            if (!_hasRenderedDetectionOverlay && DetectionOverlayCanvas.Children.Count > 0)
             {
                 _hasRenderedDetectionOverlay = true;
                 _viewModel.AppendImportantLog("YOLO overlay rendered on GUI.");
@@ -320,50 +349,6 @@ public partial class MainWindow : Window
         {
             _isRenderingOverlay = false;
         }
-    }
-
-    private BitmapSource ComposeDetectionOverlayBitmap(ReceivedVideoFrame frame, DetectionPacket detectionPacket)
-    {
-        var pixelWidth = frame.Bitmap.PixelWidth;
-        var pixelHeight = frame.Bitmap.PixelHeight;
-        if (pixelWidth <= 0 || pixelHeight <= 0)
-        {
-            return frame.Bitmap;
-        }
-
-        var sourceWidth = detectionPacket.Width > 0 ? detectionPacket.Width : frame.Width;
-        var sourceHeight = detectionPacket.Height > 0 ? detectionPacket.Height : frame.Height;
-        if (sourceWidth <= 0 || sourceHeight <= 0)
-        {
-            return frame.Bitmap;
-        }
-
-        var scaleX = pixelWidth / (double)sourceWidth;
-        var scaleY = pixelHeight / (double)sourceHeight;
-
-        var drawingVisual = new DrawingVisual();
-        using var drawingContext = drawingVisual.RenderOpen();
-        drawingContext.DrawImage(frame.Bitmap, new Rect(0, 0, pixelWidth, pixelHeight));
-
-        foreach (var detection in detectionPacket.Detections)
-        {
-            var rectLeft = detection.X1 * scaleX;
-            var rectTop = detection.Y1 * scaleY;
-            var rectWidth = Math.Max(2, (detection.X2 - detection.X1) * scaleX);
-            var rectHeight = Math.Max(2, (detection.Y2 - detection.Y1) * scaleY);
-
-            if (rectWidth < 2 || rectHeight < 2)
-            {
-                continue;
-            }
-
-            DrawDetectionOverlayToBitmap(drawingContext, rectLeft, rectTop, rectWidth, rectHeight, detection);
-        }
-
-        var renderTarget = new RenderTargetBitmap(pixelWidth, pixelHeight, 96, 96, PixelFormats.Pbgra32);
-        renderTarget.Render(drawingVisual);
-        renderTarget.Freeze();
-        return renderTarget;
     }
 
     private void CacheEoFrame(ReceivedVideoFrame frame)
@@ -487,8 +472,7 @@ public partial class MainWindow : Window
         }
     }
 
-    private static void DrawDetectionOverlayToBitmap(
-        DrawingContext drawingContext,
+    private void AddDetectionVisualToCanvas(
         double rectLeft,
         double rectTop,
         double rectWidth,
@@ -499,44 +483,82 @@ public partial class MainWindow : Window
         accentBrush.Freeze();
         var shadowBrush = new SolidColorBrush(Color.FromArgb(96, 0, 0, 0));
         shadowBrush.Freeze();
-        var textBrush = Brushes.White;
+        var outerShadow = new Rectangle
+        {
+            Width = rectWidth,
+            Height = rectHeight,
+            Stroke = shadowBrush,
+            StrokeThickness = 4,
+            RadiusX = 2,
+            RadiusY = 2,
+            Fill = Brushes.Transparent
+        };
+        Canvas.SetLeft(outerShadow, rectLeft);
+        Canvas.SetTop(outerShadow, rectTop);
+        DetectionOverlayCanvas.Children.Add(outerShadow);
 
-        drawingContext.DrawRectangle(null, new Pen(shadowBrush, 4), new Rect(rectLeft, rectTop, rectWidth, rectHeight));
-        drawingContext.DrawRectangle(null, new Pen(accentBrush, 2), new Rect(rectLeft, rectTop, rectWidth, rectHeight));
+        var mainRectangle = new Rectangle
+        {
+            Width = rectWidth,
+            Height = rectHeight,
+            Stroke = accentBrush,
+            StrokeThickness = 2,
+            RadiusX = 2,
+            RadiusY = 2,
+            Fill = Brushes.Transparent
+        };
+        Canvas.SetLeft(mainRectangle, rectLeft);
+        Canvas.SetTop(mainRectangle, rectTop);
+        DetectionOverlayCanvas.Children.Add(mainRectangle);
 
         var cornerLength = Math.Max(12, Math.Min(rectWidth, rectHeight) * 0.18);
-        DrawCorner(drawingContext, rectLeft, rectTop, cornerLength, true, true, accentBrush);
-        DrawCorner(drawingContext, rectLeft + rectWidth, rectTop, cornerLength, false, true, accentBrush);
-        DrawCorner(drawingContext, rectLeft, rectTop + rectHeight, cornerLength, true, false, accentBrush);
-        DrawCorner(drawingContext, rectLeft + rectWidth, rectTop + rectHeight, cornerLength, false, false, accentBrush);
+        AddCornerToCanvas(rectLeft, rectTop, cornerLength, true, true, accentBrush);
+        AddCornerToCanvas(rectLeft + rectWidth, rectTop, cornerLength, false, true, accentBrush);
+        AddCornerToCanvas(rectLeft, rectTop + rectHeight, cornerLength, true, false, accentBrush);
+        AddCornerToCanvas(rectLeft + rectWidth, rectTop + rectHeight, cornerLength, false, false, accentBrush);
 
-        var labelText = new FormattedText(
-            detection.LabelText,
-            CultureInfo.InvariantCulture,
-            FlowDirection.LeftToRight,
-            new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.SemiBold, FontStretches.Normal),
-            16,
-            textBrush,
-            1.0);
-        var labelPaddingX = 10.0;
-        var labelPaddingY = 5.0;
-        var labelWidth = labelText.Width + (labelPaddingX * 2) + 14;
-        var labelHeight = labelText.Height + (labelPaddingY * 2);
-        var labelLeft = Math.Max(0, rectLeft);
-        var labelTop = Math.Max(0, rectTop - labelHeight - 8);
+        var labelBorder = new Border
+        {
+            Background = new SolidColorBrush(Color.FromArgb(230, 9, 33, 18)),
+            BorderBrush = accentBrush,
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(3),
+            Padding = new Thickness(8, 3, 8, 3),
+            Child = new StackPanel
+            {
+                Orientation = Orientation.Horizontal,
+                Children =
+                {
+                    new Ellipse
+                    {
+                        Width = 8,
+                        Height = 8,
+                        Fill = accentBrush,
+                        Margin = new Thickness(0, 3, 6, 0)
+                    },
+                    new TextBlock
+                    {
+                        Text = detection.LabelText,
+                        Foreground = Brushes.White,
+                        FontSize = 12,
+                        FontWeight = FontWeights.SemiBold
+                    }
+                }
+            }
+        };
 
-        drawingContext.DrawRoundedRectangle(
-            new SolidColorBrush(Color.FromArgb(230, 9, 33, 18)),
-            new Pen(accentBrush, 1),
-            new Rect(labelLeft, labelTop, labelWidth, labelHeight),
-            3,
-            3);
-        drawingContext.DrawEllipse(accentBrush, null, new Point(labelLeft + 10, labelTop + (labelHeight / 2)), 4, 4);
-        drawingContext.DrawText(labelText, new Point(labelLeft + 20, labelTop + labelPaddingY - 1));
+        labelBorder.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var labelWidth = labelBorder.DesiredSize.Width;
+        var labelHeight = labelBorder.DesiredSize.Height;
+        var labelLeft = Math.Max(0, Math.Min(rectLeft, Math.Max(0, CameraViewport.ActualWidth - labelWidth - 4)));
+        var preferredTop = rectTop - labelHeight - 6;
+        var labelTop = preferredTop >= 0 ? preferredTop : Math.Min(CameraViewport.ActualHeight - labelHeight - 4, rectTop + 6);
+        Canvas.SetLeft(labelBorder, labelLeft);
+        Canvas.SetTop(labelBorder, Math.Max(0, labelTop));
+        DetectionOverlayCanvas.Children.Add(labelBorder);
     }
 
-    private static void DrawCorner(
-        DrawingContext drawingContext,
+    private void AddCornerToCanvas(
         double anchorX,
         double anchorY,
         double length,
@@ -544,13 +566,32 @@ public partial class MainWindow : Window
         bool isTop,
         Brush strokeBrush)
     {
-        var pen = new Pen(strokeBrush, 3)
+        var horizontal = new Line
         {
-            StartLineCap = PenLineCap.Square,
-            EndLineCap = PenLineCap.Square
+            X1 = anchorX,
+            Y1 = anchorY,
+            X2 = anchorX + (isLeft ? length : -length),
+            Y2 = anchorY,
+            Stroke = strokeBrush,
+            StrokeThickness = 3,
+            StrokeStartLineCap = PenLineCap.Square,
+            StrokeEndLineCap = PenLineCap.Square
         };
-        drawingContext.DrawLine(pen, new Point(anchorX, anchorY), new Point(anchorX + (isLeft ? length : -length), anchorY));
-        drawingContext.DrawLine(pen, new Point(anchorX, anchorY), new Point(anchorX, anchorY + (isTop ? length : -length)));
+
+        var vertical = new Line
+        {
+            X1 = anchorX,
+            Y1 = anchorY,
+            X2 = anchorX,
+            Y2 = anchorY + (isTop ? length : -length),
+            Stroke = strokeBrush,
+            StrokeThickness = 3,
+            StrokeStartLineCap = PenLineCap.Square,
+            StrokeEndLineCap = PenLineCap.Square
+        };
+
+        DetectionOverlayCanvas.Children.Add(horizontal);
+        DetectionOverlayCanvas.Children.Add(vertical);
     }
 
     private void HandleManualRecordingStateChanged()
