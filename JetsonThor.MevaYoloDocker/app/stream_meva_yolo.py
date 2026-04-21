@@ -23,7 +23,7 @@ SOURCE_ROOT = Path(os.getenv("SOURCE_ROOT", "/data/MEVA"))
 VIDEO_PATH = os.getenv("VIDEO_PATH", "").strip()
 MODEL_PATH = os.getenv("MODEL_PATH", "yolo11n.pt").strip()
 CONFIDENCE = float(os.getenv("CONFIDENCE", "0.60"))
-INFERENCE_SIZE = int(os.getenv("INFERENCE_SIZE", "416"))
+INFERENCE_SIZE = int(os.getenv("INFERENCE_SIZE", "640"))
 JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "35"))
 LOOP_VIDEO = os.getenv("LOOP_VIDEO", "true").lower() in {"1", "true", "yes", "on"}
 CLIP_START_SECONDS = float(os.getenv("CLIP_START_SECONDS", "0"))
@@ -41,6 +41,8 @@ STREAM_MAX_HEIGHT = max(240, int(os.getenv("STREAM_MAX_HEIGHT", "360")))
 STREAM_TARGET_FPS = float(os.getenv("STREAM_TARGET_FPS", "0"))
 ENABLE_FRAME_SKIP = os.getenv("ENABLE_FRAME_SKIP", "true").lower() in {"1", "true", "yes", "on"}
 MAX_FRAME_SKIP = max(0, int(os.getenv("MAX_FRAME_SKIP", "8")))
+INFERENCE_SOURCE_MAX_WIDTH = max(0, int(os.getenv("INFERENCE_SOURCE_MAX_WIDTH", "0")))
+INFERENCE_SOURCE_MAX_HEIGHT = max(0, int(os.getenv("INFERENCE_SOURCE_MAX_HEIGHT", "0")))
 ENABLE_TILE_INFERENCE = os.getenv("ENABLE_TILE_INFERENCE", "false").lower() in {"1", "true", "yes", "on"}
 ALLOWED_CLASSES = {
     name.strip().lower()
@@ -60,6 +62,13 @@ class VideoEntry:
     path: Path
     start_time: datetime | None
     relative_start_seconds: float
+
+
+@dataclass(frozen=True)
+class DetectionResult:
+    width: int
+    height: int
+    detections: list[dict]
 
 
 def parse_video_start_time(path: Path) -> datetime | None:
@@ -308,6 +317,26 @@ def prepare_stream_frame(frame):
     return cv2.resize(frame, (resized_width, resized_height), interpolation=cv2.INTER_AREA)
 
 
+def prepare_inference_frame(frame):
+    source_height, source_width = frame.shape[:2]
+    if INFERENCE_SOURCE_MAX_WIDTH <= 0 and INFERENCE_SOURCE_MAX_HEIGHT <= 0:
+        return frame
+
+    width_limit = INFERENCE_SOURCE_MAX_WIDTH if INFERENCE_SOURCE_MAX_WIDTH > 0 else source_width
+    height_limit = INFERENCE_SOURCE_MAX_HEIGHT if INFERENCE_SOURCE_MAX_HEIGHT > 0 else source_height
+    scale = min(
+        1.0,
+        width_limit / max(1, source_width),
+        height_limit / max(1, source_height),
+    )
+    if scale >= 0.999:
+        return frame
+
+    resized_width = max(2, int(source_width * scale))
+    resized_height = max(2, int(source_height * scale))
+    return cv2.resize(frame, (resized_width, resized_height), interpolation=cv2.INTER_AREA)
+
+
 def pace_stream(capture, next_frame_time: float, frame_delay: float) -> float:
     next_frame_time += frame_delay
     sleep_seconds = next_frame_time - time.monotonic()
@@ -470,6 +499,11 @@ def detect_objects(model: YOLO, frame) -> list[dict]:
     return suppress_duplicate_detections(filtered)
 
 
+def detect_objects_for_packet(model: YOLO, frame) -> DetectionResult:
+    height, width = frame.shape[:2]
+    return DetectionResult(width, height, detect_objects(model, frame))
+
+
 def main() -> None:
     sampled_entries = build_sampled_entries()
     original_sample_count = len(sampled_entries)
@@ -500,6 +534,10 @@ def main() -> None:
     print(f"YOLO inference size: {INFERENCE_SIZE}")
     print(f"YOLO detection interval: every {DETECTION_INTERVAL_SECONDS:.2f} second(s)")
     print(f"Stream max size: {STREAM_MAX_WIDTH}x{STREAM_MAX_HEIGHT}")
+    if INFERENCE_SOURCE_MAX_WIDTH > 0 or INFERENCE_SOURCE_MAX_HEIGHT > 0:
+        print(f"Inference source max size: {INFERENCE_SOURCE_MAX_WIDTH}x{INFERENCE_SOURCE_MAX_HEIGHT}")
+    else:
+        print("Inference source size: original video frame")
     if STREAM_TARGET_FPS > 0:
         print(f"Stream target FPS override: {STREAM_TARGET_FPS:.2f}")
     print(f"Frame skip enabled: {ENABLE_FRAME_SKIP} (max {MAX_FRAME_SKIP})")
@@ -517,8 +555,10 @@ def main() -> None:
         cycle_index = 0
         frame_index = 0
         latest_detections: list[dict] = []
+        latest_detection_width = 0
+        latest_detection_height = 0
         last_detection_monotonic: float | None = None
-        pending_detection: Future[list[dict]] | None = None
+        pending_detection: Future[DetectionResult] | None = None
         while True:
             for clip_index, entry in enumerate(sampled_entries, start=1):
                 capture = cv2.VideoCapture(str(entry.path))
@@ -569,9 +609,14 @@ def main() -> None:
 
                         if pending_detection is not None and pending_detection.done():
                             try:
-                                latest_detections = pending_detection.result()
+                                detection_result = pending_detection.result()
+                                latest_detections = detection_result.detections
+                                latest_detection_width = detection_result.width
+                                latest_detection_height = detection_result.height
                             except Exception as exc:
                                 latest_detections = []
+                                latest_detection_width = 0
+                                latest_detection_height = 0
                                 status_packet = build_status_packet(
                                     True,
                                     True,
@@ -593,14 +638,17 @@ def main() -> None:
                         )
 
                         if should_run_detection:
+                            inference_frame = prepare_inference_frame(frame)
                             pending_detection = detection_executor.submit(
-                                detect_objects,
+                                detect_objects_for_packet,
                                 model,
-                                stream_frame.copy(),
+                                inference_frame.copy(),
                             )
                             last_detection_monotonic = now_monotonic
 
                         detections = latest_detections
+                        detection_width = latest_detection_width or stream_frame.shape[1]
+                        detection_height = latest_detection_height or stream_frame.shape[0]
                         encoded_bytes = encode_frame_for_udp(stream_frame)
                         if encoded_bytes is None:
                             next_frame_time = pace_stream(capture, next_frame_time, frame_delay)
@@ -618,8 +666,8 @@ def main() -> None:
                         detection_packet = build_detection_packet(
                             current_frame_stamp_ns,
                             frame_index,
-                            stream_frame.shape[1],
-                            stream_frame.shape[0],
+                            detection_width,
+                            detection_height,
                             detections,
                         )
                         sock.sendto(image_packet, (GUI_HOST, GUI_PORT))
