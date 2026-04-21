@@ -43,6 +43,7 @@ ENABLE_FRAME_SKIP = os.getenv("ENABLE_FRAME_SKIP", "true").lower() in {"1", "tru
 MAX_FRAME_SKIP = max(0, int(os.getenv("MAX_FRAME_SKIP", "8")))
 INFERENCE_SOURCE_MAX_WIDTH = max(0, int(os.getenv("INFERENCE_SOURCE_MAX_WIDTH", "0")))
 INFERENCE_SOURCE_MAX_HEIGHT = max(0, int(os.getenv("INFERENCE_SOURCE_MAX_HEIGHT", "0")))
+ENABLE_ASYNC_ENCODING = os.getenv("ENABLE_ASYNC_ENCODING", "true").lower() in {"1", "true", "yes", "on"}
 ENABLE_TILE_INFERENCE = os.getenv("ENABLE_TILE_INFERENCE", "false").lower() in {"1", "true", "yes", "on"}
 ALLOWED_CLASSES = {
     name.strip().lower()
@@ -68,6 +69,16 @@ class VideoEntry:
 class DetectionResult:
     width: int
     height: int
+    detections: list[dict]
+
+
+@dataclass(frozen=True)
+class EncodedFrame:
+    encoded_bytes: bytes
+    width: int
+    height: int
+    detection_width: int
+    detection_height: int
     detections: list[dict]
 
 
@@ -300,6 +311,48 @@ def encode_frame_for_udp(frame) -> bytes | None:
                 return encoded.tobytes()
 
     return None
+
+
+def encode_frame_for_packet(
+    frame,
+    detection_width: int,
+    detection_height: int,
+    detections: list[dict],
+) -> EncodedFrame | None:
+    encoded_bytes = encode_frame_for_udp(frame)
+    if encoded_bytes is None:
+        return None
+
+    return EncodedFrame(
+        encoded_bytes,
+        frame.shape[1],
+        frame.shape[0],
+        detection_width,
+        detection_height,
+        [dict(detection) for detection in detections],
+    )
+
+
+def send_encoded_frame(sock: socket.socket, encoded_frame: EncodedFrame, frame_index: int) -> int:
+    next_frame_index = frame_index + 1
+    current_frame_stamp_ns = time.time_ns()
+    image_packet = build_image_packet(
+        encoded_frame.encoded_bytes,
+        encoded_frame.width,
+        encoded_frame.height,
+        next_frame_index,
+        current_frame_stamp_ns,
+    )
+    detection_packet = build_detection_packet(
+        current_frame_stamp_ns,
+        next_frame_index,
+        encoded_frame.detection_width,
+        encoded_frame.detection_height,
+        encoded_frame.detections,
+    )
+    sock.sendto(image_packet, (GUI_HOST, GUI_PORT))
+    sock.sendto(detection_packet, (GUI_HOST, GUI_PORT))
+    return next_frame_index
 
 
 def prepare_stream_frame(frame):
@@ -541,6 +594,7 @@ def main() -> None:
     if STREAM_TARGET_FPS > 0:
         print(f"Stream target FPS override: {STREAM_TARGET_FPS:.2f}")
     print(f"Frame skip enabled: {ENABLE_FRAME_SKIP} (max {MAX_FRAME_SKIP})")
+    print(f"Async JPEG encoding enabled: {ENABLE_ASYNC_ENCODING}")
     print(f"Tile inference enabled: {ENABLE_TILE_INFERENCE}")
     print(f"Allowed classes: {', '.join(sorted(ALLOWED_CLASSES))}")
     print(f"Max UDP payload target: {MAX_UDP_BYTES} bytes")
@@ -550,6 +604,7 @@ def main() -> None:
     status_packet = build_status_packet(True, True, CONFIDENCE, "", str(SOURCE_ROOT))
     sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
     detection_executor = ThreadPoolExecutor(max_workers=1)
+    encode_executor = ThreadPoolExecutor(max_workers=1) if ENABLE_ASYNC_ENCODING else None
 
     try:
         cycle_index = 0
@@ -559,6 +614,7 @@ def main() -> None:
         latest_detection_height = 0
         last_detection_monotonic: float | None = None
         pending_detection: Future[DetectionResult] | None = None
+        pending_encoded_frame: Future[EncodedFrame | None] | None = None
         while True:
             for clip_index, entry in enumerate(sampled_entries, start=1):
                 capture = cv2.VideoCapture(str(entry.path))
@@ -628,6 +684,23 @@ def main() -> None:
                             finally:
                                 pending_detection = None
 
+                        if pending_encoded_frame is not None and pending_encoded_frame.done():
+                            try:
+                                encoded_frame = pending_encoded_frame.result()
+                                if encoded_frame is not None:
+                                    frame_index = send_encoded_frame(sock, encoded_frame, frame_index)
+                            except Exception as exc:
+                                status_packet = build_status_packet(
+                                    True,
+                                    True,
+                                    CONFIDENCE,
+                                    f"JPEG encoding failed: {exc}",
+                                    str(SOURCE_ROOT),
+                                )
+                                sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
+                            finally:
+                                pending_encoded_frame = None
+
                         now_monotonic = time.monotonic()
                         should_run_detection = (
                             pending_detection is None and
@@ -649,31 +722,34 @@ def main() -> None:
                         detections = latest_detections
                         detection_width = latest_detection_width or stream_frame.shape[1]
                         detection_height = latest_detection_height or stream_frame.shape[0]
-                        encoded_bytes = encode_frame_for_udp(stream_frame)
-                        if encoded_bytes is None:
-                            next_frame_time = pace_stream(capture, next_frame_time, frame_delay)
-                            continue
-
-                        frame_index += 1
-                        current_frame_stamp_ns = time.time_ns()
-                        image_packet = build_image_packet(
-                            encoded_bytes,
-                            stream_frame.shape[1],
-                            stream_frame.shape[0],
-                            frame_index,
-                            current_frame_stamp_ns,
-                        )
-                        detection_packet = build_detection_packet(
-                            current_frame_stamp_ns,
-                            frame_index,
-                            detection_width,
-                            detection_height,
-                            detections,
-                        )
-                        sock.sendto(image_packet, (GUI_HOST, GUI_PORT))
-                        sock.sendto(detection_packet, (GUI_HOST, GUI_PORT))
+                        if encode_executor is not None:
+                            if pending_encoded_frame is None:
+                                pending_encoded_frame = encode_executor.submit(
+                                    encode_frame_for_packet,
+                                    stream_frame.copy(),
+                                    detection_width,
+                                    detection_height,
+                                    [dict(detection) for detection in detections],
+                                )
+                        else:
+                            encoded_frame = encode_frame_for_packet(
+                                stream_frame,
+                                detection_width,
+                                detection_height,
+                                detections,
+                            )
+                            if encoded_frame is not None:
+                                frame_index = send_encoded_frame(sock, encoded_frame, frame_index)
 
                         next_frame_time = pace_stream(capture, next_frame_time, frame_delay)
+
+                    if pending_encoded_frame is not None and pending_encoded_frame.done():
+                        try:
+                            encoded_frame = pending_encoded_frame.result()
+                            if encoded_frame is not None:
+                                frame_index = send_encoded_frame(sock, encoded_frame, frame_index)
+                        finally:
+                            pending_encoded_frame = None
                 finally:
                     capture.release()
 
@@ -684,6 +760,8 @@ def main() -> None:
             cycle_index += 1
     finally:
         detection_executor.shutdown(wait=False, cancel_futures=True)
+        if encode_executor is not None:
+            encode_executor.shutdown(wait=False, cancel_futures=True)
         sock.close()
 
 

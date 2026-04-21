@@ -513,3 +513,23 @@ Then run the PC decode/network benchmark with those two files:
 ```powershell
 dotnet run --project .\BroadcastControl.Benchmarks\BroadcastControl.Benchmarks.csproj -- --a .\JetsonThor.MevaYoloDocker\benchmark-output\sample_1280x720_q85.jpg --b .\JetsonThor.MevaYoloDocker\benchmark-output\sample_640x360_q35.jpg --network-mbps 100
 ```
+
+## Stream Thread Pipeline
+
+The `2026_04_21_ver2/stream-thread-pipeline` branch separates the Jetson sender into three practical work lanes:
+
+- Main stream loop: reads MEVA frames, keeps playback timing, sends UDP packets.
+- YOLO worker thread: runs detection without blocking video playback.
+- JPEG encode worker thread: compresses the current stream frame without blocking frame reading.
+
+The JPEG encode worker is enabled by default:
+
+```bash
+ENABLE_ASYNC_ENCODING=true bash ./run_meva_yolo_demo.sh
+```
+
+If a comparison run is needed, disable it:
+
+```bash
+ENABLE_ASYNC_ENCODING=false bash ./run_meva_yolo_demo.sh
+```
