@@ -19,8 +19,8 @@ public partial class MainWindow : Window
     private const double SettingsDrawerClosedOffset = 320;
     private const double WindowedWidth = 1600;
     private const double WindowedHeight = 900;
-    private const int EoUdpPort = 5001;
-    private const int IrUdpPort = 5000;
+    private const int EoUdpPort = 5000;
+    private const int IrUdpPort = 5001;
 
     private readonly MainViewModel _viewModel;
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;

@@ -12,7 +12,7 @@ IR 카메라
 -> Jetson ROS2 영상/전처리/YOLO 노드
 -> /yolo/ir/image_raw, /detections/ir, /yolo/ir/status
 -> JetsonThor.RosIrBridge
--> UDP 5000
+-> UDP 5001
 -> 운용통제 GUI IR 화면
 ```
 
@@ -20,8 +20,8 @@ IR 카메라
 
 | 영상 | GUI 수신 포트 | 설명 |
 | --- | --- | --- |
-| IR | `5000` | 현재 IR ROS2 브리지 경로 |
-| EO | `5001` | ver4에서 예약한 EO 경로 |
+| EO | `5000` | 기존 EO/MEVA 경로 |
+| IR | `5001` | 현재 IR ROS2 브리지 경로 |
 
 GUI는 실행 시 두 포트를 동시에 엽니다. IR 브리지에서 첫 영상이 들어오면 시스템 로그에 `IR UDP camera first frame received.`가 표시됩니다.
 
@@ -100,7 +100,7 @@ GUI 쪽 확인 기준은 다음과 같습니다.
 
 - IR 작은 화면 또는 IR을 큰 화면으로 전환했을 때 영상이 보여야 합니다.
 - IR을 큰 화면으로 전환하면 `/detections/ir` 기반 bbox가 표시됩니다.
-- 시스템 로그에 `IR UDP stream receiver is waiting on port 5000.`가 보여야 합니다.
+- 시스템 로그에 `IR UDP stream receiver is waiting on port 5001.`가 보여야 합니다.
 - 첫 프레임 수신 후 `IR UDP camera first frame received.`가 보여야 합니다.
 
 만약 `ModuleNotFoundError: No module named 'rclpy'`가 나오면 Jetson에서 아래를 먼저 확인합니다.
@@ -116,7 +116,7 @@ python3 -c "import rclpy; import sentinel_interfaces.msg; print('ok')"
 | 변수 | 기본값 | 설명 |
 | --- | --- | --- |
 | `GUI_HOST` | `192.168.1.94` | 운용통제 PC IP |
-| `GUI_PORT` | `5000` | GUI IR UDP 수신 포트 |
+| `GUI_PORT` | `5001` | GUI IR UDP 수신 포트 |
 | `IMAGE_TOPIC` | `/yolo/ir/image_raw` | IR 영상 토픽 |
 | `DETECTION_TOPIC` | `/detections/ir` | IR detection 토픽 |
 | `STATUS_TOPIC` | `/yolo/ir/status` | IR YOLO 상태 토픽 |
