@@ -46,12 +46,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private int _motorPan;
     private int _motorTilt;
 
-    // EO???몃? UDP ?곸긽, IR? ?꾩떆 ?명듃遺?移대찓???곸긽???ъ슜??
+    // EO와 IR 모두 Jetson에서 전달되는 UDP 영상을 표시한다.
     // ?꾨젅???섏떊 ?꾩뿉???붾㈃??鍮꾩? ?딅룄濡?EO/IR 湲곕낯 ?덈궡 ?대?吏瑜?以鍮꾪븿.
     private ImageSource? _eoFrame;
     private ImageSource? _irFrame;
     private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame("MEVA DEMO", Color.FromRgb(51, 94, 160));
-    private readonly ImageSource _irPlaceholderFrame = CreateCameraPlaceholderFrame("IR TEMP", Color.FromRgb(192, 109, 40));
+    private readonly ImageSource _irPlaceholderFrame = CreateCameraPlaceholderFrame("IR UDP", Color.FromRgb(192, 109, 40));
 
     public MainViewModel()
     {
@@ -289,9 +289,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public string IrTitle => "IR cam";
 
-    public string EoSubtitle => "Jetson YOLO MEVA demo stream";
+    public string EoSubtitle => "Jetson YOLO EO stream";
 
-    public string IrSubtitle => "\uB178\uD2B8\uBD81 \uCE74\uBA54\uB77C \uC784\uC2DC \uC785\uB825";
+    public string IrSubtitle => "ZYBO10 -> Jetson YOLO IR stream";
 
     public ImageSource? LargeFeedImage => _isEoPrimary
         ? _eoFrame ?? _eoPlaceholderFrame

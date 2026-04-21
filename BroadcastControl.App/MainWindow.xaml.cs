@@ -19,10 +19,12 @@ public partial class MainWindow : Window
     private const double SettingsDrawerClosedOffset = 320;
     private const double WindowedWidth = 1600;
     private const double WindowedHeight = 900;
+    private const int EoUdpPort = 5000;
+    private const int IrUdpPort = 5001;
 
     private readonly MainViewModel _viewModel;
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
-    private readonly WebcamCaptureService _irWebcamCaptureService;
+    private readonly UdpEncodedVideoReceiverService _irUdpCaptureService;
     private readonly ViewportRecordingService _viewportRecordingService;
 
     private bool _isDraggingZoom;
@@ -31,10 +33,12 @@ public partial class MainWindow : Window
     private bool _hasReceivedIrFrame;
     private bool _isFullscreenMode = true;
     private ReceivedVideoFrame? _latestEoFrame;
-    private DetectionPacket? _latestDetectionPacket;
+    private ReceivedVideoFrame? _latestIrFrame;
     private string? _lastStatusSignature;
     private readonly Dictionary<uint, ReceivedVideoFrame> _eoFrameCache = new();
-    private readonly Dictionary<uint, DetectionPacket> _detectionCache = new();
+    private readonly Dictionary<uint, ReceivedVideoFrame> _irFrameCache = new();
+    private readonly Dictionary<uint, DetectionPacket> _eoDetectionCache = new();
+    private readonly Dictionary<uint, DetectionPacket> _irDetectionCache = new();
     private bool _hasReceivedDetectionPacket;
     private bool _hasReceivedNonEmptyDetectionPacket;
     private bool _hasRenderedDetectionOverlay;
@@ -86,7 +90,7 @@ public partial class MainWindow : Window
 
         _viewModel = new MainViewModel();
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
-        _irWebcamCaptureService = new WebcamCaptureService();
+        _irUdpCaptureService = new UdpEncodedVideoReceiverService();
         _viewportRecordingService = new ViewportRecordingService();
         DataContext = _viewModel;
 
@@ -103,10 +107,14 @@ public partial class MainWindow : Window
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived += OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived += OnYoloStatusReceived;
-        _irWebcamCaptureService.FrameReady += OnIrFrameReady;
+        _irUdpCaptureService.FrameReady += OnIrFrameReady;
+        _irUdpCaptureService.DetectionsReceived += OnIrDetectionsReceived;
+        _irUdpCaptureService.StatusReceived += OnYoloStatusReceived;
 
         _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
         _eoUdpCaptureService.SetContrast(_viewModel.Contrast);
+        _irUdpCaptureService.SetBrightness(_viewModel.Brightness);
+        _irUdpCaptureService.SetContrast(_viewModel.Contrast);
 
         _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
         UpdateRecordingViewportState();
@@ -114,21 +122,21 @@ public partial class MainWindow : Window
 
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
 
-        if (_eoUdpCaptureService.Start())
+        if (_eoUdpCaptureService.Start(EoUdpPort))
         {
         }
         else
         {
-            _viewModel.AppendImportantLog("Failed to start the MEVA YOLO UDP stream receiver.");
+            _viewModel.AppendImportantLog($"Failed to start the EO UDP stream receiver on port {EoUdpPort}.");
         }
 
-        if (_irWebcamCaptureService.Start())
+        if (_irUdpCaptureService.Start(IrUdpPort))
         {
-            _viewModel.AppendImportantLog("Connected the laptop camera to the temporary IR panel.");
+            _viewModel.AppendImportantLog($"IR UDP stream receiver is waiting on port {IrUdpPort}.");
         }
         else
         {
-            _viewModel.AppendImportantLog("Could not connect the laptop camera to the temporary IR panel.");
+            _viewModel.AppendImportantLog($"Failed to start the IR UDP stream receiver on port {IrUdpPort}.");
         }
     }
 
@@ -138,10 +146,12 @@ public partial class MainWindow : Window
         {
             case nameof(MainViewModel.Brightness):
                 _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
+                _irUdpCaptureService.SetBrightness(_viewModel.Brightness);
                 break;
 
             case nameof(MainViewModel.Contrast):
                 _eoUdpCaptureService.SetContrast(_viewModel.Contrast);
+                _irUdpCaptureService.SetContrast(_viewModel.Contrast);
                 break;
 
             case nameof(MainViewModel.IsManualRecordingEnabled):
@@ -221,7 +231,7 @@ public partial class MainWindow : Window
     private void OnEoFrameReady(ReceivedVideoFrame frame)
     {
         _latestEoFrame = frame;
-        CacheEoFrame(frame);
+        CacheFrame(frame, _eoFrameCache);
 
         if (!_hasReceivedEoFrame)
         {
@@ -233,8 +243,19 @@ public partial class MainWindow : Window
 
     private void OnEoDetectionsReceived(DetectionPacket detectionPacket)
     {
-        _latestDetectionPacket = detectionPacket;
-        CacheDetectionPacket(detectionPacket);
+        HandleDetectionsReceived(detectionPacket, _eoDetectionCache);
+    }
+
+    private void OnIrDetectionsReceived(DetectionPacket detectionPacket)
+    {
+        HandleDetectionsReceived(detectionPacket, _irDetectionCache);
+    }
+
+    private void HandleDetectionsReceived(
+        DetectionPacket detectionPacket,
+        Dictionary<uint, DetectionPacket> detectionCache)
+    {
+        CacheDetectionPacket(detectionPacket, detectionCache);
 
         if (!_hasReceivedDetectionPacket)
         {
@@ -287,15 +308,18 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnIrFrameReady(System.Windows.Media.Imaging.BitmapSource frame)
+    private void OnIrFrameReady(ReceivedVideoFrame frame)
     {
+        _latestIrFrame = frame;
+        CacheFrame(frame, _irFrameCache);
+
         if (!_hasReceivedIrFrame)
         {
             _hasReceivedIrFrame = true;
-            _viewModel.AppendImportantLog("IR temporary camera first frame received.");
+            _viewModel.AppendImportantLog("IR UDP camera first frame received.");
         }
 
-        _viewModel.UpdateIrFrame(frame);
+        _viewModel.UpdateIrFrame(frame.Bitmap);
     }
 
     private void OnEoSegmentChanged(PlaybackSegmentInfo segmentInfo)
@@ -313,6 +337,12 @@ public partial class MainWindow : Window
     private void UpdateRecordingViewportState()
     {
         _eoUdpCaptureService.UpdateViewportTransform(
+            _viewModel.ZoomLevel,
+            _viewModel.ZoomTransformX,
+            _viewModel.ZoomTransformY,
+            CameraViewport.ActualWidth,
+            CameraViewport.ActualHeight);
+        _irUdpCaptureService.UpdateViewportTransform(
             _viewModel.ZoomLevel,
             _viewModel.ZoomTransformX,
             _viewModel.ZoomTransformY,
@@ -337,7 +367,8 @@ public partial class MainWindow : Window
         {
             DetectionOverlayCanvas.Children.Clear();
 
-            if (_latestEoFrame is null)
+            var latestFrame = _viewModel.IsEoPrimary ? _latestEoFrame : _latestIrFrame;
+            if (latestFrame is null)
             {
                 _lastOverlaySignature = null;
                 return;
@@ -412,26 +443,31 @@ public partial class MainWindow : Window
             detections.Select(d => $"{d.ObjectId}:{d.ClassName}:{d.X1:0}:{d.Y1:0}:{d.X2:0}:{d.Y2:0}"));
     }
 
-    private void CacheEoFrame(ReceivedVideoFrame frame)
+    private static void CacheFrame(ReceivedVideoFrame frame, Dictionary<uint, ReceivedVideoFrame> frameCache)
     {
-        _eoFrameCache[frame.FrameIndex] = frame;
-        TrimCache(_eoFrameCache);
+        frameCache[frame.FrameIndex] = frame;
+        TrimCache(frameCache);
     }
 
-    private void CacheDetectionPacket(DetectionPacket detectionPacket)
+    private static void CacheDetectionPacket(
+        DetectionPacket detectionPacket,
+        Dictionary<uint, DetectionPacket> detectionCache)
     {
-        _detectionCache[detectionPacket.FrameId] = detectionPacket;
-        TrimCache(_detectionCache);
+        detectionCache[detectionPacket.FrameId] = detectionPacket;
+        TrimCache(detectionCache);
     }
 
-    private bool TryGetRenderableDetectionPacket(uint currentFrameId, out DetectionPacket detectionPacket)
+    private bool TryGetRenderableDetectionPacket(
+        uint currentFrameId,
+        Dictionary<uint, DetectionPacket> detectionCache,
+        out DetectionPacket detectionPacket)
     {
-        if (_detectionCache.TryGetValue(currentFrameId, out detectionPacket))
+        if (detectionCache.TryGetValue(currentFrameId, out detectionPacket))
         {
             return true;
         }
 
-        var recentCandidates = _detectionCache
+        var recentCandidates = detectionCache
             .Where(pair => pair.Value.Detections.Count > 0 && pair.Key <= currentFrameId)
             .OrderByDescending(pair => pair.Key)
             .ToArray();
@@ -450,7 +486,7 @@ public partial class MainWindow : Window
             return true;
         }
 
-        var fallbackCandidates = _detectionCache
+        var fallbackCandidates = detectionCache
             .Where(pair => pair.Value.Detections.Count > 0)
             .OrderByDescending(pair => pair.Key)
             .ToArray();
@@ -467,29 +503,33 @@ public partial class MainWindow : Window
 
     private bool TryGetRenderableFrameAndDetection(out ReceivedVideoFrame frame, out DetectionPacket detectionPacket)
     {
-        if (_latestEoFrame is not null &&
-            _detectionCache.TryGetValue(_latestEoFrame.Value.FrameIndex, out detectionPacket))
+        var latestFrame = _viewModel.IsEoPrimary ? _latestEoFrame : _latestIrFrame;
+        var frameCache = _viewModel.IsEoPrimary ? _eoFrameCache : _irFrameCache;
+        var detectionCache = _viewModel.IsEoPrimary ? _eoDetectionCache : _irDetectionCache;
+
+        if (latestFrame is not null &&
+            detectionCache.TryGetValue(latestFrame.Value.FrameIndex, out detectionPacket))
         {
-            frame = _latestEoFrame.Value;
+            frame = latestFrame.Value;
             return true;
         }
 
-        var exactPairs = _detectionCache
-            .Where(pair => pair.Value.Detections.Count > 0 && _eoFrameCache.ContainsKey(pair.Key))
+        var exactPairs = detectionCache
+            .Where(pair => pair.Value.Detections.Count > 0 && frameCache.ContainsKey(pair.Key))
             .OrderByDescending(pair => pair.Key)
             .ToArray();
 
         foreach (var pair in exactPairs)
         {
-            frame = _eoFrameCache[pair.Key];
+            frame = frameCache[pair.Key];
             detectionPacket = pair.Value;
             return true;
         }
 
-        if (_latestEoFrame is not null &&
-            TryGetRenderableDetectionPacket(_latestEoFrame.Value.FrameIndex, out detectionPacket))
+        if (latestFrame is not null &&
+            TryGetRenderableDetectionPacket(latestFrame.Value.FrameIndex, detectionCache, out detectionPacket))
         {
-            frame = _latestEoFrame.Value;
+            frame = latestFrame.Value;
             return true;
         }
 
@@ -800,10 +840,12 @@ public partial class MainWindow : Window
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
-        _irWebcamCaptureService.FrameReady -= OnIrFrameReady;
+        _irUdpCaptureService.FrameReady -= OnIrFrameReady;
+        _irUdpCaptureService.DetectionsReceived -= OnIrDetectionsReceived;
+        _irUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
         _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
-        _irWebcamCaptureService.Dispose();
+        _irUdpCaptureService.Dispose();
     }
 }
 
