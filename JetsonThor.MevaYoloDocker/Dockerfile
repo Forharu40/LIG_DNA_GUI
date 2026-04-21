@@ -6,6 +6,7 @@ ARG MODEL_NAME=yolo11s.pt
 WORKDIR /app
 
 COPY app/stream_meva_yolo.py /app/stream_meva_yolo.py
+COPY app/benchmark_encode_time.py /app/benchmark_encode_time.py
 
 RUN pip install --no-cache-dir "lap>=0.5.12"
 

@@ -27,6 +27,7 @@ ENABLE_TILE_INFERENCE="${ENABLE_TILE_INFERENCE:-false}"
 HOST_MEVA_PATH="${HOST_MEVA_PATH:-$HOME/datashets/MEVA}"
 
 BUILD_IMAGE=0
+RUN_ENCODE_BENCHMARK=0
 
 print_usage() {
   cat <<'EOF'
@@ -35,6 +36,8 @@ Usage:
 
 Options:
   --build    Force rebuild the Docker image before running.
+  --benchmark-encode
+             Measure JPEG encode time for 1280x720 and 480x270 frames.
 
 Environment overrides:
   GUI_HOST, GUI_PORT, SOURCE_ROOT, CLIP_START_SECONDS, CLIP_DURATION_SECONDS
@@ -51,6 +54,9 @@ for arg in "$@"; do
   case "$arg" in
     --build)
       BUILD_IMAGE=1
+      ;;
+    --benchmark-encode)
+      RUN_ENCODE_BENCHMARK=1
       ;;
     --help|-h)
       print_usage
@@ -86,6 +92,24 @@ echo "INFERENCE_SIZE=$INFERENCE_SIZE STREAM_MAX_WIDTH=$STREAM_MAX_WIDTH STREAM_M
 echo "STREAM_TARGET_FPS=$STREAM_TARGET_FPS ENABLE_FRAME_SKIP=$ENABLE_FRAME_SKIP MAX_FRAME_SKIP=$MAX_FRAME_SKIP"
 echo "INFERENCE_SOURCE_MAX_WIDTH=$INFERENCE_SOURCE_MAX_WIDTH INFERENCE_SOURCE_MAX_HEIGHT=$INFERENCE_SOURCE_MAX_HEIGHT"
 echo "ENABLE_TILE_INFERENCE=$ENABLE_TILE_INFERENCE JPEG_QUALITY=$JPEG_QUALITY MAX_UDP_BYTES=$MAX_UDP_BYTES"
+
+if [[ "$RUN_ENCODE_BENCHMARK" -eq 1 ]]; then
+  sudo docker run --rm \
+    --runtime nvidia \
+    --network host \
+    -e SOURCE_ROOT="$SOURCE_ROOT" \
+    -e VIDEO_PATH="${VIDEO_PATH:-}" \
+    -e JPEG_QUALITY="$JPEG_QUALITY" \
+    -e BENCHMARK_FRAMES="${BENCHMARK_FRAMES:-180}" \
+    -e WARMUP_FRAMES="${WARMUP_FRAMES:-20}" \
+    -e BENCHMARK_SIZE_A="${BENCHMARK_SIZE_A:-1280x720}" \
+    -e BENCHMARK_SIZE_B="${BENCHMARK_SIZE_B:-480x270}" \
+    -v "$HOST_MEVA_PATH:$SOURCE_ROOT:ro" \
+    --entrypoint python3 \
+    "$IMAGE_NAME" \
+    /app/benchmark_encode_time.py
+  exit 0
+fi
 
 sudo docker run --rm \
   --runtime nvidia \
