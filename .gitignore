@@ -18,7 +18,3 @@
 *.log
 *.tmp
 *.cache
-
-# Benchmark artifacts
-benchmark-output/
-JetsonThor.MevaYoloDocker/benchmark-output/

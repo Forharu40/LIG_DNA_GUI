@@ -30,7 +30,6 @@ ENABLE_TILE_INFERENCE="${ENABLE_TILE_INFERENCE:-false}"
 HOST_MEVA_PATH="${HOST_MEVA_PATH:-$HOME/datashets/MEVA}"
 
 BUILD_IMAGE=0
-RUN_ENCODE_BENCHMARK=0
 
 print_usage() {
   cat <<'EOF'
@@ -39,8 +38,6 @@ Usage:
 
 Options:
   --build    Force rebuild the Docker image before running.
-  --benchmark-encode
-             Measure JPEG encode time for 1280x720 and 480x270 frames.
 
 Environment overrides:
   GUI_HOST, GUI_PORT, SOURCE_ROOT, CLIP_START_SECONDS, CLIP_DURATION_SECONDS
@@ -59,9 +56,6 @@ for arg in "$@"; do
   case "$arg" in
     --build)
       BUILD_IMAGE=1
-      ;;
-    --benchmark-encode)
-      RUN_ENCODE_BENCHMARK=1
       ;;
     --help|-h)
       print_usage
@@ -99,36 +93,6 @@ echo "INFERENCE_SOURCE_MAX_WIDTH=$INFERENCE_SOURCE_MAX_WIDTH INFERENCE_SOURCE_MA
 echo "ENABLE_ASYNC_ENCODING=$ENABLE_ASYNC_ENCODING"
 echo "ENABLE_ASYNC_UDP_SEND=$ENABLE_ASYNC_UDP_SEND UDP_SEND_BUFFER_BYTES=$UDP_SEND_BUFFER_BYTES"
 echo "ENABLE_TILE_INFERENCE=$ENABLE_TILE_INFERENCE JPEG_QUALITY=$JPEG_QUALITY MAX_UDP_BYTES=$MAX_UDP_BYTES"
-
-if [[ "$RUN_ENCODE_BENCHMARK" -eq 1 ]]; then
-  BENCHMARK_HOST_OUTPUT_DIR="${BENCHMARK_HOST_OUTPUT_DIR:-$SCRIPT_DIR/benchmark-output}"
-  BENCHMARK_OUTPUT_DIR="${BENCHMARK_OUTPUT_DIR:-/benchmark-output}"
-  mkdir -p "$BENCHMARK_HOST_OUTPUT_DIR"
-
-  sudo docker run --rm \
-    --runtime nvidia \
-    --network host \
-    -e SOURCE_ROOT="$SOURCE_ROOT" \
-    -e VIDEO_PATH="${VIDEO_PATH:-}" \
-    -e JPEG_QUALITY="$JPEG_QUALITY" \
-    -e BENCHMARK_FRAMES="${BENCHMARK_FRAMES:-180}" \
-    -e WARMUP_FRAMES="${WARMUP_FRAMES:-20}" \
-    -e BENCHMARK_SIZE_A="${BENCHMARK_SIZE_A:-1280x720}" \
-    -e BENCHMARK_SIZE_B="${BENCHMARK_SIZE_B:-480x270}" \
-    -e BENCHMARK_QUALITY_A="${BENCHMARK_QUALITY_A:-$JPEG_QUALITY}" \
-    -e BENCHMARK_QUALITY_B="${BENCHMARK_QUALITY_B:-$JPEG_QUALITY}" \
-    -e BENCHMARK_MAX_BYTES_A="${BENCHMARK_MAX_BYTES_A:-0}" \
-    -e BENCHMARK_MAX_BYTES_B="${BENCHMARK_MAX_BYTES_B:-0}" \
-    -e BENCHMARK_ADAPTIVE_A="${BENCHMARK_ADAPTIVE_A:-false}" \
-    -e BENCHMARK_ADAPTIVE_B="${BENCHMARK_ADAPTIVE_B:-false}" \
-    -e BENCHMARK_OUTPUT_DIR="$BENCHMARK_OUTPUT_DIR" \
-    -v "$HOST_MEVA_PATH:$SOURCE_ROOT:ro" \
-    -v "$BENCHMARK_HOST_OUTPUT_DIR:$BENCHMARK_OUTPUT_DIR" \
-    --entrypoint python3 \
-    "$IMAGE_NAME" \
-    /app/benchmark_encode_time.py
-  exit 0
-fi
 
 sudo docker run --rm \
   --runtime nvidia \

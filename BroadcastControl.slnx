@@ -1,4 +1,3 @@
 <Solution>
   <Project Path="BroadcastControl.App/BroadcastControl.App.csproj" />
-  <Project Path="BroadcastControl.Benchmarks/BroadcastControl.Benchmarks.csproj" />
 </Solution>
