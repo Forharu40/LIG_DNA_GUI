@@ -44,6 +44,8 @@ MAX_FRAME_SKIP = max(0, int(os.getenv("MAX_FRAME_SKIP", "8")))
 INFERENCE_SOURCE_MAX_WIDTH = max(0, int(os.getenv("INFERENCE_SOURCE_MAX_WIDTH", "0")))
 INFERENCE_SOURCE_MAX_HEIGHT = max(0, int(os.getenv("INFERENCE_SOURCE_MAX_HEIGHT", "0")))
 ENABLE_ASYNC_ENCODING = os.getenv("ENABLE_ASYNC_ENCODING", "true").lower() in {"1", "true", "yes", "on"}
+ENABLE_ASYNC_UDP_SEND = os.getenv("ENABLE_ASYNC_UDP_SEND", "true").lower() in {"1", "true", "yes", "on"}
+UDP_SEND_BUFFER_BYTES = max(0, int(os.getenv("UDP_SEND_BUFFER_BYTES", "1048576")))
 ENABLE_TILE_INFERENCE = os.getenv("ENABLE_TILE_INFERENCE", "false").lower() in {"1", "true", "yes", "on"}
 ALLOWED_CLASSES = {
     name.strip().lower()
@@ -333,26 +335,44 @@ def encode_frame_for_packet(
     )
 
 
-def send_encoded_frame(sock: socket.socket, encoded_frame: EncodedFrame, frame_index: int) -> int:
-    next_frame_index = frame_index + 1
+def send_encoded_frame_by_index(sock: socket.socket, encoded_frame: EncodedFrame, frame_index: int) -> None:
     current_frame_stamp_ns = time.time_ns()
     image_packet = build_image_packet(
         encoded_frame.encoded_bytes,
         encoded_frame.width,
         encoded_frame.height,
-        next_frame_index,
+        frame_index,
         current_frame_stamp_ns,
     )
     detection_packet = build_detection_packet(
         current_frame_stamp_ns,
-        next_frame_index,
+        frame_index,
         encoded_frame.detection_width,
         encoded_frame.detection_height,
         encoded_frame.detections,
     )
     sock.sendto(image_packet, (GUI_HOST, GUI_PORT))
     sock.sendto(detection_packet, (GUI_HOST, GUI_PORT))
+
+
+def send_encoded_frame(sock: socket.socket, encoded_frame: EncodedFrame, frame_index: int) -> int:
+    next_frame_index = frame_index + 1
+    send_encoded_frame_by_index(sock, encoded_frame, next_frame_index)
     return next_frame_index
+
+
+def complete_pending_send(sock: socket.socket, pending_send: Future[None]) -> None:
+    try:
+        pending_send.result()
+    except Exception as exc:
+        status_packet = build_status_packet(
+            True,
+            True,
+            CONFIDENCE,
+            f"UDP send failed: {exc}",
+            str(SOURCE_ROOT),
+        )
+        sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
 
 
 def prepare_stream_frame(frame):
@@ -595,16 +615,25 @@ def main() -> None:
         print(f"Stream target FPS override: {STREAM_TARGET_FPS:.2f}")
     print(f"Frame skip enabled: {ENABLE_FRAME_SKIP} (max {MAX_FRAME_SKIP})")
     print(f"Async JPEG encoding enabled: {ENABLE_ASYNC_ENCODING}")
+    print(f"Async UDP send enabled: {ENABLE_ASYNC_UDP_SEND}")
+    print(f"UDP send buffer target: {UDP_SEND_BUFFER_BYTES} bytes")
     print(f"Tile inference enabled: {ENABLE_TILE_INFERENCE}")
     print(f"Allowed classes: {', '.join(sorted(ALLOWED_CLASSES))}")
     print(f"Max UDP payload target: {MAX_UDP_BYTES} bytes")
 
     model = YOLO(MODEL_PATH)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    if UDP_SEND_BUFFER_BYTES > 0:
+        try:
+            sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, UDP_SEND_BUFFER_BYTES)
+        except OSError as exc:
+            print(f"Could not set UDP send buffer: {exc}")
+
     status_packet = build_status_packet(True, True, CONFIDENCE, "", str(SOURCE_ROOT))
     sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
     detection_executor = ThreadPoolExecutor(max_workers=1)
     encode_executor = ThreadPoolExecutor(max_workers=1) if ENABLE_ASYNC_ENCODING else None
+    send_executor = ThreadPoolExecutor(max_workers=1) if ENABLE_ASYNC_UDP_SEND else None
 
     try:
         cycle_index = 0
@@ -615,6 +644,7 @@ def main() -> None:
         last_detection_monotonic: float | None = None
         pending_detection: Future[DetectionResult] | None = None
         pending_encoded_frame: Future[EncodedFrame | None] | None = None
+        pending_send: Future[None] | None = None
         while True:
             for clip_index, entry in enumerate(sampled_entries, start=1):
                 capture = cv2.VideoCapture(str(entry.path))
@@ -688,7 +718,21 @@ def main() -> None:
                             try:
                                 encoded_frame = pending_encoded_frame.result()
                                 if encoded_frame is not None:
-                                    frame_index = send_encoded_frame(sock, encoded_frame, frame_index)
+                                    if send_executor is not None:
+                                        if pending_send is not None and pending_send.done():
+                                            complete_pending_send(sock, pending_send)
+                                            pending_send = None
+
+                                        if pending_send is None:
+                                            frame_index += 1
+                                            pending_send = send_executor.submit(
+                                                send_encoded_frame_by_index,
+                                                sock,
+                                                encoded_frame,
+                                                frame_index,
+                                            )
+                                    else:
+                                        frame_index = send_encoded_frame(sock, encoded_frame, frame_index)
                             except Exception as exc:
                                 status_packet = build_status_packet(
                                     True,
@@ -700,6 +744,10 @@ def main() -> None:
                                 sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
                             finally:
                                 pending_encoded_frame = None
+
+                        if pending_send is not None and pending_send.done():
+                            complete_pending_send(sock, pending_send)
+                            pending_send = None
 
                         now_monotonic = time.monotonic()
                         should_run_detection = (
@@ -739,7 +787,21 @@ def main() -> None:
                                 detections,
                             )
                             if encoded_frame is not None:
-                                frame_index = send_encoded_frame(sock, encoded_frame, frame_index)
+                                if send_executor is not None:
+                                    if pending_send is not None and pending_send.done():
+                                        complete_pending_send(sock, pending_send)
+                                        pending_send = None
+
+                                    if pending_send is None:
+                                        frame_index += 1
+                                        pending_send = send_executor.submit(
+                                            send_encoded_frame_by_index,
+                                            sock,
+                                            encoded_frame,
+                                            frame_index,
+                                        )
+                                else:
+                                    frame_index = send_encoded_frame(sock, encoded_frame, frame_index)
 
                         next_frame_time = pace_stream(capture, next_frame_time, frame_delay)
 
@@ -747,7 +809,21 @@ def main() -> None:
                         try:
                             encoded_frame = pending_encoded_frame.result()
                             if encoded_frame is not None:
-                                frame_index = send_encoded_frame(sock, encoded_frame, frame_index)
+                                if send_executor is not None:
+                                    if pending_send is not None and pending_send.done():
+                                        complete_pending_send(sock, pending_send)
+                                        pending_send = None
+
+                                    if pending_send is None:
+                                        frame_index += 1
+                                        pending_send = send_executor.submit(
+                                            send_encoded_frame_by_index,
+                                            sock,
+                                            encoded_frame,
+                                            frame_index,
+                                        )
+                                else:
+                                    frame_index = send_encoded_frame(sock, encoded_frame, frame_index)
                         finally:
                             pending_encoded_frame = None
                 finally:
@@ -762,6 +838,8 @@ def main() -> None:
         detection_executor.shutdown(wait=False, cancel_futures=True)
         if encode_executor is not None:
             encode_executor.shutdown(wait=False, cancel_futures=True)
+        if send_executor is not None:
+            send_executor.shutdown(wait=False, cancel_futures=True)
         sock.close()
 
 

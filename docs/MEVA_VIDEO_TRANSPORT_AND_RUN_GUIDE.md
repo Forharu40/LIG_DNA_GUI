@@ -521,6 +521,7 @@ The `2026_04_21_ver2/stream-thread-pipeline` branch separates the Jetson sender 
 - Main stream loop: reads MEVA frames, keeps playback timing, sends UDP packets.
 - YOLO worker thread: runs detection without blocking video playback.
 - JPEG encode worker thread: compresses the current stream frame without blocking frame reading.
+- UDP send worker thread: sends image/detection packets without blocking frame reading or encoding.
 
 The JPEG encode worker is enabled by default:
 
@@ -532,4 +533,22 @@ If a comparison run is needed, disable it:
 
 ```bash
 ENABLE_ASYNC_ENCODING=false bash ./run_meva_yolo_demo.sh
+```
+
+The UDP send worker is also enabled by default:
+
+```bash
+ENABLE_ASYNC_UDP_SEND=true bash ./run_meva_yolo_demo.sh
+```
+
+For a higher-quality stream test, raise quality gradually instead of jumping directly to `1280x720`:
+
+```bash
+STREAM_MAX_WIDTH=854 STREAM_MAX_HEIGHT=480 JPEG_QUALITY=45 MAX_UDP_BYTES=55000 bash ./run_meva_yolo_demo.sh
+```
+
+If the network path can handle it, increase the socket send buffer:
+
+```bash
+UDP_SEND_BUFFER_BYTES=4194304 bash ./run_meva_yolo_demo.sh
 ```
