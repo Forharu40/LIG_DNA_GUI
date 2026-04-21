@@ -100,7 +100,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         SaveSystemLogsCommand = new RelayCommand(_ => SaveSystemLogsToDesktop());
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         MoveMotorCommand = new RelayCommand(MoveMotor, _ => CanUseMotorControls);
-        InitializeJetsonBridge();
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
