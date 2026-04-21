@@ -13,6 +13,12 @@ BENCHMARK_FRAMES = max(1, int(os.getenv("BENCHMARK_FRAMES", "180")))
 WARMUP_FRAMES = max(0, int(os.getenv("WARMUP_FRAMES", "20")))
 BENCHMARK_SIZE_A = os.getenv("BENCHMARK_SIZE_A", "1280x720")
 BENCHMARK_SIZE_B = os.getenv("BENCHMARK_SIZE_B", "480x270")
+BENCHMARK_QUALITY_A = int(os.getenv("BENCHMARK_QUALITY_A", str(JPEG_QUALITY)))
+BENCHMARK_QUALITY_B = int(os.getenv("BENCHMARK_QUALITY_B", str(JPEG_QUALITY)))
+BENCHMARK_MAX_BYTES_A = int(os.getenv("BENCHMARK_MAX_BYTES_A", "0"))
+BENCHMARK_MAX_BYTES_B = int(os.getenv("BENCHMARK_MAX_BYTES_B", "0"))
+BENCHMARK_ADAPTIVE_A = os.getenv("BENCHMARK_ADAPTIVE_A", "false").lower() in {"1", "true", "yes", "on"}
+BENCHMARK_ADAPTIVE_B = os.getenv("BENCHMARK_ADAPTIVE_B", "false").lower() in {"1", "true", "yes", "on"}
 BENCHMARK_OUTPUT_DIR = Path(os.getenv("BENCHMARK_OUTPUT_DIR", "/benchmark-output"))
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".m4v"}
 
@@ -52,22 +58,58 @@ def parse_size(value: str) -> tuple[int, int]:
     return width, height
 
 
-def measure_encode(frame, frame_count: int) -> tuple[list[float], list[int]]:
+def encode_frame(frame, quality: int, max_bytes: int, adaptive: bool) -> bytes | None:
+    if not adaptive:
+        ok, encoded = cv2.imencode(
+            ".jpg",
+            frame,
+            [int(cv2.IMWRITE_JPEG_QUALITY), quality],
+        )
+        if not ok:
+            raise RuntimeError("cv2.imencode failed")
+
+        return encoded.tobytes()
+
+    quality_attempts = [
+        max(25, quality),
+        max(25, min(quality, 70)),
+        55,
+        40,
+    ]
+    scale_attempts = [1.0, 0.85, 0.7, 0.55]
+    max_payload_bytes = max(1024, max_bytes) if max_bytes > 0 else 0
+
+    for scale in scale_attempts:
+        working_frame = frame
+        if scale < 0.999:
+            new_width = max(2, int(frame.shape[1] * scale))
+            new_height = max(2, int(frame.shape[0] * scale))
+            working_frame = cv2.resize(frame, (new_width, new_height), interpolation=cv2.INTER_AREA)
+
+        for quality_attempt in quality_attempts:
+            ok, encoded = cv2.imencode(
+                ".jpg",
+                working_frame,
+                [int(cv2.IMWRITE_JPEG_QUALITY), quality_attempt],
+            )
+            if ok and (max_payload_bytes <= 0 or len(encoded) <= max_payload_bytes):
+                return encoded.tobytes()
+
+    return None
+
+
+def measure_encode(frame, frame_count: int, quality: int, max_bytes: int, adaptive: bool) -> tuple[list[float], list[int]]:
     encode_times_ms: list[float] = []
     encoded_sizes: list[int] = []
 
     for _ in range(WARMUP_FRAMES):
-        cv2.imencode(".jpg", frame, [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY])
+        encode_frame(frame, quality, max_bytes, adaptive)
 
     for _ in range(frame_count):
         started_at = time.perf_counter()
-        ok, encoded = cv2.imencode(
-            ".jpg",
-            frame,
-            [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
-        )
+        encoded = encode_frame(frame, quality, max_bytes, adaptive)
         elapsed_ms = (time.perf_counter() - started_at) * 1000.0
-        if not ok:
+        if encoded is None:
             raise RuntimeError("cv2.imencode failed")
 
         encode_times_ms.append(elapsed_ms)
@@ -76,16 +118,12 @@ def measure_encode(frame, frame_count: int) -> tuple[list[float], list[int]]:
     return encode_times_ms, encoded_sizes
 
 
-def encode_sample(frame) -> bytes:
-    ok, encoded = cv2.imencode(
-        ".jpg",
-        frame,
-        [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
-    )
-    if not ok:
+def encode_sample(frame, quality: int, max_bytes: int, adaptive: bool) -> bytes:
+    encoded = encode_frame(frame, quality, max_bytes, adaptive)
+    if encoded is None:
         raise RuntimeError("cv2.imencode failed while writing sample")
 
-    return encoded.tobytes()
+    return encoded
 
 
 def summarize(label: str, times_ms: list[float], sizes: list[int]) -> dict[str, float]:
@@ -130,24 +168,29 @@ def main() -> None:
 
     print("JPEG encode benchmark")
     print(f"Video: {video_path}")
-    print(f"JPEG quality: {JPEG_QUALITY}")
+    print(f"Sample A quality: {BENCHMARK_QUALITY_A}, max bytes: {BENCHMARK_MAX_BYTES_A}, adaptive: {BENCHMARK_ADAPTIVE_A}")
+    print(f"Sample B quality: {BENCHMARK_QUALITY_B}, max bytes: {BENCHMARK_MAX_BYTES_B}, adaptive: {BENCHMARK_ADAPTIVE_B}")
     print(f"Warmup frames: {WARMUP_FRAMES}")
     print(f"Measured frames: {BENCHMARK_FRAMES}")
     print(f"Sample output: {BENCHMARK_OUTPUT_DIR}")
     print()
 
     BENCHMARK_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-    sample_a_path = BENCHMARK_OUTPUT_DIR / f"sample_{width_a}x{height_a}_q{JPEG_QUALITY}.jpg"
-    sample_b_path = BENCHMARK_OUTPUT_DIR / f"sample_{width_b}x{height_b}_q{JPEG_QUALITY}.jpg"
-    sample_a_path.write_bytes(encode_sample(frame_a))
-    sample_b_path.write_bytes(encode_sample(frame_b))
+    sample_a_path = BENCHMARK_OUTPUT_DIR / f"sample_{width_a}x{height_a}_q{BENCHMARK_QUALITY_A}.jpg"
+    sample_b_path = BENCHMARK_OUTPUT_DIR / f"sample_{width_b}x{height_b}_q{BENCHMARK_QUALITY_B}.jpg"
+    sample_a_path.write_bytes(encode_sample(frame_a, BENCHMARK_QUALITY_A, BENCHMARK_MAX_BYTES_A, BENCHMARK_ADAPTIVE_A))
+    sample_b_path.write_bytes(encode_sample(frame_b, BENCHMARK_QUALITY_B, BENCHMARK_MAX_BYTES_B, BENCHMARK_ADAPTIVE_B))
     print(f"Wrote sample A: {sample_a_path}")
     print(f"Wrote sample B: {sample_b_path}")
     print()
 
-    result_a = summarize(f"{width_a}x{height_a} encode", *measure_encode(frame_a, BENCHMARK_FRAMES))
+    result_a = summarize(
+        f"{width_a}x{height_a} q{BENCHMARK_QUALITY_A} encode",
+        *measure_encode(frame_a, BENCHMARK_FRAMES, BENCHMARK_QUALITY_A, BENCHMARK_MAX_BYTES_A, BENCHMARK_ADAPTIVE_A))
     print()
-    result_b = summarize(f"{width_b}x{height_b} encode", *measure_encode(frame_b, BENCHMARK_FRAMES))
+    result_b = summarize(
+        f"{width_b}x{height_b} q{BENCHMARK_QUALITY_B} encode",
+        *measure_encode(frame_b, BENCHMARK_FRAMES, BENCHMARK_QUALITY_B, BENCHMARK_MAX_BYTES_B, BENCHMARK_ADAPTIVE_B))
     print()
 
     average_delta_ms = result_a["average_ms"] - result_b["average_ms"]

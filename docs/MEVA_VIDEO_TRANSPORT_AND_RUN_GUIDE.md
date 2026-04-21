@@ -485,3 +485,31 @@ The output compares:
 - encode time from the Jetson script
 - GUI-like JPEG decode time from the PC benchmark
 - estimated network serialization burden from JPEG byte size and configured Mbps
+
+To compare `2026_04_20_ver3/video-stream-performance` style transport against the current fast stream profile:
+
+```bash
+cd ~/LIG_DNA_GUI/JetsonThor.MevaYoloDocker
+BENCHMARK_SIZE_A=1280x720 \
+BENCHMARK_QUALITY_A=85 \
+BENCHMARK_MAX_BYTES_A=59980 \
+BENCHMARK_ADAPTIVE_A=true \
+BENCHMARK_SIZE_B=640x360 \
+BENCHMARK_QUALITY_B=35 \
+BENCHMARK_MAX_BYTES_B=34980 \
+BENCHMARK_ADAPTIVE_B=true \
+bash ./run_meva_yolo_demo.sh --build --benchmark-encode
+```
+
+This writes:
+
+```text
+sample_1280x720_q85.jpg
+sample_640x360_q35.jpg
+```
+
+Then run the PC decode/network benchmark with those two files:
+
+```powershell
+dotnet run --project .\BroadcastControl.Benchmarks\BroadcastControl.Benchmarks.csproj -- --a .\JetsonThor.MevaYoloDocker\benchmark-output\sample_1280x720_q85.jpg --b .\JetsonThor.MevaYoloDocker\benchmark-output\sample_640x360_q35.jpg --network-mbps 100
+```
