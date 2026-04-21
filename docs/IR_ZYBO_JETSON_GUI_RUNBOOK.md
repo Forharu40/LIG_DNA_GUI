@@ -79,6 +79,12 @@ GUI_HOST=192.168.1.94 bash ./run_ir_gui_bridge.sh
 WORKSPACE_SETUP=~/ros2_ws/install/setup.bash GUI_HOST=192.168.1.94 bash ./run_ir_gui_bridge.sh
 ```
 
+ROS 배포판 setup까지 직접 지정해야 하면 다음처럼 실행합니다.
+
+```bash
+ROS_SETUP=/opt/ros/humble/setup.bash WORKSPACE_SETUP=~/ros2_ws/install/setup.bash GUI_HOST=192.168.1.94 bash ./run_ir_gui_bridge.sh
+```
+
 ## 6. 확인 명령어
 
 Jetson에서 먼저 ROS2 토픽이 살아 있는지 확인합니다.
@@ -96,6 +102,14 @@ GUI 쪽 확인 기준은 다음과 같습니다.
 - IR을 큰 화면으로 전환하면 `/detections/ir` 기반 bbox가 표시됩니다.
 - 시스템 로그에 `IR UDP stream receiver is waiting on port 5001.`가 보여야 합니다.
 - 첫 프레임 수신 후 `IR UDP camera first frame received.`가 보여야 합니다.
+
+만약 `ModuleNotFoundError: No module named 'rclpy'`가 나오면 Jetson에서 아래를 먼저 확인합니다.
+
+```bash
+source /opt/ros/humble/setup.bash
+source ~/ros2_ws/install/setup.bash
+python3 -c "import rclpy; import sentinel_interfaces.msg; print('ok')"
+```
 
 ## 7. 조절 가능한 환경 변수
 
