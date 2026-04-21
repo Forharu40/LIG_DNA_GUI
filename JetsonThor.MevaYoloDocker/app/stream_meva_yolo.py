@@ -4,6 +4,7 @@ import socket
 import struct
 import time
 import math
+from concurrent.futures import Future, ThreadPoolExecutor
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -22,8 +23,8 @@ SOURCE_ROOT = Path(os.getenv("SOURCE_ROOT", "/data/MEVA"))
 VIDEO_PATH = os.getenv("VIDEO_PATH", "").strip()
 MODEL_PATH = os.getenv("MODEL_PATH", "yolo11n.pt").strip()
 CONFIDENCE = float(os.getenv("CONFIDENCE", "0.60"))
-INFERENCE_SIZE = int(os.getenv("INFERENCE_SIZE", "640"))
-JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "45"))
+INFERENCE_SIZE = int(os.getenv("INFERENCE_SIZE", "416"))
+JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "35"))
 LOOP_VIDEO = os.getenv("LOOP_VIDEO", "true").lower() in {"1", "true", "yes", "on"}
 CLIP_START_SECONDS = float(os.getenv("CLIP_START_SECONDS", "0"))
 CLIP_DURATION_SECONDS = float(os.getenv("CLIP_DURATION_SECONDS", "10"))
@@ -32,11 +33,14 @@ SAMPLE_START_RATIO = float(os.getenv("SAMPLE_START_RATIO", "0.8"))
 BOX_THICKNESS = int(os.getenv("BOX_THICKNESS", "2"))
 FONT_SCALE = float(os.getenv("FONT_SCALE", "0.6"))
 LABEL_THICKNESS = int(os.getenv("LABEL_THICKNESS", "2"))
-MAX_UDP_BYTES = int(os.getenv("MAX_UDP_BYTES", "45000"))
+MAX_UDP_BYTES = int(os.getenv("MAX_UDP_BYTES", "35000"))
 TILE_OVERLAP_RATIO = float(os.getenv("TILE_OVERLAP_RATIO", "0.15"))
 DETECTION_INTERVAL_SECONDS = max(0.1, float(os.getenv("DETECTION_INTERVAL_SECONDS", "1.0")))
-STREAM_MAX_WIDTH = max(320, int(os.getenv("STREAM_MAX_WIDTH", "960")))
-STREAM_MAX_HEIGHT = max(240, int(os.getenv("STREAM_MAX_HEIGHT", "540")))
+STREAM_MAX_WIDTH = max(320, int(os.getenv("STREAM_MAX_WIDTH", "640")))
+STREAM_MAX_HEIGHT = max(240, int(os.getenv("STREAM_MAX_HEIGHT", "360")))
+STREAM_TARGET_FPS = float(os.getenv("STREAM_TARGET_FPS", "0"))
+ENABLE_FRAME_SKIP = os.getenv("ENABLE_FRAME_SKIP", "true").lower() in {"1", "true", "yes", "on"}
+MAX_FRAME_SKIP = max(0, int(os.getenv("MAX_FRAME_SKIP", "8")))
 ENABLE_TILE_INFERENCE = os.getenv("ENABLE_TILE_INFERENCE", "false").lower() in {"1", "true", "yes", "on"}
 ALLOWED_CLASSES = {
     name.strip().lower()
@@ -304,6 +308,22 @@ def prepare_stream_frame(frame):
     return cv2.resize(frame, (resized_width, resized_height), interpolation=cv2.INTER_AREA)
 
 
+def pace_stream(capture, next_frame_time: float, frame_delay: float) -> float:
+    next_frame_time += frame_delay
+    sleep_seconds = next_frame_time - time.monotonic()
+    if sleep_seconds > 0:
+        time.sleep(sleep_seconds)
+        return next_frame_time
+
+    if ENABLE_FRAME_SKIP and frame_delay > 0:
+        frames_to_skip = min(MAX_FRAME_SKIP, int(abs(sleep_seconds) / frame_delay))
+        for _ in range(frames_to_skip):
+            if not capture.grab():
+                break
+
+    return time.monotonic()
+
+
 def calculate_iou(a: dict, b: dict) -> float:
     inter_x1 = max(a["x1"], b["x1"])
     inter_y1 = max(a["y1"], b["y1"])
@@ -480,6 +500,9 @@ def main() -> None:
     print(f"YOLO inference size: {INFERENCE_SIZE}")
     print(f"YOLO detection interval: every {DETECTION_INTERVAL_SECONDS:.2f} second(s)")
     print(f"Stream max size: {STREAM_MAX_WIDTH}x{STREAM_MAX_HEIGHT}")
+    if STREAM_TARGET_FPS > 0:
+        print(f"Stream target FPS override: {STREAM_TARGET_FPS:.2f}")
+    print(f"Frame skip enabled: {ENABLE_FRAME_SKIP} (max {MAX_FRAME_SKIP})")
     print(f"Tile inference enabled: {ENABLE_TILE_INFERENCE}")
     print(f"Allowed classes: {', '.join(sorted(ALLOWED_CLASSES))}")
     print(f"Max UDP payload target: {MAX_UDP_BYTES} bytes")
@@ -488,12 +511,14 @@ def main() -> None:
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     status_packet = build_status_packet(True, True, CONFIDENCE, "", str(SOURCE_ROOT))
     sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
+    detection_executor = ThreadPoolExecutor(max_workers=1)
 
     try:
         cycle_index = 0
         frame_index = 0
         latest_detections: list[dict] = []
         last_detection_monotonic: float | None = None
+        pending_detection: Future[list[dict]] | None = None
         while True:
             for clip_index, entry in enumerate(sampled_entries, start=1):
                 capture = cv2.VideoCapture(str(entry.path))
@@ -501,8 +526,10 @@ def main() -> None:
                     raise RuntimeError(f"Could not open video: {entry.path}")
 
                 try:
-                    fps = capture.get(cv2.CAP_PROP_FPS)
-                    frame_delay = 1.0 / fps if fps and fps > 0 else 0.04
+                    source_fps = capture.get(cv2.CAP_PROP_FPS)
+                    effective_fps = STREAM_TARGET_FPS if STREAM_TARGET_FPS > 0 else source_fps
+                    frame_delay = 1.0 / effective_fps if effective_fps and effective_fps > 0 else 0.04
+                    next_frame_time = time.monotonic()
                     clip_start_msec = max(0.0, CLIP_START_SECONDS * 1000.0)
                     clip_end_msec = None
                     if CLIP_DURATION_SECONDS > 0:
@@ -540,31 +567,43 @@ def main() -> None:
 
                         stream_frame = prepare_stream_frame(frame)
 
+                        if pending_detection is not None and pending_detection.done():
+                            try:
+                                latest_detections = pending_detection.result()
+                            except Exception as exc:
+                                latest_detections = []
+                                status_packet = build_status_packet(
+                                    True,
+                                    True,
+                                    CONFIDENCE,
+                                    f"YOLO detection failed: {exc}",
+                                    str(SOURCE_ROOT),
+                                )
+                                sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
+                            finally:
+                                pending_detection = None
+
                         now_monotonic = time.monotonic()
                         should_run_detection = (
-                            last_detection_monotonic is None or
-                            (now_monotonic - last_detection_monotonic) >= DETECTION_INTERVAL_SECONDS
+                            pending_detection is None and
+                            (
+                                last_detection_monotonic is None or
+                                (now_monotonic - last_detection_monotonic) >= DETECTION_INTERVAL_SECONDS
+                            )
                         )
 
                         if should_run_detection:
-                            latest_detections = detect_objects(model, stream_frame)
+                            pending_detection = detection_executor.submit(
+                                detect_objects,
+                                model,
+                                stream_frame.copy(),
+                            )
                             last_detection_monotonic = now_monotonic
 
                         detections = latest_detections
-                        if should_run_detection and detections:
-                            preview_labels = ", ".join(
-                                f"{item['className']} object{item['objectId']}"
-                                for item in detections[:3]
-                            )
-                            if len(detections) > 3:
-                                preview_labels += f" +{len(detections) - 3}"
-                            print(
-                                f"[YOLO] frame={frame_index + 1} detections={len(detections)} "
-                                f"labels={preview_labels}"
-                            )
                         encoded_bytes = encode_frame_for_udp(stream_frame)
                         if encoded_bytes is None:
-                            time.sleep(frame_delay)
+                            next_frame_time = pace_stream(capture, next_frame_time, frame_delay)
                             continue
 
                         frame_index += 1
@@ -586,12 +625,7 @@ def main() -> None:
                         sock.sendto(image_packet, (GUI_HOST, GUI_PORT))
                         sock.sendto(detection_packet, (GUI_HOST, GUI_PORT))
 
-                        if should_run_detection and detections:
-                            print(
-                                f"[DETS] frame={frame_index} objects={len(detections)} bytes={len(detection_packet)}"
-                            )
-
-                        time.sleep(frame_delay)
+                        next_frame_time = pace_stream(capture, next_frame_time, frame_delay)
                 finally:
                     capture.release()
 
@@ -601,6 +635,7 @@ def main() -> None:
             print("MEVA video segment cycle completed. Restarting from the first sampled timeline entry.")
             cycle_index += 1
     finally:
+        detection_executor.shutdown(wait=False, cancel_futures=True)
         sock.close()
 
 
