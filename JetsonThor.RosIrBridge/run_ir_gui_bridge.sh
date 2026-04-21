@@ -26,8 +26,8 @@ detect_ros_setup() {
   fi
 
   local candidates=(
-    "/opt/ros/jazzy/setup.bash"
     "/opt/ros/humble/setup.bash"
+    "/opt/ros/jazzy/setup.bash"
     "/opt/ros/iron/setup.bash"
     "/opt/ros/rolling/setup.bash"
     "/opt/ros/foxy/setup.bash"
@@ -42,6 +42,33 @@ detect_ros_setup() {
   done
 
   return 1
+}
+
+safe_source_setup() {
+  local setup_path="$1"
+
+  if [[ ! -f "$setup_path" ]]; then
+    echo "Setup file not found: $setup_path" >&2
+    return 1
+  fi
+
+  # ROS setup 스크립트 일부는 비어 있는 환경변수를 참조하므로
+  # source 직전에는 nounset(-u)을 잠시 끄고, 끝나면 다시 복구한다.
+  local had_nounset=0
+  case $- in
+    *u*) had_nounset=1 ;;
+  esac
+
+  set +u
+  # shellcheck disable=SC1090
+  source "$setup_path"
+  local source_exit=$?
+
+  if [[ $had_nounset -eq 1 ]]; then
+    set -u
+  fi
+
+  return $source_exit
 }
 
 detect_workspace_setup() {
@@ -102,16 +129,20 @@ if ! ROS_SETUP="$(detect_ros_setup)"; then
   exit 1
 fi
 
-# shellcheck disable=SC1090
-source "$ROS_SETUP"
+if ! safe_source_setup "$ROS_SETUP"; then
+  echo "Failed to source ROS setup: $ROS_SETUP" >&2
+  exit 1
+fi
 
 if ! WORKSPACE_SETUP="$(detect_workspace_setup)"; then
   echo "Workspace setup.bash could not be found. Set WORKSPACE_SETUP explicitly." >&2
   exit 1
 fi
 
-# shellcheck disable=SC1090
-source "$WORKSPACE_SETUP"
+if ! safe_source_setup "$WORKSPACE_SETUP"; then
+  echo "Failed to source workspace setup: $WORKSPACE_SETUP" >&2
+  exit 1
+fi
 
 export GUI_HOST GUI_PORT IMAGE_TOPIC DETECTION_TOPIC STATUS_TOPIC
 export JPEG_QUALITY MAX_UDP_BYTES STREAM_MAX_WIDTH STREAM_MAX_HEIGHT
