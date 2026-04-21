@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1400" height="780" viewBox="0 0 1400 780">
+  <defs>
+    <style>
+      .bg { fill: #0f1720; }
+      .panel { fill: #1f2b38; stroke: #4c647d; stroke-width: 3; rx: 18; ry: 18; }
+      .accent { fill: #294a75; stroke: #7ab7ff; stroke-width: 3; rx: 18; ry: 18; }
+      .accent2 { fill: #385b3c; stroke: #8ddd95; stroke-width: 3; rx: 18; ry: 18; }
+      .arrow { stroke: #8fd3ff; stroke-width: 8; fill: none; marker-end: url(#arrowHead); }
+      .title { fill: #eef4fb; font-size: 34px; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-weight: 700; }
+      .boxTitle { fill: #eef4fb; font-size: 26px; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-weight: 700; text-anchor: middle; }
+      .boxText { fill: #d7e5f3; font-size: 20px; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; text-anchor: middle; }
+      .caption { fill: #9fc1dc; font-size: 20px; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; font-weight: 700; text-anchor: middle; }
+    </style>
+    <marker id="arrowHead" markerWidth="14" markerHeight="14" refX="10" refY="5" orient="auto">
+      <path d="M0,0 L10,5 L0,10 z" fill="#8fd3ff" />
+    </marker>
+  </defs>
+
+  <rect class="bg" x="0" y="0" width="1400" height="780" />
+  <text class="title" x="70" y="70">EO 카메라 영상 송출 구조</text>
+
+  <rect class="accent2" x="70" y="190" width="240" height="150" />
+  <text class="boxTitle" x="190" y="250">EO 카메라 모듈</text>
+  <text class="boxText" x="190" y="290">JPEG 기반 영상 생성</text>
+  <text class="boxText" x="190" y="320">UDP로 PC에 전송</text>
+
+  <rect class="panel" x="420" y="170" width="240" height="190" />
+  <text class="boxTitle" x="540" y="235">운용통제 PC</text>
+  <text class="boxText" x="540" y="275">UDP 포트 5000 대기</text>
+  <text class="boxText" x="540" y="305">패킷 수신</text>
+  <text class="boxText" x="540" y="335">영상 데이터 전달</text>
+
+  <rect class="panel" x="770" y="120" width="250" height="130" />
+  <text class="boxTitle" x="895" y="180">JPEG / 헤더 판별</text>
+  <text class="boxText" x="895" y="215">raw JPEG 또는 헤더 포함 형식 확인</text>
+
+  <rect class="panel" x="770" y="290" width="250" height="130" />
+  <text class="boxTitle" x="895" y="350">영상 디코딩</text>
+  <text class="boxText" x="895" y="385">JPEG를 실제 프레임으로 복원</text>
+
+  <rect class="panel" x="1070" y="210" width="250" height="130" />
+  <text class="boxTitle" x="1195" y="270">영상 보정</text>
+  <text class="boxText" x="1195" y="305">밝기 / 대비 적용</text>
+
+  <rect class="accent" x="1070" y="420" width="250" height="150" />
+  <text class="boxTitle" x="1195" y="485">GUI EO 화면 표시</text>
+  <text class="boxText" x="1195" y="525">실시간 영상 출력</text>
+  <text class="boxText" x="1195" y="555">필요 시 녹화 저장</text>
+
+  <path class="arrow" d="M310 265 L420 265" />
+  <text class="caption" x="365" y="245">UDP 영상 전송</text>
+
+  <path class="arrow" d="M660 265 L770 185" />
+  <path class="arrow" d="M660 265 L770 355" />
+  <path class="arrow" d="M1020 355 L1070 290" />
+  <path class="arrow" d="M1195 340 L1195 420" />
+
+  <text class="caption" x="700" y="470">요청 방식이 아니라, 카메라가 영상을 보내고 PC가 받는 Push 구조</text>
+</svg>

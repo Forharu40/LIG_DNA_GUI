@@ -1,55 +1,84 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
+using System.Globalization;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
+using System.Windows.Shapes;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels;
+using System.Collections.Generic;
 
 namespace BroadcastControl.App;
 
-/// <summary>
-/// MainWindow와 입력/출력 서비스를 연결하는 조정자임.
-/// XAML은 화면 배치를 담당하고, 이 파일은 EO UDP 수신, IR 임시 웹캠, 줌 입력, 녹화, 설정창 애니메이션을 연결함.
-/// </summary>
 public partial class MainWindow : Window
 {
-    /// <summary>
-    /// 설정창 닫힘 상태에서 오른쪽 바깥으로 밀어둘 거리임.
-    /// </summary>
     private const double SettingsDrawerClosedOffset = 320;
+    private const double WindowedWidth = 1600;
+    private const double WindowedHeight = 900;
 
-    /// <summary>
-    /// 화면 상태, 명령, 텍스트, 줌 값을 관리하는 ViewModel임.
-    /// </summary>
     private readonly MainViewModel _viewModel;
-
-    /// <summary>
-    /// 외부 EO 카메라 UDP 패킷을 프레임으로 복원하는 서비스임.
-    /// </summary>
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
-
-    /// <summary>
-    /// 임시 IR 화면으로 사용할 노트북 카메라 서비스임.
-    /// </summary>
     private readonly WebcamCaptureService _irWebcamCaptureService;
+    private readonly ViewportRecordingService _viewportRecordingService;
 
-    /// <summary>
-    /// 전자 줌 상태에서 마우스 드래그 중인지 저장함.
-    /// </summary>
     private bool _isDraggingZoom;
-
-    /// <summary>
-    /// 이전 드래그 좌표임. 다음 이동량 계산에 사용함.
-    /// </summary>
     private Point _lastZoomDragPoint;
-
-    /// <summary>
-    /// 첫 프레임 수신 로그를 한 번만 남기기 위한 플래그임.
-    /// </summary>
     private bool _hasReceivedEoFrame;
     private bool _hasReceivedIrFrame;
+    private bool _isFullscreenMode = true;
+    private ReceivedVideoFrame? _latestEoFrame;
+    private DetectionPacket? _latestDetectionPacket;
+    private string? _lastStatusSignature;
+    private readonly Dictionary<uint, ReceivedVideoFrame> _eoFrameCache = new();
+    private readonly Dictionary<uint, DetectionPacket> _detectionCache = new();
+    private bool _hasReceivedDetectionPacket;
+    private bool _hasReceivedNonEmptyDetectionPacket;
+    private bool _hasRenderedDetectionOverlay;
+    private bool _isRenderingOverlay;
+    private string? _lastDetectionAlertSignature;
+    private string? _lastFilteredOutTargetSignature;
+    private string? _lastOverlaySignature;
+    private const int OverlayCacheLimit = 48;
+    private const uint OverlayFrameTolerance = 12;
+    private const float DisplayScoreThreshold = 0.60f;
+    private static readonly HashSet<string> NonMilitaryTargetClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "chair",
+        "dining table",
+        "tv",
+        "laptop",
+        "cell phone",
+        "bottle",
+        "couch",
+        "bench",
+        "refrigerator"
+    };
+
+    private static readonly HashSet<string> CompositeTargetClasses = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "person",
+        "airplane",
+        "bicycle",
+        "car",
+        "motorcycle",
+        "bus",
+        "truck",
+        "train",
+        "boat",
+        "cell phone",
+        "laptop",
+        "chair",
+        "dining table",
+        "tv",
+        "couch",
+        "bench",
+        "bottle",
+        "refrigerator"
+    };
 
     public MainWindow()
     {
@@ -58,56 +87,51 @@ public partial class MainWindow : Window
         _viewModel = new MainViewModel();
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
         _irWebcamCaptureService = new WebcamCaptureService();
+        _viewportRecordingService = new ViewportRecordingService();
         DataContext = _viewModel;
 
         Loaded += OnLoaded;
         Closed += OnClosed;
     }
 
-    /// <summary>
-    /// 창 표시 시 입력 서비스 연결과 초기 상태 동기화를 수행함.
-    /// </summary>
     private void OnLoaded(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Maximized;
+        UpdateWindowModeButtonText();
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
+        _eoUdpCaptureService.DetectionsReceived += OnEoDetectionsReceived;
+        _eoUdpCaptureService.StatusReceived += OnYoloStatusReceived;
         _irWebcamCaptureService.FrameReady += OnIrFrameReady;
 
-        // 밝기/대조비 슬라이더 값은 EO 외부 영상 보정에 적용함.
         _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
         _eoUdpCaptureService.SetContrast(_viewModel.Contrast);
 
-        // 현재 EO 표시 영역 크기를 ViewModel과 EO 녹화 서비스에 전달함.
         _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
         UpdateRecordingViewportState();
+        RenderDetectionOverlay();
 
-        // 초기 설정창 위치를 ViewModel 상태와 맞춤.
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
 
         if (_eoUdpCaptureService.Start())
         {
-            _viewModel.AppendImportantLog($"EO UDP 수신 대기 중임. 포트: {_eoUdpCaptureService.ListeningPort}");
         }
         else
         {
-            _viewModel.AppendImportantLog("EO UDP 수신 소켓 생성 실패.");
+            _viewModel.AppendImportantLog("Failed to start the MEVA YOLO UDP stream receiver.");
         }
 
         if (_irWebcamCaptureService.Start())
         {
-            _viewModel.AppendImportantLog("노트북 카메라를 IR 임시 화면에 연결함.");
+            _viewModel.AppendImportantLog("Connected the laptop camera to the temporary IR panel.");
         }
         else
         {
-            _viewModel.AppendImportantLog("노트북 카메라를 IR 임시 화면에 연결하지 못함.");
+            _viewModel.AppendImportantLog("Could not connect the laptop camera to the temporary IR panel.");
         }
     }
 
-    /// <summary>
-    /// ViewModel 변경 사항 중 실제 서비스와 애니메이션에 반영해야 할 항목을 처리함.
-    /// </summary>
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         switch (e.PropertyName)
@@ -127,7 +151,10 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.ZoomLevel):
             case nameof(MainViewModel.ZoomTransformX):
             case nameof(MainViewModel.ZoomTransformY):
+            case nameof(MainViewModel.IsEoPrimary):
+            case nameof(MainViewModel.SelectedPrimaryTarget):
                 UpdateRecordingViewportState();
+                RenderDetectionOverlay(forceRefresh: true);
                 break;
 
             case nameof(MainViewModel.IsSettingsOpen):
@@ -136,18 +163,13 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>
-    /// EO 메인 화면 크기 변경 시 전자 줌 이동 범위와 녹화 구도를 재계산함.
-    /// </summary>
     private void CameraViewport_OnSizeChanged(object sender, SizeChangedEventArgs e)
     {
         _viewModel.UpdateViewportSize(e.NewSize.Width, e.NewSize.Height);
         UpdateRecordingViewportState();
+        RenderDetectionOverlay(forceRefresh: true);
     }
 
-    /// <summary>
-    /// 전자 줌 상태에서만 드래그 패닝을 시작함.
-    /// </summary>
     private void CameraViewport_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (!_viewModel.ShowZoomMiniMap)
@@ -160,9 +182,6 @@ public partial class MainWindow : Window
         CameraViewport.CaptureMouse();
     }
 
-    /// <summary>
-    /// 드래그 중 확대된 EO 시야를 이동함.
-    /// </summary>
     private void CameraViewport_OnMouseMove(object sender, MouseEventArgs e)
     {
         if (!_isDraggingZoom)
@@ -177,9 +196,6 @@ public partial class MainWindow : Window
         _viewModel.PanZoom(delta.X, delta.Y);
     }
 
-    /// <summary>
-    /// 수동 모드에서 EO 화면 위 마우스 휠로 전자 줌 배율을 조절함.
-    /// </summary>
     private void CameraViewport_OnMouseWheel(object sender, MouseWheelEventArgs e)
     {
         if (!_viewModel.CanUseZoomControls)
@@ -191,9 +207,6 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    /// <summary>
-    /// 드래그 종료 시 마우스 캡처를 해제함.
-    /// </summary>
     private void CameraViewport_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
     {
         if (!_isDraggingZoom)
@@ -205,39 +218,98 @@ public partial class MainWindow : Window
         CameraViewport.ReleaseMouseCapture();
     }
 
-    /// <summary>
-    /// EO UDP 프레임을 메인 EO 화면에 반영함.
-    /// 첫 프레임 수신 시 연결 확인 로그를 한 번만 남김.
-    /// </summary>
-    private void OnEoFrameReady(BitmapSource frame)
+    private void OnEoFrameReady(ReceivedVideoFrame frame)
     {
+        _latestEoFrame = frame;
+        CacheEoFrame(frame);
+
         if (!_hasReceivedEoFrame)
         {
             _hasReceivedEoFrame = true;
-            _viewModel.AppendImportantLog("EO UDP 카메라 첫 프레임을 수신함.");
         }
 
-        _viewModel.UpdateEoFrame(frame);
+        _viewModel.UpdateEoFrame(frame.Bitmap);
     }
 
-    /// <summary>
-    /// 노트북 카메라 프레임을 임시 IR 화면에 반영함.
-    /// </summary>
-    private void OnIrFrameReady(BitmapSource frame)
+    private void OnEoDetectionsReceived(DetectionPacket detectionPacket)
+    {
+        _latestDetectionPacket = detectionPacket;
+        CacheDetectionPacket(detectionPacket);
+
+        if (!_hasReceivedDetectionPacket)
+        {
+            _hasReceivedDetectionPacket = true;
+        }
+
+        var displayDetections = FilterDisplayDetections(detectionPacket.Detections);
+
+        if (!_hasReceivedNonEmptyDetectionPacket && displayDetections.Count > 0)
+        {
+            _hasReceivedNonEmptyDetectionPacket = true;
+        }
+
+        if (detectionPacket.Detections.Count > 0 && displayDetections.Count == 0)
+        {
+            var filteredSignature = $"{_viewModel.SelectedPrimaryTarget}:{detectionPacket.FrameId}";
+            if (!string.Equals(_lastFilteredOutTargetSignature, filteredSignature, StringComparison.Ordinal))
+            {
+                _lastFilteredOutTargetSignature = filteredSignature;
+            }
+        }
+        else
+        {
+            _lastFilteredOutTargetSignature = null;
+        }
+
+        NotifyDetectionAlertIfNeeded(detectionPacket.FrameId, displayDetections);
+        _viewModel.UpdateDetectionSummary(displayDetections);
+        RenderDetectionOverlay(forceRefresh: true);
+    }
+
+    private void OnYoloStatusReceived(YoloStatusPacket statusPacket)
+    {
+        var signature = $"{statusPacket.Enabled}:{statusPacket.ModelLoaded}:{statusPacket.ConfThreshold}:{statusPacket.LastError}:{statusPacket.Source}";
+        if (string.Equals(_lastStatusSignature, signature, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _lastStatusSignature = signature;
+
+        if (!statusPacket.ModelLoaded)
+        {
+            _viewModel.AppendImportantLog("YOLO 모델이 아직 로드되지 않았습니다.");
+        }
+
+        if (!string.IsNullOrWhiteSpace(statusPacket.LastError))
+        {
+            _viewModel.AppendImportantLog($"YOLO 상태 오류: {statusPacket.LastError}");
+        }
+    }
+
+    private void OnIrFrameReady(System.Windows.Media.Imaging.BitmapSource frame)
     {
         if (!_hasReceivedIrFrame)
         {
             _hasReceivedIrFrame = true;
-            _viewModel.AppendImportantLog("IR 임시 카메라 첫 프레임을 수신함.");
+            _viewModel.AppendImportantLog("IR temporary camera first frame received.");
         }
 
         _viewModel.UpdateIrFrame(frame);
     }
 
-    /// <summary>
-    /// EO 화면의 전자 줌/패닝 상태를 녹화 서비스에 전달함.
-    /// 저장 영상 구도를 현재 운용자가 보는 화면과 맞추기 위한 처리임.
-    /// </summary>
+    private void OnEoSegmentChanged(PlaybackSegmentInfo segmentInfo)
+    {
+    }
+
+    private void OnEoSegmentLoopRestarted(PlaybackSegmentInfo segmentInfo)
+    {
+    }
+
+    private void OnEoDiagnosticsMessageReady(string message)
+    {
+    }
+
     private void UpdateRecordingViewportState()
     {
         _eoUdpCaptureService.UpdateViewportTransform(
@@ -248,28 +320,366 @@ public partial class MainWindow : Window
             CameraViewport.ActualHeight);
     }
 
-    /// <summary>
-    /// 수동 녹화 상태 변경 시 EO 서비스의 실제 녹화 시작/종료를 처리함.
-    /// </summary>
+    private void RenderDetectionOverlay(bool forceRefresh = false)
+    {
+        if (_isRenderingOverlay)
+        {
+            return;
+        }
+
+        if (DetectionOverlayCanvas is null)
+        {
+            return;
+        }
+
+        _isRenderingOverlay = true;
+        try
+        {
+            DetectionOverlayCanvas.Children.Clear();
+
+            if (_latestEoFrame is null)
+            {
+                _lastOverlaySignature = null;
+                return;
+            }
+
+            if (!TryGetRenderableFrameAndDetection(out var frameToRender, out var detectionPacket))
+            {
+                _lastOverlaySignature = null;
+                return;
+            }
+
+            var displayDetections = FilterDisplayDetections(detectionPacket.Detections);
+            if (displayDetections.Count == 0)
+            {
+                _lastOverlaySignature = null;
+                return;
+            }
+
+            var overlaySignature = BuildOverlaySignature(displayDetections);
+            if (!forceRefresh && string.Equals(_lastOverlaySignature, overlaySignature, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _lastOverlaySignature = overlaySignature;
+
+            var sourceWidth = detectionPacket.Width > 0 ? detectionPacket.Width : frameToRender.Width;
+            var sourceHeight = detectionPacket.Height > 0 ? detectionPacket.Height : frameToRender.Height;
+            if (sourceWidth <= 0 || sourceHeight <= 0)
+            {
+                return;
+            }
+
+            var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
+            var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
+            var baseScale = Math.Max(viewportWidth / sourceWidth, viewportHeight / sourceHeight);
+            var scaledWidth = sourceWidth * baseScale;
+            var scaledHeight = sourceHeight * baseScale;
+            var baseLeft = (viewportWidth - scaledWidth) / 2.0;
+            var baseTop = (viewportHeight - scaledHeight) / 2.0;
+
+            foreach (var detection in displayDetections)
+            {
+                var rectLeft = baseLeft + (detection.X1 * baseScale);
+                var rectTop = baseTop + (detection.Y1 * baseScale);
+                var rectWidth = Math.Max(2, (detection.X2 - detection.X1) * baseScale);
+                var rectHeight = Math.Max(2, (detection.Y2 - detection.Y1) * baseScale);
+
+                if (rectWidth < 2 || rectHeight < 2)
+                {
+                    continue;
+                }
+
+                AddDetectionVisualToCanvas(rectLeft, rectTop, rectWidth, rectHeight, detection);
+            }
+
+            if (!_hasRenderedDetectionOverlay)
+            {
+                _hasRenderedDetectionOverlay = true;
+            }
+        }
+        finally
+        {
+            _isRenderingOverlay = false;
+        }
+    }
+
+    private static string BuildOverlaySignature(IReadOnlyList<DetectionInfo> detections)
+    {
+        return string.Join(
+            "|",
+            detections.Select(d => $"{d.ObjectId}:{d.ClassName}:{d.X1:0}:{d.Y1:0}:{d.X2:0}:{d.Y2:0}"));
+    }
+
+    private void CacheEoFrame(ReceivedVideoFrame frame)
+    {
+        _eoFrameCache[frame.FrameIndex] = frame;
+        TrimCache(_eoFrameCache);
+    }
+
+    private void CacheDetectionPacket(DetectionPacket detectionPacket)
+    {
+        _detectionCache[detectionPacket.FrameId] = detectionPacket;
+        TrimCache(_detectionCache);
+    }
+
+    private bool TryGetRenderableDetectionPacket(uint currentFrameId, out DetectionPacket detectionPacket)
+    {
+        if (_detectionCache.TryGetValue(currentFrameId, out detectionPacket))
+        {
+            return true;
+        }
+
+        var recentCandidates = _detectionCache
+            .Where(pair => pair.Value.Detections.Count > 0 && pair.Key <= currentFrameId)
+            .OrderByDescending(pair => pair.Key)
+            .ToArray();
+
+        foreach (var candidate in recentCandidates)
+        {
+            var frameGap = currentFrameId >= candidate.Key
+                ? currentFrameId - candidate.Key
+                : uint.MaxValue;
+            if (frameGap > OverlayFrameTolerance)
+            {
+                break;
+            }
+
+            detectionPacket = candidate.Value;
+            return true;
+        }
+
+        var fallbackCandidates = _detectionCache
+            .Where(pair => pair.Value.Detections.Count > 0)
+            .OrderByDescending(pair => pair.Key)
+            .ToArray();
+
+        foreach (var candidate in fallbackCandidates)
+        {
+            detectionPacket = candidate.Value;
+            return true;
+        }
+
+        detectionPacket = default;
+        return false;
+    }
+
+    private bool TryGetRenderableFrameAndDetection(out ReceivedVideoFrame frame, out DetectionPacket detectionPacket)
+    {
+        if (_latestEoFrame is not null &&
+            _detectionCache.TryGetValue(_latestEoFrame.Value.FrameIndex, out detectionPacket))
+        {
+            frame = _latestEoFrame.Value;
+            return true;
+        }
+
+        var exactPairs = _detectionCache
+            .Where(pair => pair.Value.Detections.Count > 0 && _eoFrameCache.ContainsKey(pair.Key))
+            .OrderByDescending(pair => pair.Key)
+            .ToArray();
+
+        foreach (var pair in exactPairs)
+        {
+            frame = _eoFrameCache[pair.Key];
+            detectionPacket = pair.Value;
+            return true;
+        }
+
+        if (_latestEoFrame is not null &&
+            TryGetRenderableDetectionPacket(_latestEoFrame.Value.FrameIndex, out detectionPacket))
+        {
+            frame = _latestEoFrame.Value;
+            return true;
+        }
+
+        frame = default;
+        detectionPacket = default;
+        return false;
+    }
+
+    private IReadOnlyList<DetectionInfo> FilterDisplayDetections(IReadOnlyList<DetectionInfo> detections)
+    {
+        var filtered = detections
+            .Where(ShouldDisplayDetectionSafe)
+            .ToArray();
+        return filtered;
+    }
+
+    private bool ShouldDisplayDetectionSafe(DetectionInfo detection)
+    {
+        var className = detection.ClassName.ToLowerInvariant();
+        var primaryTarget = _viewModel.SelectedPrimaryTarget;
+        if (detection.Score < DisplayScoreThreshold)
+        {
+            return false;
+        }
+
+        if (primaryTarget == "\uBCF5\uD569")
+        {
+            return CompositeTargetClasses.Contains(className);
+        }
+
+        if (primaryTarget == "\uC0AC\uB78C")
+        {
+            return className == "person";
+        }
+
+        if (primaryTarget == "\uACF5\uC911 \uBB34\uAE30\uCCB4\uACC4")
+        {
+            return className == "airplane";
+        }
+
+        if (primaryTarget == "\uC721\uC0C1 \uBB34\uAE30\uCCB4\uACC4")
+        {
+            return className is "bicycle" or "car" or "motorcycle" or "bus" or "truck" or "train";
+        }
+
+        if (primaryTarget == "\uD574\uC0C1 \uBB34\uAE30\uCCB4\uACC4")
+        {
+            return className == "boat";
+        }
+
+        if (primaryTarget == "\uD1B5\uC2E0 \uC7A5\uBE44")
+        {
+            return className is "cell phone" or "laptop";
+        }
+
+        if (primaryTarget == "\uBE44\uAD70\uC0AC \uD45C\uC801")
+        {
+            return NonMilitaryTargetClasses.Contains(className);
+        }
+
+        return true;
+    }
+
+    private bool ShouldDisplayDetection(DetectionInfo detection) => ShouldDisplayDetectionSafe(detection);
+
+    private void NotifyDetectionAlertIfNeeded(uint frameId, IReadOnlyList<DetectionInfo> detections)
+    {
+        _lastDetectionAlertSignature = detections.Count == 0 ? null : $"{frameId}:{detections.Count}";
+    }
+
+    private static void TrimCache<T>(Dictionary<uint, T> cache)
+    {
+        while (cache.Count > OverlayCacheLimit)
+        {
+            var oldestKey = cache.Keys.Min();
+            cache.Remove(oldestKey);
+        }
+    }
+
+    private void AddDetectionVisualToCanvas(
+        double rectLeft,
+        double rectTop,
+        double rectWidth,
+        double rectHeight,
+        DetectionInfo detection)
+    {
+        var accentBrush = new SolidColorBrush(Color.FromRgb(105, 255, 132));
+        accentBrush.Freeze();
+        var mainRectangle = new Rectangle
+        {
+            Width = rectWidth,
+            Height = rectHeight,
+            Stroke = accentBrush,
+            StrokeThickness = 2,
+            RadiusX = 2,
+            RadiusY = 2,
+            Fill = Brushes.Transparent
+        };
+        Canvas.SetLeft(mainRectangle, rectLeft);
+        Canvas.SetTop(mainRectangle, rectTop);
+        DetectionOverlayCanvas.Children.Add(mainRectangle);
+
+        var cornerLength = Math.Max(12, Math.Min(rectWidth, rectHeight) * 0.18);
+        AddCornerToCanvas(rectLeft, rectTop, cornerLength, true, true, accentBrush);
+        AddCornerToCanvas(rectLeft + rectWidth, rectTop, cornerLength, false, true, accentBrush);
+        AddCornerToCanvas(rectLeft, rectTop + rectHeight, cornerLength, true, false, accentBrush);
+        AddCornerToCanvas(rectLeft + rectWidth, rectTop + rectHeight, cornerLength, false, false, accentBrush);
+
+        var labelText = new TextBlock
+        {
+            Text = detection.LabelText,
+            Foreground = accentBrush,
+            FontSize = 12,
+            FontWeight = FontWeights.SemiBold
+        };
+
+        labelText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        var labelWidth = labelText.DesiredSize.Width;
+        var labelHeight = labelText.DesiredSize.Height;
+        var labelLeft = Math.Max(0, Math.Min(rectLeft, Math.Max(0, CameraViewport.ActualWidth - labelWidth - 4)));
+        var preferredTop = rectTop - labelHeight - 6;
+        var labelTop = preferredTop >= 0 ? preferredTop : Math.Min(CameraViewport.ActualHeight - labelHeight - 4, rectTop + 6);
+        Canvas.SetLeft(labelText, labelLeft);
+        Canvas.SetTop(labelText, Math.Max(0, labelTop));
+        DetectionOverlayCanvas.Children.Add(labelText);
+    }
+
+    private void AddCornerToCanvas(
+        double anchorX,
+        double anchorY,
+        double length,
+        bool isLeft,
+        bool isTop,
+        Brush strokeBrush)
+    {
+        var horizontal = new Line
+        {
+            X1 = anchorX,
+            Y1 = anchorY,
+            X2 = anchorX + (isLeft ? length : -length),
+            Y2 = anchorY,
+            Stroke = strokeBrush,
+            StrokeThickness = 3,
+            StrokeStartLineCap = PenLineCap.Square,
+            StrokeEndLineCap = PenLineCap.Square
+        };
+
+        var vertical = new Line
+        {
+            X1 = anchorX,
+            Y1 = anchorY,
+            X2 = anchorX,
+            Y2 = anchorY + (isTop ? length : -length),
+            Stroke = strokeBrush,
+            StrokeThickness = 3,
+            StrokeStartLineCap = PenLineCap.Square,
+            StrokeEndLineCap = PenLineCap.Square
+        };
+
+        DetectionOverlayCanvas.Children.Add(horizontal);
+        DetectionOverlayCanvas.Children.Add(vertical);
+    }
+
     private void HandleManualRecordingStateChanged()
     {
         if (_viewModel.IsManualRecordingEnabled)
         {
-            var filePath = _eoUdpCaptureService.StartRecordingToDesktop();
-            _viewModel.AppendImportantLog($"수동 녹화를 시작함: {System.IO.Path.GetFileName(filePath)}");
+            var filePath = _viewportRecordingService.StartRecordingToDesktop(CameraPanel);
+            _viewModel.AppendImportantLog($"Manual recording started: {filePath}");
             return;
         }
 
-        var savedPath = _eoUdpCaptureService.StopRecording();
+        var savedPath = _viewportRecordingService.StopRecording();
         if (!string.IsNullOrWhiteSpace(savedPath))
         {
-            _viewModel.AppendImportantLog($"영상 저장 완료: {System.IO.Path.GetFileName(savedPath)}");
+            if (System.IO.File.Exists(savedPath))
+            {
+                _viewModel.AppendImportantLog($"Video saved: {savedPath} ({_viewportRecordingService.RecordedFrameCount} frames)");
+            }
+            else if (!string.IsNullOrWhiteSpace(_viewportRecordingService.LastRecordingErrorMessage))
+            {
+                _viewModel.AppendImportantLog($"Video save failed: {_viewportRecordingService.LastRecordingErrorMessage}");
+            }
+            else
+            {
+                _viewModel.AppendImportantLog($"Video file was not created: {savedPath} ({_viewportRecordingService.RecordedFrameCount} frames)");
+            }
         }
     }
 
-    /// <summary>
-    /// 설정창 바깥 배경 클릭 시 설정창을 닫음.
-    /// </summary>
     private void SettingsBackdrop_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
         if (_viewModel.IsSettingsOpen)
@@ -278,9 +688,49 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>
-    /// 설정창을 페이드와 슬라이드 애니메이션으로 열고 닫음.
-    /// </summary>
+    private void WindowModeToggleButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        ToggleWindowMode();
+    }
+
+    private void ToggleWindowMode()
+    {
+        if (_isFullscreenMode)
+        {
+            WindowStyle = WindowStyle.SingleBorderWindow;
+            ResizeMode = ResizeMode.CanResize;
+            WindowState = WindowState.Normal;
+            Width = WindowedWidth;
+            Height = WindowedHeight;
+            Left = Math.Max(0, (SystemParameters.WorkArea.Width - Width) / 2);
+            Top = Math.Max(0, (SystemParameters.WorkArea.Height - Height) / 2);
+            _isFullscreenMode = false;
+            _viewModel.AppendImportantLog("화면 모드가 창모드로 전환되었습니다.");
+        }
+        else
+        {
+            WindowStyle = WindowStyle.None;
+            ResizeMode = ResizeMode.NoResize;
+            WindowState = WindowState.Maximized;
+            _isFullscreenMode = true;
+            _viewModel.AppendImportantLog("화면 모드가 전체화면으로 전환되었습니다.");
+        }
+
+        UpdateWindowModeButtonText();
+    }
+
+    private void UpdateWindowModeButtonText()
+    {
+        if (WindowModeToggleButton is null)
+        {
+            return;
+        }
+
+        WindowModeToggleButton.Content = _isFullscreenMode
+            ? "창모드로 전환"
+            : "전체화면으로 전환";
+    }
+
     private void AnimateSettingsDrawer(bool isOpen, bool animate)
     {
         if (!animate)
@@ -344,15 +794,16 @@ public partial class MainWindow : Window
         SettingsDrawerTransform.BeginAnimation(TranslateTransform.XProperty, drawerSlideAnimation, HandoffBehavior.SnapshotAndReplace);
     }
 
-    /// <summary>
-    /// 창 종료 시 이벤트 구독과 입력 장치 리소스를 정리함.
-    /// </summary>
     private void OnClosed(object? sender, EventArgs e)
     {
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
+        _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
+        _eoUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
         _irWebcamCaptureService.FrameReady -= OnIrFrameReady;
+        _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
         _irWebcamCaptureService.Dispose();
     }
 }
+

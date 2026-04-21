@@ -12,8 +12,8 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- 앱 전체 공통 색상 리소스임.
-                 App.xaml.cs에서 다크/라이트 테마 전환 시 함께 교체함. -->
+            <!-- 앱 전체 공통 색상 리소스.
+                 App.xaml.cs에서 다크/라이트 테마 전환 시 함께 교체. -->
             <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF161B24" />
             <SolidColorBrush x:Key="PanelBrush" Color="#FF242A35" />
             <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF464E5D" />
@@ -34,8 +34,7 @@
             <SolidColorBrush x:Key="TopBarButtonHoverBrush" Color="#FF394353" />
             <SolidColorBrush x:Key="TopBarButtonPressedBrush" Color="#FF465164" />
 
-            <!-- 화면 최하단 배경 그라데이션임.
-                 테마 전환 시 패널색과 함께 바꿔 전체 분위기를 맞춤. -->
+            <!-- 화면 최하단 배경 그라데이션.-->
             <LinearGradientBrush x:Key="WindowBackdropBrush" StartPoint="0,0" EndPoint="0,1">
                 <GradientStop Offset="0" Color="#FF1C2230" />
                 <GradientStop Offset="0.08" Color="#FF1A2742" />

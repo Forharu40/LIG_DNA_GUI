@@ -1,10 +1,10 @@
 using System.Windows;
 
+//WPF 리소스 딕셔너리 위치 정보 설정 파일
+//ThemeInfo 특성을 통해 테마 리소스 탐색 위치를 지정
+
 [assembly:ThemeInfo(
-    ResourceDictionaryLocation.None,            //where theme specific resource dictionaries are located
-                                                //(used if a resource is not found in the page,
-                                                // or application resource dictionaries)
-    ResourceDictionaryLocation.SourceAssembly   //where the generic resource dictionary is located
-                                                //(used if a resource is not found in the page,
-                                                // app, or any theme specific resource dictionaries)
+    ResourceDictionaryLocation.None,
+                                                
+    ResourceDictionaryLocation.SourceAssembly
 )]
