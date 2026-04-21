@@ -13,6 +13,7 @@ BENCHMARK_FRAMES = max(1, int(os.getenv("BENCHMARK_FRAMES", "180")))
 WARMUP_FRAMES = max(0, int(os.getenv("WARMUP_FRAMES", "20")))
 BENCHMARK_SIZE_A = os.getenv("BENCHMARK_SIZE_A", "1280x720")
 BENCHMARK_SIZE_B = os.getenv("BENCHMARK_SIZE_B", "480x270")
+BENCHMARK_OUTPUT_DIR = Path(os.getenv("BENCHMARK_OUTPUT_DIR", "/benchmark-output"))
 VIDEO_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".m4v"}
 
 
@@ -75,6 +76,18 @@ def measure_encode(frame, frame_count: int) -> tuple[list[float], list[int]]:
     return encode_times_ms, encoded_sizes
 
 
+def encode_sample(frame) -> bytes:
+    ok, encoded = cv2.imencode(
+        ".jpg",
+        frame,
+        [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
+    )
+    if not ok:
+        raise RuntimeError("cv2.imencode failed while writing sample")
+
+    return encoded.tobytes()
+
+
 def summarize(label: str, times_ms: list[float], sizes: list[int]) -> dict[str, float]:
     average_ms = statistics.fmean(times_ms)
     median_ms = statistics.median(times_ms)
@@ -120,6 +133,16 @@ def main() -> None:
     print(f"JPEG quality: {JPEG_QUALITY}")
     print(f"Warmup frames: {WARMUP_FRAMES}")
     print(f"Measured frames: {BENCHMARK_FRAMES}")
+    print(f"Sample output: {BENCHMARK_OUTPUT_DIR}")
+    print()
+
+    BENCHMARK_OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
+    sample_a_path = BENCHMARK_OUTPUT_DIR / f"sample_{width_a}x{height_a}_q{JPEG_QUALITY}.jpg"
+    sample_b_path = BENCHMARK_OUTPUT_DIR / f"sample_{width_b}x{height_b}_q{JPEG_QUALITY}.jpg"
+    sample_a_path.write_bytes(encode_sample(frame_a))
+    sample_b_path.write_bytes(encode_sample(frame_b))
+    print(f"Wrote sample A: {sample_a_path}")
+    print(f"Wrote sample B: {sample_b_path}")
     print()
 
     result_a = summarize(f"{width_a}x{height_a} encode", *measure_encode(frame_a, BENCHMARK_FRAMES))
