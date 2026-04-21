@@ -22,8 +22,8 @@ SOURCE_ROOT = Path(os.getenv("SOURCE_ROOT", "/data/MEVA"))
 VIDEO_PATH = os.getenv("VIDEO_PATH", "").strip()
 MODEL_PATH = os.getenv("MODEL_PATH", "yolo11n.pt").strip()
 CONFIDENCE = float(os.getenv("CONFIDENCE", "0.60"))
-INFERENCE_SIZE = int(os.getenv("INFERENCE_SIZE", "1280"))
-JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "85"))
+INFERENCE_SIZE = int(os.getenv("INFERENCE_SIZE", "640"))
+JPEG_QUALITY = int(os.getenv("JPEG_QUALITY", "45"))
 LOOP_VIDEO = os.getenv("LOOP_VIDEO", "true").lower() in {"1", "true", "yes", "on"}
 CLIP_START_SECONDS = float(os.getenv("CLIP_START_SECONDS", "0"))
 CLIP_DURATION_SECONDS = float(os.getenv("CLIP_DURATION_SECONDS", "10"))
@@ -32,9 +32,12 @@ SAMPLE_START_RATIO = float(os.getenv("SAMPLE_START_RATIO", "0.8"))
 BOX_THICKNESS = int(os.getenv("BOX_THICKNESS", "2"))
 FONT_SCALE = float(os.getenv("FONT_SCALE", "0.6"))
 LABEL_THICKNESS = int(os.getenv("LABEL_THICKNESS", "2"))
-MAX_UDP_BYTES = int(os.getenv("MAX_UDP_BYTES", "60000"))
+MAX_UDP_BYTES = int(os.getenv("MAX_UDP_BYTES", "45000"))
 TILE_OVERLAP_RATIO = float(os.getenv("TILE_OVERLAP_RATIO", "0.15"))
 DETECTION_INTERVAL_SECONDS = max(0.1, float(os.getenv("DETECTION_INTERVAL_SECONDS", "1.0")))
+STREAM_MAX_WIDTH = max(320, int(os.getenv("STREAM_MAX_WIDTH", "960")))
+STREAM_MAX_HEIGHT = max(240, int(os.getenv("STREAM_MAX_HEIGHT", "540")))
+ENABLE_TILE_INFERENCE = os.getenv("ENABLE_TILE_INFERENCE", "false").lower() in {"1", "true", "yes", "on"}
 ALLOWED_CLASSES = {
     name.strip().lower()
     for name in os.getenv(
@@ -286,6 +289,21 @@ def encode_frame_for_udp(frame) -> bytes | None:
     return None
 
 
+def prepare_stream_frame(frame):
+    source_height, source_width = frame.shape[:2]
+    scale = min(
+        1.0,
+        STREAM_MAX_WIDTH / max(1, source_width),
+        STREAM_MAX_HEIGHT / max(1, source_height),
+    )
+    if scale >= 0.999:
+        return frame
+
+    resized_width = max(2, int(source_width * scale))
+    resized_height = max(2, int(source_height * scale))
+    return cv2.resize(frame, (resized_width, resized_height), interpolation=cv2.INTER_AREA)
+
+
 def calculate_iou(a: dict, b: dict) -> float:
     inter_x1 = max(a["x1"], b["x1"])
     inter_y1 = max(a["y1"], b["y1"])
@@ -398,34 +416,35 @@ def detect_objects(model: YOLO, frame) -> list[dict]:
     )
     append_result_detections(full_frame_results, detections, 0, 0, source_width, source_height)
 
-    overlap_x = int(source_width * TILE_OVERLAP_RATIO)
-    overlap_y = int(source_height * TILE_OVERLAP_RATIO)
-    tile_width = max(64, (source_width // 2) + overlap_x)
-    tile_height = max(64, (source_height // 2) + overlap_y)
-    step_x = max(32, tile_width - overlap_x)
-    step_y = max(32, tile_height - overlap_y)
+    if ENABLE_TILE_INFERENCE:
+        overlap_x = int(source_width * TILE_OVERLAP_RATIO)
+        overlap_y = int(source_height * TILE_OVERLAP_RATIO)
+        tile_width = max(64, (source_width // 2) + overlap_x)
+        tile_height = max(64, (source_height // 2) + overlap_y)
+        step_x = max(32, tile_width - overlap_x)
+        step_y = max(32, tile_height - overlap_y)
 
-    for top in range(0, source_height, step_y):
-        for left in range(0, source_width, step_x):
-            bottom = min(source_height, top + tile_height)
-            right = min(source_width, left + tile_width)
-            tile = frame[top:bottom, left:right]
-            if tile.size == 0:
-                continue
+        for top in range(0, source_height, step_y):
+            for left in range(0, source_width, step_x):
+                bottom = min(source_height, top + tile_height)
+                right = min(source_width, left + tile_width)
+                tile = frame[top:bottom, left:right]
+                if tile.size == 0:
+                    continue
 
-            tile_results = model.predict(
-                tile,
-                conf=CONFIDENCE,
-                imgsz=INFERENCE_SIZE,
-                verbose=False,
-            )
-            append_result_detections(tile_results, detections, left, top, source_width, source_height)
+                tile_results = model.predict(
+                    tile,
+                    conf=CONFIDENCE,
+                    imgsz=INFERENCE_SIZE,
+                    verbose=False,
+                )
+                append_result_detections(tile_results, detections, left, top, source_width, source_height)
 
-            if right >= source_width:
+                if right >= source_width:
+                    break
+
+            if bottom >= source_height:
                 break
-
-        if bottom >= source_height:
-            break
 
     filtered = filter_allowed_detections(detections)
     return suppress_duplicate_detections(filtered)
@@ -460,6 +479,8 @@ def main() -> None:
     print(f"YOLO confidence threshold: {CONFIDENCE:.2f}")
     print(f"YOLO inference size: {INFERENCE_SIZE}")
     print(f"YOLO detection interval: every {DETECTION_INTERVAL_SECONDS:.2f} second(s)")
+    print(f"Stream max size: {STREAM_MAX_WIDTH}x{STREAM_MAX_HEIGHT}")
+    print(f"Tile inference enabled: {ENABLE_TILE_INFERENCE}")
     print(f"Allowed classes: {', '.join(sorted(ALLOWED_CLASSES))}")
     print(f"Max UDP payload target: {MAX_UDP_BYTES} bytes")
 
@@ -517,6 +538,8 @@ def main() -> None:
                         if not ok:
                             break
 
+                        stream_frame = prepare_stream_frame(frame)
+
                         now_monotonic = time.monotonic()
                         should_run_detection = (
                             last_detection_monotonic is None or
@@ -524,7 +547,7 @@ def main() -> None:
                         )
 
                         if should_run_detection:
-                            latest_detections = detect_objects(model, frame)
+                            latest_detections = detect_objects(model, stream_frame)
                             last_detection_monotonic = now_monotonic
 
                         detections = latest_detections
@@ -539,7 +562,7 @@ def main() -> None:
                                 f"[YOLO] frame={frame_index + 1} detections={len(detections)} "
                                 f"labels={preview_labels}"
                             )
-                        encoded_bytes = encode_frame_for_udp(frame)
+                        encoded_bytes = encode_frame_for_udp(stream_frame)
                         if encoded_bytes is None:
                             time.sleep(frame_delay)
                             continue
@@ -548,16 +571,16 @@ def main() -> None:
                         current_frame_stamp_ns = time.time_ns()
                         image_packet = build_image_packet(
                             encoded_bytes,
-                            frame.shape[1],
-                            frame.shape[0],
+                            stream_frame.shape[1],
+                            stream_frame.shape[0],
                             frame_index,
                             current_frame_stamp_ns,
                         )
                         detection_packet = build_detection_packet(
                             current_frame_stamp_ns,
                             frame_index,
-                            frame.shape[1],
-                            frame.shape[0],
+                            stream_frame.shape[1],
+                            stream_frame.shape[0],
                             detections,
                         )
                         sock.sendto(image_packet, (GUI_HOST, GUI_PORT))

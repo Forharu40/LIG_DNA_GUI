@@ -41,6 +41,7 @@ public partial class MainWindow : Window
     private bool _isRenderingOverlay;
     private string? _lastDetectionAlertSignature;
     private string? _lastFilteredOutTargetSignature;
+    private string? _lastOverlaySignature;
     private const int OverlayCacheLimit = 48;
     private const uint OverlayFrameTolerance = 12;
     private const float DisplayScoreThreshold = 0.60f;
@@ -153,7 +154,7 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.IsEoPrimary):
             case nameof(MainViewModel.SelectedPrimaryTarget):
                 UpdateRecordingViewportState();
-                RenderDetectionOverlay();
+                RenderDetectionOverlay(forceRefresh: true);
                 break;
 
             case nameof(MainViewModel.IsSettingsOpen):
@@ -166,7 +167,7 @@ public partial class MainWindow : Window
     {
         _viewModel.UpdateViewportSize(e.NewSize.Width, e.NewSize.Height);
         UpdateRecordingViewportState();
-        RenderDetectionOverlay();
+        RenderDetectionOverlay(forceRefresh: true);
     }
 
     private void CameraViewport_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -228,7 +229,6 @@ public partial class MainWindow : Window
         }
 
         _viewModel.UpdateEoFrame(frame.Bitmap);
-        RenderDetectionOverlay();
     }
 
     private void OnEoDetectionsReceived(DetectionPacket detectionPacket)
@@ -263,7 +263,7 @@ public partial class MainWindow : Window
 
         NotifyDetectionAlertIfNeeded(detectionPacket.FrameId, displayDetections);
         _viewModel.UpdateDetectionSummary(displayDetections);
-        RenderDetectionOverlay();
+        RenderDetectionOverlay(forceRefresh: true);
     }
 
     private void OnYoloStatusReceived(YoloStatusPacket statusPacket)
@@ -320,7 +320,7 @@ public partial class MainWindow : Window
             CameraViewport.ActualHeight);
     }
 
-    private void RenderDetectionOverlay()
+    private void RenderDetectionOverlay(bool forceRefresh = false)
     {
         if (_isRenderingOverlay)
         {
@@ -339,22 +339,30 @@ public partial class MainWindow : Window
 
             if (_latestEoFrame is null)
             {
+                _lastOverlaySignature = null;
                 return;
             }
 
             if (!TryGetRenderableFrameAndDetection(out var frameToRender, out var detectionPacket))
             {
-                _viewModel.UpdateEoFrame(_latestEoFrame.Value.Bitmap);
+                _lastOverlaySignature = null;
                 return;
             }
-
-            _viewModel.UpdateEoFrame(frameToRender.Bitmap);
 
             var displayDetections = FilterDisplayDetections(detectionPacket.Detections);
             if (displayDetections.Count == 0)
             {
+                _lastOverlaySignature = null;
                 return;
             }
+
+            var overlaySignature = BuildOverlaySignature(displayDetections);
+            if (!forceRefresh && string.Equals(_lastOverlaySignature, overlaySignature, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _lastOverlaySignature = overlaySignature;
 
             var sourceWidth = detectionPacket.Width > 0 ? detectionPacket.Width : frameToRender.Width;
             var sourceHeight = detectionPacket.Height > 0 ? detectionPacket.Height : frameToRender.Height;
@@ -395,6 +403,13 @@ public partial class MainWindow : Window
         {
             _isRenderingOverlay = false;
         }
+    }
+
+    private static string BuildOverlaySignature(IReadOnlyList<DetectionInfo> detections)
+    {
+        return string.Join(
+            "|",
+            detections.Select(d => $"{d.ObjectId}:{d.ClassName}:{d.X1:0}:{d.Y1:0}:{d.X2:0}:{d.Y2:0}"));
     }
 
     private void CacheEoFrame(ReceivedVideoFrame frame)
