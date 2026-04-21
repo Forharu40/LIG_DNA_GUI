@@ -33,8 +33,8 @@ sudo docker run --rm \
   -e CLIP_DURATION_SECONDS=10 \
   -e SAMPLE_INTERVAL_SECONDS=1800 \
   -e SAMPLE_START_RATIO=0.8 \
-  -e JPEG_QUALITY=60 \
-  -e MAX_UDP_BYTES=60000 \
+  -e JPEG_QUALITY=45 \
+  -e MAX_UDP_BYTES=55000 \
   -v ~/datashets/MEVA:/data/MEVA:ro \
   meva-yolo-demo
 ```
@@ -62,8 +62,8 @@ sudo docker run --rm \
   -e CLIP_DURATION_SECONDS=10 \
   -e SAMPLE_INTERVAL_SECONDS=1800 \
   -e SAMPLE_START_RATIO=0.8 \
-  -e JPEG_QUALITY=60 \
-  -e MAX_UDP_BYTES=60000 \
+  -e JPEG_QUALITY=45 \
+  -e MAX_UDP_BYTES=55000 \
   -v ~/datashets/MEVA:/data/MEVA:ro \
   meva-yolo-demo
 ```

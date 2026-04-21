@@ -94,7 +94,7 @@ ENABLE_ASYNC_UDP_SEND=true
 UDP 송신 버퍼는 기본값으로 `1048576 bytes`를 사용합니다.
 
 ```text
-UDP_SEND_BUFFER_BYTES=1048576
+UDP_SEND_BUFFER_BYTES=4194304
 ```
 
 더 높은 화질 테스트 시에는 다음처럼 늘릴 수 있습니다.
@@ -251,15 +251,15 @@ STAT + JSON
 | `GUI_PORT` | `5000` | GUI UDP 수신 포트 |
 | `SOURCE_ROOT` | `/data/MEVA` | 컨테이너 내부 MEVA 경로 |
 | `HOST_MEVA_PATH` | `$HOME/datashets/MEVA` | Jetson 실제 MEVA 경로 |
-| `STREAM_MAX_WIDTH` | `640` | GUI 송출 최대 너비 |
-| `STREAM_MAX_HEIGHT` | `360` | GUI 송출 최대 높이 |
-| `JPEG_QUALITY` | `35` | JPEG 품질 |
-| `MAX_UDP_BYTES` | `35000` | UDP payload 목표 크기 |
+| `STREAM_MAX_WIDTH` | `854` | GUI 송출 최대 너비 |
+| `STREAM_MAX_HEIGHT` | `480` | GUI 송출 최대 높이 |
+| `JPEG_QUALITY` | `45` | JPEG 품질 |
+| `MAX_UDP_BYTES` | `55000` | UDP payload 목표 크기 |
 | `INFERENCE_SIZE` | `640` | YOLO 입력 크기 |
 | `DETECTION_INTERVAL_SECONDS` | `0.5` | YOLO 추론 주기 |
 | `ENABLE_ASYNC_ENCODING` | `true` | JPEG 인코딩 쓰레드 사용 |
 | `ENABLE_ASYNC_UDP_SEND` | `true` | UDP 전송 쓰레드 사용 |
-| `UDP_SEND_BUFFER_BYTES` | `1048576` | UDP 송신 버퍼 목표 크기 |
+| `UDP_SEND_BUFFER_BYTES` | `4194304` | UDP 송신 버퍼 목표 크기 |
 
 ## 6. Docker 이미지
 
@@ -381,13 +381,13 @@ bash ./run_meva_yolo_demo.sh
 현재보다 화질을 올려 테스트할 때는 다음처럼 실행합니다.
 
 ```bash
-STREAM_MAX_WIDTH=854 STREAM_MAX_HEIGHT=480 JPEG_QUALITY=45 MAX_UDP_BYTES=55000 bash ./run_meva_yolo_demo.sh
+STREAM_MAX_WIDTH=960 STREAM_MAX_HEIGHT=540 JPEG_QUALITY=50 MAX_UDP_BYTES=60000 bash ./run_meva_yolo_demo.sh
 ```
 
 UDP 버퍼까지 늘려서 테스트하려면 다음처럼 실행합니다.
 
 ```bash
-UDP_SEND_BUFFER_BYTES=4194304 STREAM_MAX_WIDTH=854 STREAM_MAX_HEIGHT=480 JPEG_QUALITY=45 MAX_UDP_BYTES=55000 bash ./run_meva_yolo_demo.sh
+UDP_SEND_BUFFER_BYTES=4194304 STREAM_MAX_WIDTH=960 STREAM_MAX_HEIGHT=540 JPEG_QUALITY=50 MAX_UDP_BYTES=60000 bash ./run_meva_yolo_demo.sh
 ```
 
 ### 8-5. 쓰레드 기능 비교 실행
@@ -395,13 +395,13 @@ UDP_SEND_BUFFER_BYTES=4194304 STREAM_MAX_WIDTH=854 STREAM_MAX_HEIGHT=480 JPEG_QU
 인코딩 쓰레드와 UDP 전송 쓰레드를 모두 끄고 비교하려면 다음처럼 실행합니다.
 
 ```bash
-ENABLE_ASYNC_ENCODING=false ENABLE_ASYNC_UDP_SEND=false STREAM_MAX_WIDTH=854 STREAM_MAX_HEIGHT=480 JPEG_QUALITY=45 MAX_UDP_BYTES=55000 bash ./run_meva_yolo_demo.sh
+ENABLE_ASYNC_ENCODING=false ENABLE_ASYNC_UDP_SEND=false bash ./run_meva_yolo_demo.sh
 ```
 
 UDP 전송 쓰레드만 끄려면 다음처럼 실행합니다.
 
 ```bash
-ENABLE_ASYNC_UDP_SEND=false STREAM_MAX_WIDTH=854 STREAM_MAX_HEIGHT=480 JPEG_QUALITY=45 MAX_UDP_BYTES=55000 bash ./run_meva_yolo_demo.sh
+ENABLE_ASYNC_UDP_SEND=false bash ./run_meva_yolo_demo.sh
 ```
 
 ## 9. 한 줄 정리

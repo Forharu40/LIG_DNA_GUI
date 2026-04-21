@@ -474,7 +474,7 @@ ENABLE_ASYNC_UDP_SEND=true bash ./run_meva_yolo_demo.sh
 For a higher-quality stream test, raise quality gradually instead of jumping directly to `1280x720`:
 
 ```bash
-STREAM_MAX_WIDTH=854 STREAM_MAX_HEIGHT=480 JPEG_QUALITY=45 MAX_UDP_BYTES=55000 bash ./run_meva_yolo_demo.sh
+STREAM_MAX_WIDTH=960 STREAM_MAX_HEIGHT=540 JPEG_QUALITY=50 MAX_UDP_BYTES=60000 bash ./run_meva_yolo_demo.sh
 ```
 
 If the network path can handle it, increase the socket send buffer:

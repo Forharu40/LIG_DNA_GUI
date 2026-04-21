@@ -510,11 +510,7 @@ public partial class MainWindow : Window
     {
         var className = detection.ClassName.ToLowerInvariant();
         var primaryTarget = _viewModel.SelectedPrimaryTarget;
-        var scoreThreshold = primaryTarget == "\uBCF5\uD569" || primaryTarget == "\uBE44\uAD70\uC0AC \uD45C\uC801"
-            ? 0.70f
-            : DisplayScoreThreshold;
-
-        if (detection.Score < scoreThreshold)
+        if (detection.Score < DisplayScoreThreshold)
         {
             return false;
         }
