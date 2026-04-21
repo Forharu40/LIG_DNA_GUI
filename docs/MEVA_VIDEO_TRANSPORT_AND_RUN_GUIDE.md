@@ -375,7 +375,7 @@ bash ./run_meva_yolo_demo.sh
 
 ```bash
 cd ~/LIG_DNA_GUI/JetsonThor.MevaYoloDocker
-GUI_HOST=192.168.1.94 DETECTION_INTERVAL_SECONDS=1.0 bash ./run_meva_yolo_demo.sh
+GUI_HOST=192.168.1.94 DETECTION_INTERVAL_SECONDS=0.5 bash ./run_meva_yolo_demo.sh
 ```
 
 ---
