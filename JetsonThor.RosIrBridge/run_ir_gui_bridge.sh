@@ -4,7 +4,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 GUI_HOST="${GUI_HOST:-192.168.1.94}"
-GUI_PORT="${GUI_PORT:-5001}"
+GUI_PORT="${GUI_PORT:-5000}"
 IMAGE_TOPIC="${IMAGE_TOPIC:-/yolo/ir/image_raw}"
 DETECTION_TOPIC="${DETECTION_TOPIC:-/detections/ir}"
 STATUS_TOPIC="${STATUS_TOPIC:-/yolo/ir/status}"

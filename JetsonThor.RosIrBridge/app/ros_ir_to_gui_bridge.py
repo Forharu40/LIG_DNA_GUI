@@ -38,7 +38,7 @@ def getenv_float(name: str, default: float) -> float:
 
 
 GUI_HOST = os.getenv("GUI_HOST", "192.168.1.94")
-GUI_PORT = getenv_int("GUI_PORT", 5001)
+GUI_PORT = getenv_int("GUI_PORT", 5000)
 IMAGE_TOPIC = os.getenv("IMAGE_TOPIC", "/yolo/ir/image_raw")
 DETECTION_TOPIC = os.getenv("DETECTION_TOPIC", "/detections/ir")
 STATUS_TOPIC = os.getenv("STATUS_TOPIC", "/yolo/ir/status")

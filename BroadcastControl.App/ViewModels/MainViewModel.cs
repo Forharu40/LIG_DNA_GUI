@@ -27,7 +27,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private static readonly SolidColorBrush RecordingOffBrush = CreateBrush(0x41, 0x49, 0x55);
     private static readonly SolidColorBrush RecordingTextOffBrush = CreateBrush(0x92, 0x9D, 0xAA);
 
-    private bool _isEoPrimary = true;
+    private bool _isEoPrimary;
     private bool _isSettingsOpen;
     private bool _isSystemPoweredOn = true;
     private string _currentMode = "\uC790\uB3D9";
@@ -289,7 +289,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public string IrTitle => "IR cam";
 
-    public string EoSubtitle => "Jetson YOLO EO stream";
+    public string EoSubtitle => "Jetson YOLO EO stream (reserved)";
 
     public string IrSubtitle => "ZYBO10 -> Jetson YOLO IR stream";
 
