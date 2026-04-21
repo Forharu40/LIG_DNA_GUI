@@ -34,7 +34,7 @@ FONT_SCALE = float(os.getenv("FONT_SCALE", "0.6"))
 LABEL_THICKNESS = int(os.getenv("LABEL_THICKNESS", "2"))
 MAX_UDP_BYTES = int(os.getenv("MAX_UDP_BYTES", "60000"))
 TILE_OVERLAP_RATIO = float(os.getenv("TILE_OVERLAP_RATIO", "0.15"))
-DETECTION_INTERVAL_FRAMES = max(1, int(os.getenv("DETECTION_INTERVAL_FRAMES", "4")))
+DETECTION_INTERVAL_SECONDS = max(0.1, float(os.getenv("DETECTION_INTERVAL_SECONDS", "1.0")))
 ALLOWED_CLASSES = {
     name.strip().lower()
     for name in os.getenv(
@@ -459,7 +459,7 @@ def main() -> None:
     print(f"Sample start ratio: {SAMPLE_START_RATIO:.2f}")
     print(f"YOLO confidence threshold: {CONFIDENCE:.2f}")
     print(f"YOLO inference size: {INFERENCE_SIZE}")
-    print(f"YOLO detection interval: every {DETECTION_INTERVAL_FRAMES} frame(s)")
+    print(f"YOLO detection interval: every {DETECTION_INTERVAL_SECONDS:.2f} second(s)")
     print(f"Allowed classes: {', '.join(sorted(ALLOWED_CLASSES))}")
     print(f"Max UDP payload target: {MAX_UDP_BYTES} bytes")
 
@@ -472,6 +472,7 @@ def main() -> None:
         cycle_index = 0
         frame_index = 0
         latest_detections: list[dict] = []
+        last_detection_monotonic: float | None = None
         while True:
             for clip_index, entry in enumerate(sampled_entries, start=1):
                 capture = cv2.VideoCapture(str(entry.path))
@@ -516,13 +517,15 @@ def main() -> None:
                         if not ok:
                             break
 
+                        now_monotonic = time.monotonic()
                         should_run_detection = (
-                            frame_index == 0 or
-                            frame_index % DETECTION_INTERVAL_FRAMES == 0
+                            last_detection_monotonic is None or
+                            (now_monotonic - last_detection_monotonic) >= DETECTION_INTERVAL_SECONDS
                         )
 
                         if should_run_detection:
                             latest_detections = detect_objects(model, frame)
+                            last_detection_monotonic = now_monotonic
 
                         detections = latest_detections
                         if should_run_detection and detections:

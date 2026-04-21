@@ -100,11 +100,8 @@ public partial class MainWindow : Window
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
-        _eoUdpCaptureService.SegmentChanged += OnEoSegmentChanged;
-        _eoUdpCaptureService.SegmentLoopRestarted += OnEoSegmentLoopRestarted;
         _eoUdpCaptureService.DetectionsReceived += OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived += OnYoloStatusReceived;
-        _eoUdpCaptureService.DiagnosticsMessageReady += OnEoDiagnosticsMessageReady;
         _irWebcamCaptureService.FrameReady += OnIrFrameReady;
 
         _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
@@ -118,7 +115,6 @@ public partial class MainWindow : Window
 
         if (_eoUdpCaptureService.Start())
         {
-            _viewModel.AppendImportantLog($"MEVA YOLO UDP stream receiver is waiting on port {_eoUdpCaptureService.ListeningPort}.");
         }
         else
         {
@@ -229,7 +225,6 @@ public partial class MainWindow : Window
         if (!_hasReceivedEoFrame)
         {
             _hasReceivedEoFrame = true;
-            _viewModel.AppendImportantLog("EO UDP camera first frame received.");
         }
 
         _viewModel.UpdateEoFrame(frame.Bitmap);
@@ -244,8 +239,6 @@ public partial class MainWindow : Window
         if (!_hasReceivedDetectionPacket)
         {
             _hasReceivedDetectionPacket = true;
-            _viewModel.AppendImportantLog(
-                $"YOLO detection stream connected. first frameId={detectionPacket.FrameId}");
         }
 
         var displayDetections = FilterDisplayDetections(detectionPacket.Detections);
@@ -253,8 +246,6 @@ public partial class MainWindow : Window
         if (!_hasReceivedNonEmptyDetectionPacket && displayDetections.Count > 0)
         {
             _hasReceivedNonEmptyDetectionPacket = true;
-            _viewModel.AppendImportantLog(
-                $"YOLO non-empty detection received. frameId={detectionPacket.FrameId}, objects={displayDetections.Count}");
         }
 
         if (detectionPacket.Detections.Count > 0 && displayDetections.Count == 0)
@@ -263,8 +254,6 @@ public partial class MainWindow : Window
             if (!string.Equals(_lastFilteredOutTargetSignature, filteredSignature, StringComparison.Ordinal))
             {
                 _lastFilteredOutTargetSignature = filteredSignature;
-                _viewModel.AppendImportantLog(
-                    $"YOLO detections received, but none match the current primary target: {_viewModel.SelectedPrimaryTarget}");
             }
         }
         else
@@ -311,17 +300,14 @@ public partial class MainWindow : Window
 
     private void OnEoSegmentChanged(PlaybackSegmentInfo segmentInfo)
     {
-        _viewModel.AppendImportantLog(segmentInfo.ToLogMessage());
     }
 
     private void OnEoSegmentLoopRestarted(PlaybackSegmentInfo segmentInfo)
     {
-        _viewModel.AppendImportantLog(segmentInfo.ToLoopRestartLogMessage());
     }
 
     private void OnEoDiagnosticsMessageReady(string message)
     {
-        _viewModel.AppendImportantLog(message);
     }
 
     private void UpdateRecordingViewportState()
@@ -403,7 +389,6 @@ public partial class MainWindow : Window
             if (!_hasRenderedDetectionOverlay)
             {
                 _hasRenderedDetectionOverlay = true;
-                _viewModel.AppendImportantLog("YOLO overlay rendered on GUI.");
             }
         }
         finally
@@ -561,28 +546,7 @@ public partial class MainWindow : Window
 
     private void NotifyDetectionAlertIfNeeded(uint frameId, IReadOnlyList<DetectionInfo> detections)
     {
-        if (detections.Count == 0)
-        {
-            _lastDetectionAlertSignature = null;
-            return;
-        }
-
-        var preview = string.Join(
-            ", ",
-            detections
-                .Take(3)
-                .Select(d => $"{d.ClassName} object{d.ObjectId}"));
-        var signature = $"{frameId}:{preview}:{detections.Count}";
-        if (string.Equals(_lastDetectionAlertSignature, signature, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        _lastDetectionAlertSignature = signature;
-        var suffix = detections.Count > 3
-            ? $" 외 {detections.Count - 3}개"
-            : string.Empty;
-        _viewModel.AppendImportantLog($"YOLO detected: {preview}{suffix}");
+        _lastDetectionAlertSignature = detections.Count == 0 ? null : $"{frameId}:{detections.Count}";
     }
 
     private static void TrimCache<T>(Dictionary<uint, T> cache)
@@ -823,11 +787,8 @@ public partial class MainWindow : Window
     {
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
-        _eoUdpCaptureService.SegmentChanged -= OnEoSegmentChanged;
-        _eoUdpCaptureService.SegmentLoopRestarted -= OnEoSegmentLoopRestarted;
         _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
-        _eoUdpCaptureService.DiagnosticsMessageReady -= OnEoDiagnosticsMessageReady;
         _irWebcamCaptureService.FrameReady -= OnIrFrameReady;
         _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
