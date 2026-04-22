@@ -6,6 +6,7 @@ ARG MODEL_NAME=yolo11s.pt
 WORKDIR /app
 
 COPY app/stream_meva_yolo.py /app/stream_meva_yolo.py
+COPY app/stream_live_camera_yolo.py /app/stream_live_camera_yolo.py
 
 RUN pip install --no-cache-dir "lap>=0.5.12"
 
