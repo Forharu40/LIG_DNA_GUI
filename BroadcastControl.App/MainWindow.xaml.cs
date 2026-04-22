@@ -16,6 +16,13 @@ namespace BroadcastControl.App;
 
 public partial class MainWindow : Window
 {
+    private enum DisplayRotation
+    {
+        None,
+        Rotate180,
+        RotateLeft90
+    }
+
     private const double SettingsDrawerClosedOffset = 320;
     private const double WindowedWidth = 1600;
     private const double WindowedHeight = 900;
@@ -387,7 +394,21 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var overlaySignature = BuildOverlaySignature(displayDetections);
+            var rotation = GetCurrentDisplayRotation();
+            var originalSourceWidth = detectionPacket.Width > 0 ? detectionPacket.Width : frameToRender.Width;
+            var originalSourceHeight = detectionPacket.Height > 0 ? detectionPacket.Height : frameToRender.Height;
+            if (originalSourceWidth <= 0 || originalSourceHeight <= 0)
+            {
+                return;
+            }
+
+            var rotatedSourceWidth = GetRotatedWidth(originalSourceWidth, originalSourceHeight, rotation);
+            var rotatedSourceHeight = GetRotatedHeight(originalSourceWidth, originalSourceHeight, rotation);
+            var rotatedDetections = displayDetections
+                .Select(d => RotateDetectionForDisplay(d, originalSourceWidth, originalSourceHeight, rotation))
+                .ToArray();
+
+            var overlaySignature = $"{rotation}:{BuildOverlaySignature(rotatedDetections)}";
             if (!forceRefresh && string.Equals(_lastOverlaySignature, overlaySignature, StringComparison.Ordinal))
             {
                 return;
@@ -395,22 +416,15 @@ public partial class MainWindow : Window
 
             _lastOverlaySignature = overlaySignature;
 
-            var sourceWidth = detectionPacket.Width > 0 ? detectionPacket.Width : frameToRender.Width;
-            var sourceHeight = detectionPacket.Height > 0 ? detectionPacket.Height : frameToRender.Height;
-            if (sourceWidth <= 0 || sourceHeight <= 0)
-            {
-                return;
-            }
-
             var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
             var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
-            var baseScale = Math.Max(viewportWidth / sourceWidth, viewportHeight / sourceHeight);
-            var scaledWidth = sourceWidth * baseScale;
-            var scaledHeight = sourceHeight * baseScale;
+            var baseScale = Math.Max(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
+            var scaledWidth = rotatedSourceWidth * baseScale;
+            var scaledHeight = rotatedSourceHeight * baseScale;
             var baseLeft = (viewportWidth - scaledWidth) / 2.0;
             var baseTop = (viewportHeight - scaledHeight) / 2.0;
 
-            foreach (var detection in displayDetections)
+            foreach (var detection in rotatedDetections)
             {
                 var rectLeft = baseLeft + (detection.X1 * baseScale);
                 var rectTop = baseTop + (detection.Y1 * baseScale);
@@ -436,11 +450,79 @@ public partial class MainWindow : Window
         }
     }
 
+    private DisplayRotation GetCurrentDisplayRotation()
+    {
+        return _viewModel.IsEoPrimary
+            ? DisplayRotation.None
+            : DisplayRotation.RotateLeft90;
+    }
+
     private static string BuildOverlaySignature(IReadOnlyList<DetectionInfo> detections)
     {
         return string.Join(
             "|",
             detections.Select(d => $"{d.ObjectId}:{d.ClassName}:{d.X1:0}:{d.Y1:0}:{d.X2:0}:{d.Y2:0}"));
+    }
+
+    private static int GetRotatedWidth(int sourceWidth, int sourceHeight, DisplayRotation rotation)
+    {
+        return rotation == DisplayRotation.RotateLeft90 ? sourceHeight : sourceWidth;
+    }
+
+    private static int GetRotatedHeight(int sourceWidth, int sourceHeight, DisplayRotation rotation)
+    {
+        return rotation == DisplayRotation.RotateLeft90 ? sourceWidth : sourceHeight;
+    }
+
+    private static DetectionInfo RotateDetectionForDisplay(
+        DetectionInfo detection,
+        int sourceWidth,
+        int sourceHeight,
+        DisplayRotation rotation)
+    {
+        return rotation switch
+        {
+            DisplayRotation.Rotate180 => new DetectionInfo(
+                detection.ClassName,
+                detection.Score,
+                (float)(sourceWidth - detection.X2),
+                (float)(sourceHeight - detection.Y2),
+                (float)(sourceWidth - detection.X1),
+                (float)(sourceHeight - detection.Y1),
+                detection.ObjectId),
+            DisplayRotation.RotateLeft90 => RotateDetectionLeft90(detection, sourceWidth),
+            _ => detection
+        };
+    }
+
+    private static DetectionInfo RotateDetectionLeft90(DetectionInfo detection, int sourceWidth)
+    {
+        var rotatedCorners = new[]
+        {
+            RotatePointLeft90(detection.X1, detection.Y1, sourceWidth),
+            RotatePointLeft90(detection.X2, detection.Y1, sourceWidth),
+            RotatePointLeft90(detection.X2, detection.Y2, sourceWidth),
+            RotatePointLeft90(detection.X1, detection.Y2, sourceWidth)
+        };
+
+        var x1 = rotatedCorners.Min(point => point.X);
+        var y1 = rotatedCorners.Min(point => point.Y);
+        var x2 = rotatedCorners.Max(point => point.X);
+        var y2 = rotatedCorners.Max(point => point.Y);
+
+        return new DetectionInfo(
+            detection.ClassName,
+            detection.Score,
+            (float)x1,
+            (float)y1,
+            (float)x2,
+            (float)y2,
+            detection.ObjectId);
+    }
+
+    private static Point RotatePointLeft90(double x, double y, int sourceWidth)
+    {
+        return new Point(y, sourceWidth - x);
     }
 
     private static void CacheFrame(ReceivedVideoFrame frame, Dictionary<uint, ReceivedVideoFrame> frameCache)

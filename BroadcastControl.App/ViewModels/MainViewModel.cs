@@ -6,6 +6,7 @@ using System.Text;
 using System.Windows;
 using System.Windows.Input;
 using System.Windows.Media;
+using System.Windows.Media.Imaging;
 using BroadcastControl.App.Infrastructure;
 using BroadcastControl.App.Services;
 
@@ -431,9 +432,26 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     /// </summary>
     public void UpdateIrFrame(ImageSource? frame)
     {
-        _irFrame = frame;
+        _irFrame = RotateFrame(frame, -90);
         OnPropertyChanged(nameof(LargeFeedImage));
         OnPropertyChanged(nameof(InsetFeedImage));
+    }
+
+    private static ImageSource? RotateFrame(ImageSource? frame, double angle)
+    {
+        if (frame is not BitmapSource bitmap)
+        {
+            return frame;
+        }
+
+        if (Math.Abs(angle) < double.Epsilon)
+        {
+            return bitmap;
+        }
+
+        var transformed = new TransformedBitmap(bitmap, new RotateTransform(angle));
+        transformed.Freeze();
+        return transformed;
     }
 
     public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
