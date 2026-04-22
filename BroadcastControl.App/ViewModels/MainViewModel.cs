@@ -684,6 +684,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             case "Down":
                 _motorTilt = Math.Clamp(_motorTilt - 5, -45, 45);
                 break;
+            case "Center":
+                _motorPan = 0;
+                _motorTilt = 0;
+                AppendImportantLog("모터가 기본 중립 위치로 복귀했습니다.");
+                break;
         }
 
         OnPropertyChanged(nameof(MotorPanText));

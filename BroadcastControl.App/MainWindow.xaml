@@ -461,6 +461,14 @@
                                 <materialDesign:PackIcon Kind="ArrowLeftBold" Width="20" Height="20" />
                             </Button>
                             <Button Grid.Row="1"
+                                    Grid.Column="1"
+                                    Margin="0,6,0,6"
+                                    Command="{Binding MoveMotorCommand}"
+                                    CommandParameter="Center"
+                                    IsEnabled="{Binding CanUseMotorControls}"
+                                    Style="{StaticResource ArrowButton}"
+                                    Content="중립" />
+                            <Button Grid.Row="1"
                                     Grid.Column="2"
                                     Margin="6,6,0,6"
                                     Command="{Binding MoveMotorCommand}"
