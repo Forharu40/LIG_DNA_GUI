@@ -1,23 +1,12 @@
-# GUI_camera Standalone YOLO Guide
+# GUI_camera Bridge Guide
 
-이 문서는 `gui_camera`를 **완전히 분리된 독립 컨테이너**로 운용하는 방법을 설명한다.
+이 문서는 `gui_camera`를 현재 하드웨어 구조에 맞는 **EO GUI 브리지 전용 컨테이너**로 사용하는 방법을 설명한다.
 
-이제 `gui_camera`는 아래를 사용하지 않는다.
-
-- `minji-perception`
-- 공유 ROS2 workspace
-- 기존 `/video/eo/preprocessed` 토픽
-- 다른 사람이 사용 중인 Jetson ROS2 launch
-
-즉, `gui_camera`는 자기 컨테이너 안에서:
-
-1. 카메라를 직접 열고
-2. YOLO를 직접 수행하고
-3. JPEG / DETS / STAT UDP 패킷을 GUI로 직접 보낸다
+지금 구조에서는 Jetson이 카메라를 직접 여는 것이 아니라, 기존 시스템이 이미 만들고 있는 EO 토픽을 받아 GUI UDP 패킷으로 바꿔 보내는 것이 맞다.
 
 ---
 
-## 1. 쉽게 이해하는 Node / Topic / Packet
+## 0. 쉽게 이해하는 Node / Topic / Packet
 
 ### Node
 
@@ -25,25 +14,29 @@
 
 예:
 
-- 카메라 수신 프로그램
-- YOLO 추론 프로그램
-- GUI 송출 프로그램
+- 카메라 영상을 받는 프로그램
+- YOLO 추론을 하는 프로그램
+- GUI로 패킷을 보내는 프로그램
 
-지금 `gui_camera`는 이 세 역할을 **한 컨테이너 안에서 같이 수행하는 독립 실행 프로그램**이다.
+이번 `gui_camera`는 **EO GUI 송출만 담당하는 브리지 node**다.
 
 ### Topic
 
-`topic`은 ROS2 안에서 프로그램끼리 데이터를 주고받는 길이다.
+`topic`은 ROS2 안에서 node끼리 데이터를 주고받는 길이다.
 
-하지만 지금 새 `gui_camera` 방식은 **ROS2 topic을 아예 사용하지 않는다.**
+이번 방식에서 `gui_camera`가 받는 주요 topic은:
 
-즉, 이번 방식에서는 topic 의존이 없다.
+- `/yolo/eo/image_raw`
+- `/detections/eo`
+- `/yolo/eo/status`
+
+즉, 카메라/YOLO는 기존 시스템이 만들고, `gui_camera`는 그 결과만 받는다.
 
 ### Packet
 
-`packet`은 Jetson과 GUI PC 사이를 오가는 실제 UDP 데이터다.
+`packet`은 Jetson과 GUI PC 사이를 실제로 오가는 UDP 데이터다.
 
-지금 `gui_camera`는 아래 세 packet을 직접 보낸다.
+이번 `gui_camera`는 topic을 받아 아래 packet으로 바꿔 보낸다.
 
 - 영상 packet
 - detection packet
@@ -52,53 +45,67 @@
 짧게 정리하면:
 
 - `node` = 프로그램
-- `topic` = ROS2 내부 통신선
-- `packet` = Jetson과 GUI 사이 UDP 데이터
+- `topic` = ROS2 내부 통신
+- `packet` = GUI로 나가는 실제 UDP 데이터
 
-이번 `gui_camera`는:
+구조는 아래와 같다.
 
 ```text
-카메라 -> gui_camera 컨테이너 -> UDP packet -> GUI
+기존 EO 카메라/YOLO 시스템
+-> ROS2 topics
+-> gui_camera bridge
+-> UDP packets
+-> GUI
 ```
-
-구조다.
 
 ---
 
-## 2. 왜 완전 분리로 바꿨는가
+## 1. 왜 bridge 방식으로 바꿨는가
 
-기존 방식은 아래 문제가 있었다.
+현재 Jetson 환경에서는:
 
-- 다른 사람이 사용하는 `minji` workspace를 건드릴 수 있음
-- 공유 launch, shared topic, shared package 상태에 영향 받을 수 있음
-- 잘못하면 다른 사람 컨테이너나 workspace에 간섭하게 됨
+- `/dev/video*` 가 없음
+- `nvarguscamerasrc`도 `No cameras available`
 
-이번 변경의 목표는:
+즉 Jetson이 카메라를 직접 여는 독립 컨테이너 방식은 현재 장비 구조와 맞지 않는다.
 
-- 다른 사람 컨테이너와 완전히 분리
-- 다른 사람 workspace와 완전히 분리
-- 내 전용 image / container로만 실행
-- YOLO와 GUI 송출을 한 컨테이너에서 처리
+반면 기존 시스템에서는 이미 아래 EO 토픽이 살아 있다.
+
+- `/yolo/eo/image_raw`
+- `/detections/eo`
+- `/yolo/eo/status`
+
+그래서 `gui_camera`는 카메라를 직접 열지 않고, **이미 존재하는 EO 토픽을 GUI로 넘기는 브리지 역할만 하는 게 가장 안전하고 현실적**이다.
 
 ---
 
-## 3. 새 구조
-
-이제 `gui_camera`는 아래 구조다.
+## 2. 새 구조
 
 ```text
-EO/IR camera device
--> gui_camera container
-   -> camera capture
-   -> YOLO inference
-   -> JPEG encode
-   -> UDP image packet
-   -> UDP detection packet
-   -> UDP status packet
--> BroadcastControl GUI
+카메라 -> ZYBO10 -> 기존 수신/전처리/YOLO 시스템
+-> /yolo/eo/image_raw
+-> /detections/eo
+-> /yolo/eo/status
+-> gui_camera bridge container
+-> GUI UDP 5000
 ```
 
-즉, Jetson의 카메라 장치를 컨테이너에 직접 연결해서 사용한다.
+즉:
+
+- 기존 카메라/YOLO 쪽은 그대로
+- `gui_camera`는 EO GUI 송출만 담당
+
+---
+
+## 3. gui_camera가 구독하는 토픽
+
+기본값:
+
+- `IMAGE_TOPIC=/yolo/eo/image_raw`
+- `DETECTION_TOPIC=/detections/eo`
+- `STATUS_TOPIC=/yolo/eo/status`
+
+필요하면 환경변수로 다른 토픽으로 바꿀 수 있다.
 
 ---
 
@@ -134,7 +141,7 @@ EO/IR camera device
 DETS + compact JSON
 ```
 
-JSON 주요 필드:
+주요 필드:
 
 - `stampNs`
 - `frameId`
@@ -150,7 +157,7 @@ JSON 주요 필드:
 STAT + compact JSON
 ```
 
-JSON 주요 필드:
+주요 필드:
 
 - `enabled`
 - `modelLoaded`
@@ -159,8 +166,6 @@ JSON 주요 필드:
 - `source`
 - `stampNs`
 - `frameId`
-
-즉 GUI는 ROS2 없이도 이 UDP packet만 받으면 화면을 띄울 수 있다.
 
 ---
 
@@ -173,17 +178,13 @@ JSON 주요 필드:
 
 ### 컨테이너
 
-- 기본 컨테이너 이름: `gui_camera_node`
+- 기본 컨테이너 이름: `gui_camera_bridge`
 
 ### 베이스 이미지
 
-이제 베이스는 완전히 독립적으로:
+- `minji-perception`
 
-- `ultralytics/ultralytics:latest-nvidia-arm64`
-
-를 사용한다.
-
-즉 더 이상 `minji-perception`을 부모로 쓰지 않는다.
+이 이미지는 카메라 직접 입력용이 아니라, ROS2 topic bridge 용도다.
 
 ---
 
@@ -191,19 +192,16 @@ JSON 주요 필드:
 
 - `JetsonThor.MevaYoloDocker/Dockerfile.gui_camera`
 - `JetsonThor.MevaYoloDocker/app/gui_camera_yolo_node.py`
-- `JetsonThor.MevaYoloDocker/app/stream_live_camera_yolo.py`
 - `JetsonThor.MevaYoloDocker/run_gui_camera_yolo_node.sh`
 
 설명:
 
-- `stream_live_camera_yolo.py`
-  - 실제 카메라 캡처, YOLO 추론, JPEG/UDP 송출 구현
 - `gui_camera_yolo_node.py`
-  - `gui_camera` 전용 entrypoint
+  - 기존 EO ROS2 토픽을 GUI packet으로 바꾸는 브리지
 - `Dockerfile.gui_camera`
-  - 완전 독립 이미지 정의
+  - 브리지 전용 이미지
 - `run_gui_camera_yolo_node.sh`
-  - 전용 컨테이너 실행 스크립트
+  - 브리지 컨테이너 실행 스크립트
 
 ---
 
@@ -214,7 +212,7 @@ Jetson에서:
 ```bash
 cd ~/LIG_DNA_GUI
 git fetch origin
-git switch 2026_04_23_ver2_gui-camera-node
+git switch 2026_04_23_ver3_gui-camera-bridge
 git pull
 ```
 
@@ -230,114 +228,116 @@ bash ./run_gui_camera_yolo_node.sh --build
 ## 8. 기본값
 
 - image name: `gui_camera`
-- container name: `gui_camera_node`
-- base image: `ultralytics/ultralytics:latest-nvidia-arm64`
-- model: `yolo11s.pt`
-- camera source: `/dev/video0`
-- camera device mapping: `/dev/video0`
+- container name: `gui_camera_bridge`
+- base image: `minji-perception`
+- workspace: `$HOME/minji/ros2_ws`
+- workspace mount mode: `ro`
 - GUI host: `192.168.1.94`
 - GUI port: `5000`
+- image topic: `/yolo/eo/image_raw`
+- detection topic: `/detections/eo`
+- status topic: `/yolo/eo/status`
 
 ---
 
-## 9. 자주 쓰는 실행 예시
-
-### 기본 EO 카메라 실행
-
-```bash
-cd ~/LIG_DNA_GUI/JetsonThor.MevaYoloDocker
-bash ./run_gui_camera_yolo_node.sh --build
-```
-
-### 장치를 명시해서 실행
+## 9. 안전한 실행 예시
 
 ```bash
 cd ~/LIG_DNA_GUI/JetsonThor.MevaYoloDocker
 IMAGE_NAME=GUI_camera \
-CONTAINER_NAME=gui_camera_node \
-CAMERA_SOURCE=/dev/video0 \
-CAMERA_DEVICE=/dev/video0 \
-CAMERA_BACKEND=v4l2 \
-CAMERA_WIDTH=1280 \
-CAMERA_HEIGHT=720 \
-CAMERA_FPS=30 \
+CONTAINER_NAME=gui_camera_bridge \
+WORKSPACE_DIR=/home/lig/minji/ros2_ws \
+WORKSPACE_MOUNT_MODE=ro \
 GUI_HOST=192.168.1.94 \
 GUI_PORT=5000 \
+IMAGE_TOPIC=/yolo/eo/image_raw \
+DETECTION_TOPIC=/detections/eo \
+STATUS_TOPIC=/yolo/eo/status \
 bash ./run_gui_camera_yolo_node.sh --build
 ```
 
-### CSI / GStreamer source 예시
+이 방식은:
 
-```bash
-cd ~/LIG_DNA_GUI/JetsonThor.MevaYoloDocker
-CAMERA_SOURCE="nvarguscamerasrc ! video/x-raw(memory:NVMM), width=1280, height=720, framerate=30/1 ! nvvidconv ! video/x-raw, format=BGRx ! videoconvert ! video/x-raw, format=BGR ! appsink drop=true max-buffers=1" \
-CAMERA_DEVICE= \
-CAMERA_BACKEND=gstreamer \
-GUI_HOST=192.168.1.94 \
-GUI_PORT=5000 \
-bash ./run_gui_camera_yolo_node.sh --build
-```
+- 기존 카메라 장치를 직접 열지 않음
+- 기존 YOLO를 다시 돌리지 않음
+- 공유 workspace를 read-only로만 사용함
 
 ---
 
 ## 10. 이 방식에서 중요한 점
 
-이 방식은 완전히 분리되어 있으므로:
+이 방식은 카메라 장치에 의존하지 않는다.
 
-- 다른 사람 ROS2 launch를 안 건드린다
-- 다른 사람 workspace를 안 건드린다
-- 다른 사람 container를 안 건드린다
+대신 아래가 반드시 살아 있어야 한다.
 
-대신 아래는 필요하다.
+- `/yolo/eo/image_raw`
+- `/detections/eo`
+- `/yolo/eo/status`
 
-- Jetson에서 카메라 장치가 실제로 보여야 함
-  - 예: `/dev/video0`
-- 또는 GStreamer source가 실제로 열려야 함
-- GUI PC IP가 맞아야 함
-- GUI 프로그램이 켜져 있어야 함
+즉, 기존 카메라/YOLO 시스템이 먼저 정상 동작해야 한다.
 
-즉 이 방식의 핵심 의존성은 **ROS2 topic이 아니라 카메라 장치 자체**다.
+이 브리지는 그 다음 단계다.
 
 ---
 
-## 11. 지금 이 방식으로 바로 GUI에서 보이는 조건
+## 11. 지금 바로 GUI에서 보이려면
 
-조건이 맞으면, 이 방식은 ROS2 launch 없이도 바로 GUI에 영상을 보낼 수 있다.
+아래가 모두 만족돼야 한다.
 
-필요 조건:
-
-1. 카메라가 Jetson에 연결되어 있음
-2. `CAMERA_SOURCE`가 실제 장치를 가리킴
-3. 컨테이너가 카메라 장치를 열 수 있음
-4. GUI가 켜져 있음
+1. 기존 EO 카메라/YOLO 시스템이 켜져 있음
+2. `/yolo/eo/image_raw` 토픽이 실제로 발행 중임
+3. `gui_camera` 브리지 컨테이너가 실행 중임
+4. 운용통제 PC GUI가 켜져 있음
 
 즉:
 
 ```text
-카메라 on
-+ gui_camera container on
+기존 EO 시스템 on
++ gui_camera bridge on
 + GUI on
-= 영상 표시 가능
+= EO 영상 표시 가능
 ```
 
 ---
 
-## 12. 요약
+## 12. 확인 방법
 
-이번 `gui_camera`는 이제 아래 방식이다.
+Jetson에서 먼저:
 
-```text
-공유 ROS2 시스템 사용 X
-공유 workspace 사용 X
-공유 topic 사용 X
+```bash
+source /opt/ros/jazzy/setup.bash
+source /home/lig/minji/ros2_ws/install/setup.bash
+ros2 topic list | grep -E "/yolo/eo/image_raw|/detections/eo|/yolo/eo/status"
+ros2 topic hz /yolo/eo/image_raw
 ```
+
+그 다음 bridge 실행:
+
+```bash
+cd ~/LIG_DNA_GUI/JetsonThor.MevaYoloDocker
+bash ./run_gui_camera_yolo_node.sh --build
+```
+
+정상이라면 bridge 로그에:
+
+- `EO image topic: /yolo/eo/image_raw`
+- `Streaming EO GUI packets to 192.168.1.94:5000`
+- `First EO frame forwarded to GUI.`
+
+가 보여야 한다.
+
+---
+
+## 13. 요약
+
+이번 브랜치의 `gui_camera`는 더 이상 카메라를 직접 여는 컨테이너가 아니다.
 
 대신:
 
 ```text
-카메라 직접 열기
--> YOLO 직접 수행
--> GUI UDP 직접 송출
+기존 EO ROS2 토픽
+-> gui_camera bridge
+-> GUI UDP 송출
 ```
 
-즉, **완전히 독립된 내 전용 카메라+YOLO+GUI 송출 컨테이너**다.
+을 담당하는, 현재 장비 구조에 맞는 **안전한 EO GUI 브리지 컨테이너**다.
