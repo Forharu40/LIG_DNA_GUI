@@ -12,12 +12,13 @@ using BroadcastControl.App.Services;
 
 namespace BroadcastControl.App.ViewModels;
 
-/// 硫붿씤 ?붾㈃ ?곹깭, 紐⑤뱶, ?꾪뿕 ?깃툒, ?ㅼ젙 ?⑤꼸, 以???媛믪쓣 ??怨녹뿉??愿由ы븿.
-/// ?ㅼ젣 ?λ퉬? VLM ?곌껐 ????ViewModel???ㅼ떆媛?媛믪쓣 ?ｌ뼱 媛숈? ?붾㈃ 援ъ“瑜??좎???
+/// 메인 화면에서 사용하는 상태값을 한곳에서 관리하는 ViewModel이다.
+/// 화면 모드, 위험 등급, 카메라 영상, 설정 값, 로그, 줌 상태 같은 UI 데이터를 묶어서 제공한다.
+/// 현재는 데모 및 UDP 수신 화면 기준으로 동작하지만, 이후 실제 장비나 VLM 결과가 들어와도 같은 구조를 유지할 수 있도록 구성되어 있다.
 public sealed partial class MainViewModel : INotifyPropertyChanged
 {
-    /// 紐⑤뱶, ?꾪뿕 ?깃툒, 諛앷린/?議곕퉬, ?꾩옄 以? 濡쒓렇, ?뚮쭏 踰꾪듉 ?곹깭瑜?愿由ы븯??ViewModel??
-    // ?꾩옄 以?誘몃땲留듭? ?꾩옱 ?쒖빞瑜??쎄린 ?쎈룄濡??쎄컙 ?ш쾶 ?좎???
+    /// 모드, 위험 등급, 밝기/대조비, 줌, 로그, 테마 버튼 상태를 함께 관리한다.
+    // 미니맵은 현재 확대된 영역을 간단히 보여주는 용도이므로, 본 화면 비율에 맞춰 작은 크기로 고정한다.
     private const double MiniMapWidth = 130;
     private const double MiniMapHeight = 74;
 
@@ -34,7 +35,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private string _currentMode = "\uC790\uB3D9";
     private string _selectedPrimaryTarget = "\uBCF5\uD569";
     private string _currentThreatLevel = "\uB0AE\uC74C";
-    // ?꾨줈洹몃옩 ?쒖옉 ??諛앷린 湲곕낯媛믪? 以묐┰媛?50%濡??쒖옉??
+    // 프로그램을 처음 켰을 때 밝기는 중간값인 50%에서 시작한다.
     private double _brightness = 50;
     private double _contrast = 50;
     private bool _isManualRecordingEnabled;
@@ -48,7 +49,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private int _motorTilt;
 
     // EO와 IR 모두 Jetson에서 전달되는 UDP 영상을 표시한다.
-    // ?꾨젅???섏떊 ?꾩뿉???붾㈃??鍮꾩? ?딅룄濡?EO/IR 湲곕낯 ?덈궡 ?대?吏瑜?以鍮꾪븿.
+    // 실제 프레임을 아직 받지 못한 경우에도 화면이 비어 보이지 않도록 EO/IR 기본 안내 이미지를 미리 준비해둔다.
     private ImageSource? _eoFrame;
     private ImageSource? _irFrame;
     private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame("MEVA DEMO", Color.FromRgb(51, 94, 160));
@@ -56,7 +57,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public MainViewModel()
     {
-        // ?깆쓽 ?꾩옱 ?뚮쭏瑜??쎌뼱 ?ㅼ젙李?踰꾪듉 ?곹깭? 留욎땄.
+        // 앱이 현재 사용 중인 테마를 읽어서 설정 창 버튼 상태와 맞춘다.
         if (Application.Current is App app)
         {
             _currentThemeMode = app.CurrentThemeMode;
@@ -87,14 +88,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             "\uBE44\uAD70\uC0AC \uD45C\uC801",
         });
 
-        // ?붾㈃??紐⑤뱺 踰꾪듉? Command 諛붿씤?⑹쑝濡??곌껐?섎?濡??앹꽦?먯뿉????踰덉뿉 ?깅줉??
+        // 화면의 모든 버튼은 Command 바인딩으로 연결되므로 생성자에서 한 번에 등록한다.
         TogglePowerCommand = new RelayCommand(_ => TogglePower());
         SetModeCommand = new RelayCommand(SetMode, _ => IsSystemPoweredOn);
         ToggleSettingsCommand = new RelayCommand(_ => IsSettingsOpen = !IsSettingsOpen);
         SelectPrimaryTargetCommand = new RelayCommand(SelectPrimaryTarget, _ => IsSystemPoweredOn);
         ResetBrightnessCommand = new RelayCommand(_ => Brightness = 50, _ => IsSystemPoweredOn);
         ResetContrastCommand = new RelayCommand(_ => Contrast = 50, _ => IsSystemPoweredOn);
-        // ?꾩옄 以??쒕ぉ 踰꾪듉 ?대┃ ??湲곕낯 諛곗쑉 x1.0?쇰줈 蹂듦???
+        // 확대 제목 버튼을 누르면 기본 배율 x1.0으로 즉시 복귀한다.
         ResetZoomCommand = new RelayCommand(_ => ZoomLevel = 1.0, _ => CanUseZoomControls);
         ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsManualMode);
         SetThemeCommand = new RelayCommand(SetTheme);
@@ -161,7 +162,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public bool IsEoPrimary => _isEoPrimary;
 
-    // ?곷떒 ?꾩썝 踰꾪듉? ?꾨줈洹몃옩 醫낅즺 踰꾪듉?쇰줈 ?ъ슜??
+    // 상단 전원 버튼은 실제 프로그램 종료 버튼으로 사용한다.
     public string PowerButtonText => "\uC804\uC6D0 \uC885\uB8CC";
 
     public string CurrentMode
@@ -188,13 +189,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public string CurrentModeText => $"\uCE74\uBA54\uB77C \uBAA8\uB4DC: {CurrentMode}";
 
-    // ?꾩옱 紐⑤뱶 踰꾪듉留??좊챸?섍쾶 蹂댁뿬 蹂꾨룄 ?띿뒪???놁씠 ?곹깭瑜??쎄쾶 ??
+    // 현재 선택된 모드 버튼만 선명하게 보여서 별도 텍스트 없이도 상태를 알아볼 수 있게 한다.
     public double AutoModeOpacity => CurrentMode == "\uC790\uB3D9" ? 1.0 : 0.35;
 
     public double ManualModeOpacity => CurrentMode == "\uC218\uB3D9" ? 1.0 : 0.35;
 
-    // ?꾪뿕 ?깃툒 ?곸듅 ???ν썑 ?먮룞 ?뱁솕 ?쒖떆? ?곌껐???곹깭媛믪엫.
-    // ?뱁솕 ?쒖떆?깆? ?꾪뿕 ?곹솴 ?먮룞 ?뱁솕? ?섎룞 ?뱁솕瑜?紐⑤몢 諛섏쁺??
+    // 녹화 상태는 현재 수동 녹화 여부와 자동 녹화 조건을 함께 반영한 결과값이다.
+    // 자동 모드에서는 위험 등급이 높음일 때만 자동 녹화 상태로 간주하고,
+    // 수동 모드에서는 사용자가 직접 녹화를 켠 경우에만 활성화된다.
 
     public bool IsRecordingActive =>
         IsManualRecordingEnabled ||
@@ -226,7 +228,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double LightThemeButtonOpacity => IsLightThemeActive ? 1.0 : 0.55;
 
-    // ?섎룞 ?뱁솕???섎룞 紐⑤뱶?먯꽌留?耳쒓퀬 ?????덇쾶 ?쒗븳??
+    // 수동 녹화는 수동 모드에서만 켜고 끌 수 있도록 제한한다.
     public bool IsManualRecordingEnabled
     {
         get => _isManualRecordingEnabled;
@@ -285,7 +287,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public string PrimaryTargetText => $"\uC8FC \uD0D0\uC9C0\uCCB4: {SelectedPrimaryTarget}";
 
-    // ?곸긽 ???쇰꺼? 吏㏐쾶 ?좎????ㅼ젣 ?붾㈃????媛由щ룄濡???
+    // 카메라 이름은 짧고 명확하게 유지해서 실제 화면을 가리지 않도록 한다.
     public string EoTitle => "EO cam";
 
     public string IrTitle => "IR cam";
@@ -315,7 +317,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         get => _brightness;
         set
         {
-            // ?щ씪?대뜑 媛?蹂寃????쒖떆 ?띿뒪?몃룄 ?④퍡 媛깆떊??
+            // 슬라이더 값이 바뀌면 화면에 보이는 텍스트도 바로 갱신한다.
             if (SetProperty(ref _brightness, value))
             {
                 OnPropertyChanged(nameof(BrightnessText));
@@ -330,7 +332,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         get => _contrast;
         set
         {
-            // ?議곕퉬 ?レ옄 ?쒖떆? ?ㅼ젣 ?곸긽 蹂댁젙 媛믪쓣 ?숈씪?섍쾶 ?좎???
+            // 대조비 숫자 표시와 실제 영상 보정 값이 항상 같은 값을 보이도록 맞춘다.
             if (SetProperty(ref _contrast, value))
             {
                 OnPropertyChanged(nameof(ContrastText));
@@ -345,11 +347,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         get => _zoomLevel;
         set
         {
-            // ?꾩옄 以뚯? 怨쇳솗?瑜?留됯린 ?꾪빐 1.0~4.0 踰붿쐞濡??쒗븳??
+            // 지나친 확대를 막기 위해 줌 범위는 1.0~4.0 사이로 제한한다.
             var clamped = Math.Clamp(value, 1.0, 4.0);
             if (SetProperty(ref _zoomLevel, clamped))
             {
-                // 湲곕낯 諛곗쑉 蹂듦? ???붾㈃ ?대룞媛믩룄 以묒떖?쇰줈 珥덇린?뷀븿.
+                // 기본 배율로 돌아오면 이전에 이동해둔 화면 위치도 함께 중앙으로 초기화한다.
                 if (_zoomLevel <= 1.0)
                 {
                     _zoomPanX = 0;
@@ -391,7 +393,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
 
             var normalized = (_zoomPanX + maxPan) / (maxPan * 2);
-            // ?ㅼ젣 ?붾㈃ ?대룞 諛⑺뼢怨?誘몃땲留??쒖떆 諛⑺뼢??留욎텛湲??꾪빐 醫뚰몴瑜?諛섏쟾??
+            // 실제 화면 이동 방향과 미니맵 표시 방향을 맞추기 위해 좌표를 반대로 계산한다.
             return (1.0 - normalized) * (MiniMapWidth - MiniMapViewportWidth);
         }
     }
@@ -407,7 +409,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
 
             var normalized = (_zoomPanY + maxPan) / (maxPan * 2);
-            // ?ㅼ젣 ?붾㈃ ?대룞 諛⑺뼢怨?誘몃땲留??쒖떆 諛⑺뼢??留욎텛湲??꾪빐 醫뚰몴瑜?諛섏쟾??
+            // 실제 화면 이동 방향과 미니맵 표시 방향을 맞추기 위해 좌표를 반대로 계산한다.
             return (1.0 - normalized) * (MiniMapHeight - MiniMapViewportHeight);
         }
     }
@@ -417,7 +419,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public string MotorTiltText => $"모터 상하: {_motorTilt}도";
 
     /// <summary>
-    /// EO ?꾨젅?꾩쓣 ?붾㈃??諛섏쁺??
+    /// EO 카메라 프레임을 ViewModel에 반영한다.
+    /// EO가 메인 화면이든 보조 화면이든 관계없이, 바인딩된 이미지가 즉시 갱신되도록 알림을 보낸다.
     /// </summary>
     public void UpdateEoFrame(ImageSource? frame)
     {
@@ -427,8 +430,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?꾩떆 IR ?붾㈃?쇰줈 ?곕뒗 ?명듃遺?移대찓???꾨젅?꾩쓣 諛섏쁺??
-    /// EO/IR ?ㅼ솑 ?곹깭???곕씪 ?묒? ?붾㈃ ?먮뒗 ???붾㈃??利됱떆 諛섏쁺??
+    /// IR 카메라 프레임을 ViewModel에 반영한다.
+    /// 현재 장착 방향을 맞추기 위해 수신 프레임을 왼쪽으로 90도 회전한 뒤 화면에 사용한다.
+    /// EO/IR 화면이 서로 바뀐 상태여도 메인 화면과 보조 화면 모두 즉시 갱신된다.
     /// </summary>
     public void UpdateIrFrame(ImageSource? frame)
     {
@@ -461,7 +465,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 移대찓??酉고룷???ш린瑜?諛쏆븘 ?뺣? ?대룞 ?쒓퀎瑜??ㅼ떆 怨꾩궛??
+    /// 카메라 뷰포트의 실제 표시 크기를 받아 확대 이동 한계를 다시 계산한다.
+    /// 창 크기나 레이아웃이 바뀌었을 때 줌 이동 범위가 어긋나지 않도록 보정하는 용도다.
     /// </summary>
     public void UpdateViewportSize(double width, double height)
     {
@@ -472,7 +477,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?뺣? ?곹깭?먯꽌 留덉슦???쒕옒洹몃줈 ?붾㈃ ?꾩튂瑜??대룞??
+    /// 확대 상태에서 마우스 드래그로 화면 위치를 이동한다.
+    /// 확대 중이 아닐 때는 이동할 필요가 없으므로 아무 동작도 하지 않는다.
     /// </summary>
     public void PanZoom(double deltaX, double deltaY)
     {
@@ -490,7 +496,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 留덉슦?????낅젰?쇰줈 ?꾩옄 以?諛곗쑉??議곌툑??議곗젅??
+    /// 마우스 휠 입력으로 확대 배율을 조금씩 조절한다.
+    /// 수동 모드에서만 동작하며, 한 번 굴릴 때마다 0.1 단위로 배율을 변경한다.
     /// </summary>
     public void AdjustZoomByWheel(double wheelSteps)
     {
@@ -499,19 +506,20 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        // ????移몃쭏??0.1諛곗뵫 議곗젅???щ씪?대뜑? 鍮꾩듂??媛먮룄濡?留욎땄.
+        // 휠 한 칸마다 0.1 배씩 조절해서 슬라이더와 비슷한 감도로 맞춘다.
         ZoomLevel += wheelSteps * 0.1;
     }
 
     public void AppendImportantLog(string message)
     {
-        // 媛??理쒓렐 濡쒓렇媛 ?꾩뿉 ?ㅻ룄濡?留??욎뿉 異붽???
+        // 가장 최근 로그가 위에 보이도록 목록 앞부분에 추가한다.
         SystemLogs.Insert(0, new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), message));
         TrimCollection(SystemLogs, 8);
     }
 
     /// <summary>
-    /// ?쒖뒪??濡쒓렇瑜?諛뷀깢?붾㈃???쒓컙 湲곗? ?뚯씪紐낆쑝濡???ν븿.
+    /// 현재 시스템 로그를 바탕화면에 시간 기준 파일명으로 저장한다.
+    /// 나중에 테스트 기록이나 장애 추적 자료로 바로 활용할 수 있도록 UTF-8 형식으로 저장한다.
     /// </summary>
     private void SaveSystemLogsToDesktop()
     {
@@ -541,12 +549,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?곷떒 ?꾩썝 醫낅즺 踰꾪듉???ㅼ젣 ?숈옉??
-    /// ?꾪뿕 ?깃툒???믪쓬?????ㅼ닔濡??꾨줈洹몃옩???レ? 紐삵븯寃?留됱쓬.
+    /// 상단 전원 종료 버튼의 실제 동작을 처리한다.
+    /// 위험 등급이 높음인 경우에는 운용 중 실수로 프로그램을 닫지 못하도록 종료를 막는다.
     /// </summary>
     private void TogglePower()
     {
-        // ?꾪뿕 ?깃툒???믪쓬?대㈃ ?댁슜 以묒씤 ?꾨줈洹몃옩 醫낅즺瑜?李⑤떒??
+        // 위험 등급이 높음이면 사용 중인 프로그램 종료를 차단한다.
         if (CurrentThreatLevel == "\uB192\uC74C")
         {
             AppendImportantLog("\uC704\uD5D8 \uB4F1\uAE09\uC774 \uB192\uC74C \uC0C1\uD0DC\uC5EC\uC11C \uD504\uB85C\uADF8\uB7A8\uC744 \uC885\uB8CC\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
@@ -557,8 +565,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?먮룞/?섎룞 紐⑤뱶瑜??꾪솚??
-    /// ?먮룞 紐⑤뱶 蹂듦? ???섎룞 ?뱁솕, 紐⑦꽣 媛? 以?諛곗쑉??珥덇린?뷀븿.
+    /// 자동 모드와 수동 모드를 전환한다.
+    /// 자동 모드로 돌아가면 수동 녹화, 모터 각도, 확대 상태를 기본값으로 정리한다.
     /// </summary>
     private void SetMode(object? parameter)
     {
@@ -578,7 +586,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         {
             if (IsManualRecordingEnabled)
             {
-                // ?먮룞 紐⑤뱶 蹂듦? ???섎룞 ?뱁솕瑜?利됱떆 醫낅즺????ν븿.
+                // 자동 모드로 바뀌면 수동 녹화는 즉시 종료 상태로 맞춘다.
                 IsManualRecordingEnabled = false;
             }
 
@@ -593,8 +601,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?섎룞 ?뱁솕 踰꾪듉 ?대┃ ???곹깭瑜?諛섏쟾??
-    /// ?ㅼ젣 ?뚯씪 ????쒖옉/醫낅즺??MainWindow媛 ?쒕퉬?ㅼ? ?곌껐??泥섎━??
+    /// 수동 녹화 버튼을 눌렀을 때 상태를 반전한다.
+    /// 실제 파일 저장 시작/종료는 이후 서비스 계층이나 MainWindow 연동에서 처리할 수 있도록 상태만 관리한다.
     /// </summary>
     private void ToggleManualRecording()
     {
@@ -607,7 +615,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?ㅼ젙李쎌뿉?????뚮쭏瑜?吏곸젒 諛붽씀??紐낅졊 泥섎━??
+    /// 설정 창에서 테마를 직접 바꿀 때 호출되는 명령 처리부다.
+    /// 앱 전체 테마를 적용한 뒤 버튼 선택 상태와 로그도 함께 갱신한다.
     /// </summary>
     private void SetTheme(object? parameter)
     {
@@ -627,8 +636,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?ㅼ젙李쎌뿉??二??먯?泥??좏깮 ???꾩옱 ?좏깮 ?곹깭瑜?媛깆떊??
-    /// ?꾪뿕 ?깃툒? VLM 遺꾩꽍 寃곌낵媛 ?ㅼ뼱???뚮쭔 諛붾뚮룄濡??좎???
+    /// 설정 창에서 주 탐지체를 선택하면 현재 선택 상태를 갱신한다.
+    /// 지금 단계에서는 선택된 항목과 로그만 바꾸고, 위험 등급 변화는 이후 VLM 분석 결과와 연동할 때 반영한다.
     /// </summary>
     private void SelectPrimaryTarget(object? parameter)
     {
@@ -642,8 +651,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// EO/IR 硫붿씤 ?붾㈃怨??묒? ?몄뀑 ?붾㈃???쒕줈 援먯껜??
-    /// ?ъ슜?먭? ?묒? ?붾㈃???뚮윭 ?먰븯???곸긽???ш쾶 蹂????덇쾶 ??
+    /// EO와 IR의 메인 화면/보조 화면 위치를 서로 바꾼다.
+    /// 사용자가 작은 화면을 눌렀을 때 원하는 영상을 크게 볼 수 있도록 하는 동작이다.
     /// </summary>
     private void SwapFeeds()
     {
@@ -660,8 +669,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?섎룞 紐⑤뱶?먯꽌 紐⑦꽣 諛⑺뼢 踰꾪듉 ?대┃ ??醫뚯슦/?곹븯 媛곷룄瑜?蹂寃쏀븿.
-    /// ?꾩옱??UI ?쒕??덉씠??媛믪씠硫? ?댄썑 ?ㅼ젣 紐⑦꽣 ?쒖뼱 紐낅졊怨??곌껐 媛?ν븿.
+    /// 수동 모드에서 모터 방향 버튼을 누르면 좌우/상하 각도를 변경한다.
+    /// 현재는 UI 상태값만 바꾸지만, 이후 실제 모터 제어 명령과 연결하기 쉽게 분리해둔 구조다.
+    /// 중앙 버튼을 누르면 기본 중립 위치로 복귀한다.
     /// </summary>
     private void MoveMotor(object? parameter)
     {
@@ -696,8 +706,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?꾩옱 以??대룞 媛믪씠 ?덉슜 踰붿쐞瑜??섏? ?딅룄濡?蹂댁젙??
-    /// ?붾㈃ ?ш린??以?諛곗쑉 蹂寃????꾩슂???뺣━??
+    /// 현재 확대 이동 값이 허용 범위를 넘지 않도록 보정한다.
+    /// 화면 크기나 배율이 바뀐 뒤에도 이동 좌표가 튀지 않도록 정리하는 단계다.
     /// </summary>
     private void ClampZoomPan()
     {
@@ -712,7 +722,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double GetMaxPanY() => (_viewportHeight * (ZoomLevel - 1)) / 2;
 
     /// <summary>
-    /// ?꾩옄 以?誘몃땲留??ш컖?뺤쓽 ?ш린? ?꾩튂 ?ш퀎?곗쓣 UI???뚮┝.
+    /// 확대 미니맵 사각형의 크기와 위치가 바뀌었음을 UI에 알린다.
+    /// 줌 배율이나 이동 좌표가 바뀔 때마다 미니맵 표시도 함께 갱신된다.
     /// </summary>
     private void UpdateMiniMapViewport()
     {
@@ -723,8 +734,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 紐⑤뱶, ?꾩썝, 以?媛???щ? 蹂寃???踰꾪듉 ?쒖꽦 ?곹깭瑜??ㅼ떆 怨꾩궛??
-    /// 愿??紐낅졊 媛앹껜??CanExecuteChanged瑜???踰덉뿉 ?꾨떖??
+    /// 모드, 전원, 줌 가능 여부가 바뀌면 각 버튼의 활성 상태를 다시 계산한다.
+    /// 관련된 Command 객체에 CanExecuteChanged를 보내서 버튼이 즉시 켜지거나 꺼지도록 한다.
     /// </summary>
     private void RaiseAllCommandStates()
     {
@@ -754,8 +765,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?щ윭 怨녹뿉??諛섎났 ?ъ슜??怨좎젙 釉뚮윭???앹꽦.
-    /// Freeze 泥섎━濡??깅뒫怨?硫붾え由??ъ슜???덉젙?뷀븿.
+    /// 여러 곳에서 반복해서 사용하는 고정 색상 브러시를 생성한다.
+    /// Freeze 처리로 성능과 메모리 사용을 조금 더 안정적으로 유지한다.
     /// </summary>
     private static SolidColorBrush CreateBrush(byte r, byte g, byte b)
     {
@@ -765,12 +776,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?ㅼ젣 移대찓???꾨젅???섏떊 ??蹂댁뿬 以??뚮젅?댁뒪????대?吏瑜??앹꽦??
-    /// UI ?뚯뒪???④퀎?먯꽌 移대찓???곸뿭??鍮꾩뼱 蹂댁씠吏 ?딅룄濡???
+    /// 실제 카메라 프레임을 받기 전 화면에 보여줄 플레이스홀더 이미지를 만든다.
+    /// UI 테스트 단계나 연결 대기 상태에서 카메라 영역이 완전히 비어 보이지 않도록 하기 위한 용도다.
     /// </summary>
     private static ImageSource CreateCameraPlaceholderFrame(string label, Color accentColor)
     {
-        // ?ㅼ젣 ?낅젰 ?섏떊 ?꾩뿉??移대찓??諛곗튂 ?섎룄瑜??????덈룄濡??덈궡 ?꾨젅???앹꽦.
+        // 실제 입력을 받기 전에도 카메라 위치와 영역을 쉽게 알아볼 수 있도록 안내용 프레임을 만든다.
         var group = new DrawingGroup();
         using (var dc = group.Open())
         {
@@ -815,8 +826,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ViewModel 怨듯넻 ?띿꽦 蹂寃??꾩슦誘몄엫.
-    /// 媛믪씠 ?ㅼ젣濡?諛붾?寃쎌슦?먮쭔 PropertyChanged瑜?諛쒖깮?쒖폒 遺덊븘?뷀븳 媛깆떊??以꾩엫.
+    /// ViewModel 공통 속성 변경 도우미 메서드다.
+    /// 값이 실제로 바뀐 경우에만 PropertyChanged를 발생시켜 불필요한 화면 갱신을 줄인다.
     /// </summary>
     private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
     {
@@ -837,11 +848,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 }
 
 /// <summary>
-/// ?곹솴 遺꾩꽍 李쎌뿉 ?쒖떆??遺꾩꽍 臾몄옣??
+/// 상황 분석 영역에 표시할 분석 문장 한 줄을 나타낸다.
 /// </summary>
 public sealed record AnalysisItem(string Time, string Message);
 
 /// <summary>
-/// ?쒖뒪??濡쒓렇???쒖떆??以묒슂 ?곹깭 蹂????ぉ??
+/// 시스템 로그 영역에 표시할 주요 상태 변경 항목 한 줄을 나타낸다.
 /// </summary>
 public sealed record SystemLogItem(string Time, string Message);
