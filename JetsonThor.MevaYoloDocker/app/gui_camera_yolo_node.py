@@ -14,6 +14,7 @@ import cv2
 import numpy as np
 import rclpy
 from rclpy.node import Node
+from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 from sentinel_interfaces.msg import Detection2DArray, YoloStatus
 
@@ -198,7 +199,7 @@ class GuiCameraBridge(Node):
         self._last_height = 0
         self._first_frame_logged = False
 
-        self.create_subscription(Image, IMAGE_TOPIC, self._on_image, 10)
+        self.create_subscription(Image, IMAGE_TOPIC, self._on_image, qos_profile_sensor_data)
         self.create_subscription(Detection2DArray, DETECTION_TOPIC, self._on_detections, 10)
         self.create_subscription(YoloStatus, STATUS_TOPIC, self._on_status, 10)
 
