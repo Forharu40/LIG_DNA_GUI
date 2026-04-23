@@ -163,4 +163,10 @@ if [[ -n "$CAMERA_DEVICE" && -e "$CAMERA_DEVICE" ]]; then
   docker_args+=(--device "$CAMERA_DEVICE:$CAMERA_DEVICE")
 fi
 
+if [[ "$CAMERA_BACKEND" == "gstreamer" ]] || [[ "$CAMERA_SOURCE" == *"nvarguscamerasrc"* ]]; then
+  if [[ -S /tmp/argus_socket ]]; then
+    docker_args+=(-v /tmp/argus_socket:/tmp/argus_socket)
+  fi
+fi
+
 sudo docker run "${docker_args[@]}" "$IMAGE_NAME" python3 /app/gui_camera_yolo_node.py
