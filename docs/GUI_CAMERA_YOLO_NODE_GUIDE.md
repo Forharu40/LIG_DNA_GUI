@@ -159,7 +159,7 @@ IR ROS2 topics
 
 ## 4. 이번에 추가한 GUI_camera 구조
 
-이번 작업에서는 `minji-perception` 이미지를 기반으로, MEVA sender의 JPEG/UDP 최적화 로직과 IR ROS bridge의 ROS2 연동 방식을 결합한 새 노드를 추가했다.
+이번 작업에서는 `minji-perception` 이미지를 기반으로, MEVA sender가 사용하던 YOLO 런타임 환경과 JPEG/UDP 최적화 로직을 함께 흡수한 새 이미지를 만들고, IR ROS bridge의 ROS2 연동 방식을 결합한 새 노드를 추가했다.
 
 추가 파일:
 
@@ -171,6 +171,11 @@ IR ROS2 topics
 
 - 사용자 개념 이름: `GUI_camera`
 - 실제 Docker tag: `gui_camera`
+
+이 이미지는 개념적으로 아래 두 이미지를 합친 형태다.
+
+- ROS2/기존 시스템 기반: `minji-perception`
+- YOLO sender 기준 이미지: `ultralytics/ultralytics:latest-nvidia-arm64`
 
 ## 5. 새 노드가 하는 일
 
@@ -208,7 +213,7 @@ IR ROS2 topics
 
 ## 6. 무엇을 최적화했는가
 
-이 노드는 단순히 minji 이미지만 쓰는 것이 아니라, 기존 MEVA/live sender에서 이미 검증된 GUI 송출 로직을 가져와 ROS2 카메라 토픽용으로 바꿨다.
+이 노드는 단순히 minji 이미지만 쓰는 것이 아니라, 기존 MEVA/live sender에서 이미 검증된 GUI 송출 로직과 YOLO 런타임 준비 방식을 함께 가져와 ROS2 카메라 토픽용으로 바꿨다.
 
 핵심 최적화 포인트:
 
@@ -263,7 +268,9 @@ bash ./run_gui_camera_yolo_node.sh --build
 기본값:
 
 - image name: `gui_camera`
-- base image: `minji-perception`
+- ROS base image: `minji-perception`
+- YOLO reference image: `ultralytics/ultralytics:latest-nvidia-arm64`
+- bundled model: `yolo11s.pt`
 - workspace: `$HOME/minji/ros2_ws`
 - input topic: `/video/eo/preprocessed`
 - GUI target: `192.168.1.94:5000`
@@ -273,7 +280,9 @@ bash ./run_gui_camera_yolo_node.sh --build
 ```bash
 cd ~/LIG_DNA_GUI/JetsonThor.MevaYoloDocker
 IMAGE_NAME=GUI_camera \
-BASE_IMAGE=minji-perception \
+ROS_BASE_IMAGE=minji-perception \
+YOLO_REFERENCE_IMAGE=ultralytics/ultralytics:latest-nvidia-arm64 \
+MODEL_NAME=yolo11s.pt \
 WORKSPACE_DIR=/home/lig/minji/ros2_ws \
 GUI_HOST=192.168.1.94 \
 GUI_PORT=5000 \
@@ -293,14 +302,16 @@ bash ./run_gui_camera_yolo_node.sh --build
 실행 스크립트 `run_gui_camera_yolo_node.sh`는 아래를 수행한다.
 
 1. `GUI_camera` 이미지를 `Dockerfile.gui_camera`로 빌드
-2. `minji-perception` 을 base image로 사용
-3. Jetson ROS2 workspace를 `/ros2_ws` 로 mount
-4. 컨테이너 안에서:
+2. `minji-perception` 을 ROS base image로 사용
+3. MEVA sender 계열 이미지가 쓰던 Ultralytics 기반 환경에서 모델을 준비
+4. 최종 이미지에 YOLO 모델과 의존성을 포함
+5. Jetson ROS2 workspace를 `/ros2_ws` 로 mount
+6. 컨테이너 안에서:
    - `source /opt/ros/jazzy/setup.bash`
    - `source /ros2_ws/install/setup.bash`
    - `python3 /app/gui_camera_yolo_node.py`
-5. 노드가 ROS2 input topic을 받아 YOLO를 수행
-6. ROS2 output topic publish + GUI UDP packet 송출
+7. 노드가 ROS2 input topic을 받아 YOLO를 수행
+8. ROS2 output topic publish + GUI UDP packet 송출
 
 ## 10. 기존 방식과 비교
 

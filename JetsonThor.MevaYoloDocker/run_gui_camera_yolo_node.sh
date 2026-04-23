@@ -5,7 +5,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 IMAGE_NAME_INPUT="${IMAGE_NAME:-GUI_camera}"
 IMAGE_NAME="${IMAGE_NAME_INPUT,,}"
-BASE_IMAGE="${BASE_IMAGE:-minji-perception}"
+ROS_BASE_IMAGE="${ROS_BASE_IMAGE:-minji-perception}"
+YOLO_REFERENCE_IMAGE="${YOLO_REFERENCE_IMAGE:-ultralytics/ultralytics:latest-nvidia-arm64}"
+MODEL_NAME="${MODEL_NAME:-yolo11s.pt}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/minji/ros2_ws}"
 ROS_SETUP="${ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
 WORKSPACE_SETUP="${WORKSPACE_SETUP:-/ros2_ws/install/setup.bash}"
@@ -20,7 +22,7 @@ DRIVER_DETECTION_TOPIC="${DRIVER_DETECTION_TOPIC:-/driver/eo/detection}"
 STATUS_TOPIC="${STATUS_TOPIC:-/yolo/eo/status}"
 OUTPUT_FRAME_ID="${OUTPUT_FRAME_ID:-gui_camera_eo}"
 
-MODEL_PATH="${MODEL_PATH:-/ros2_ws/src/yolo_detector_pkg/model/best.onnx}"
+MODEL_PATH="${MODEL_PATH:-/opt/models/${MODEL_NAME}}"
 MODEL_INPUT_SIZE="${MODEL_INPUT_SIZE:-640}"
 CONFIDENCE="${CONFIDENCE:-0.60}"
 DETECTION_INTERVAL_SECONDS="${DETECTION_INTERVAL_SECONDS:-0.20}"
@@ -46,7 +48,7 @@ Options:
   --build    Force rebuild of the GUI_camera image.
 
 Important environment overrides:
-  IMAGE_NAME, BASE_IMAGE
+  IMAGE_NAME, ROS_BASE_IMAGE, YOLO_REFERENCE_IMAGE, MODEL_NAME
   WORKSPACE_DIR, ROS_SETUP, WORKSPACE_SETUP
   GUI_HOST, GUI_PORT
   INPUT_IMAGE_TOPIC, SYNCED_IMAGE_TOPIC, DETECTION_TOPIC
@@ -87,7 +89,9 @@ fi
 if [[ "$BUILD_IMAGE" -eq 1 ]]; then
   echo "Building Docker image: $IMAGE_NAME"
   sudo docker build \
-    --build-arg "BASE_IMAGE=$BASE_IMAGE" \
+    --build-arg "ROS_BASE_IMAGE=$ROS_BASE_IMAGE" \
+    --build-arg "YOLO_REFERENCE_IMAGE=$YOLO_REFERENCE_IMAGE" \
+    --build-arg "MODEL_NAME=$MODEL_NAME" \
     -f "$SCRIPT_DIR/Dockerfile.gui_camera" \
     -t "$IMAGE_NAME" \
     "$SCRIPT_DIR"
@@ -97,7 +101,10 @@ echo "Running GUI_camera ROS2 YOLO node"
 if [[ "$IMAGE_NAME_INPUT" != "$IMAGE_NAME" ]]; then
   echo "Docker image tags must be lowercase. Using IMAGE_NAME=$IMAGE_NAME (from $IMAGE_NAME_INPUT)"
 fi
-echo "IMAGE_NAME=$IMAGE_NAME BASE_IMAGE=$BASE_IMAGE"
+echo "IMAGE_NAME=$IMAGE_NAME"
+echo "ROS_BASE_IMAGE=$ROS_BASE_IMAGE"
+echo "YOLO_REFERENCE_IMAGE=$YOLO_REFERENCE_IMAGE"
+echo "MODEL_NAME=$MODEL_NAME"
 echo "WORKSPACE_DIR=$WORKSPACE_DIR"
 echo "GUI_HOST=$GUI_HOST GUI_PORT=$GUI_PORT"
 echo "INPUT_IMAGE_TOPIC=$INPUT_IMAGE_TOPIC"
