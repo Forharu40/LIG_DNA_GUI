@@ -1,0 +1,11 @@
+ARG BASE_IMAGE=minji-perception
+FROM ${BASE_IMAGE}
+
+WORKDIR /app
+
+COPY app/gui_camera_yolo_node.py /app/gui_camera_yolo_node.py
+
+ENV PYTHONUNBUFFERED=1 \
+    MODEL_PATH=/ros2_ws/src/yolo_detector_pkg/model/best.onnx
+
+CMD ["python3", "/app/gui_camera_yolo_node.py"]
