@@ -1,29 +1,20 @@
-ARG ROS_BASE_IMAGE=minji-perception
-ARG YOLO_REFERENCE_IMAGE=ultralytics/ultralytics:latest-nvidia-arm64
+ARG BASE_IMAGE=ultralytics/ultralytics:latest-nvidia-arm64
 ARG MODEL_NAME=yolo11s.pt
 
-FROM ${YOLO_REFERENCE_IMAGE} AS yolo_reference
+FROM ${BASE_IMAGE}
+
 ARG MODEL_NAME
+
+WORKDIR /app
+
+COPY app/stream_live_camera_yolo.py /app/stream_live_camera_yolo.py
+COPY app/gui_camera_yolo_node.py /app/gui_camera_yolo_node.py
 
 RUN pip install --no-cache-dir "lap>=0.5.12"
 
 RUN mkdir -p /opt/models \
     && python3 -c "from ultralytics import YOLO; YOLO('${MODEL_NAME}')" \
     && cp -f ${MODEL_NAME} /opt/models/${MODEL_NAME}
-
-FROM ${ROS_BASE_IMAGE}
-
-ARG MODEL_NAME
-
-WORKDIR /app
-
-COPY app/stream_meva_yolo.py /app/stream_meva_yolo.py
-COPY app/stream_live_camera_yolo.py /app/stream_live_camera_yolo.py
-COPY app/gui_camera_yolo_node.py /app/gui_camera_yolo_node.py
-
-RUN pip install --no-cache-dir "ultralytics>=8.3.0" "lap>=0.5.12"
-
-COPY --from=yolo_reference /opt/models /opt/models
 
 ENV PYTHONUNBUFFERED=1 \
     MODEL_NAME=${MODEL_NAME} \
