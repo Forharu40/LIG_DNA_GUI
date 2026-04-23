@@ -169,7 +169,8 @@ IR ROS2 topics
 
 컨테이너 이미지 이름:
 
-- `GUI_camera`
+- 사용자 개념 이름: `GUI_camera`
+- 실제 Docker tag: `gui_camera`
 
 ## 5. 새 노드가 하는 일
 
@@ -261,7 +262,7 @@ bash ./run_gui_camera_yolo_node.sh --build
 
 기본값:
 
-- image name: `GUI_camera`
+- image name: `gui_camera`
 - base image: `minji-perception`
 - workspace: `$HOME/minji/ros2_ws`
 - input topic: `/video/eo/preprocessed`

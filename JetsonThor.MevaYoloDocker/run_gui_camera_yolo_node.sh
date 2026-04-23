@@ -3,7 +3,8 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
-IMAGE_NAME="${IMAGE_NAME:-GUI_camera}"
+IMAGE_NAME_INPUT="${IMAGE_NAME:-GUI_camera}"
+IMAGE_NAME="${IMAGE_NAME_INPUT,,}"
 BASE_IMAGE="${BASE_IMAGE:-minji-perception}"
 WORKSPACE_DIR="${WORKSPACE_DIR:-$HOME/minji/ros2_ws}"
 ROS_SETUP="${ROS_SETUP:-/opt/ros/jazzy/setup.bash}"
@@ -93,6 +94,9 @@ if [[ "$BUILD_IMAGE" -eq 1 ]]; then
 fi
 
 echo "Running GUI_camera ROS2 YOLO node"
+if [[ "$IMAGE_NAME_INPUT" != "$IMAGE_NAME" ]]; then
+  echo "Docker image tags must be lowercase. Using IMAGE_NAME=$IMAGE_NAME (from $IMAGE_NAME_INPUT)"
+fi
 echo "IMAGE_NAME=$IMAGE_NAME BASE_IMAGE=$BASE_IMAGE"
 echo "WORKSPACE_DIR=$WORKSPACE_DIR"
 echo "GUI_HOST=$GUI_HOST GUI_PORT=$GUI_PORT"
