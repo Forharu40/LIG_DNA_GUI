@@ -26,7 +26,6 @@ FRAME_HEIGHT = getenv_int("FRAME_HEIGHT", 720)
 TARGET_FPS = max(1, getenv_int("TARGET_FPS", 10))
 JPEG_QUALITY = getenv_int("JPEG_QUALITY", 70)
 MAX_UDP_BYTES = getenv_int("MAX_UDP_BYTES", 60000)
-SHOW_PREVIEW = os.getenv("SHOW_PREVIEW", "true").strip().lower() in {"1", "true", "yes", "on"}
 
 
 def build_packet(encoded_bytes: bytes, frame_index: int, width: int, height: int) -> bytes:
@@ -88,11 +87,6 @@ def main() -> None:
                 print("First webcam UDP frame sent.")
                 first_logged = True
 
-            if SHOW_PREVIEW:
-                cv2.imshow("Laptop Webcam UDP Sender", frame)
-                if cv2.waitKey(1) & 0xFF == ord("q"):
-                    break
-
             elapsed = time.perf_counter() - started_at
             remaining = frame_interval_seconds - elapsed
             if remaining > 0:
@@ -100,8 +94,6 @@ def main() -> None:
     finally:
         capture.release()
         sock.close()
-        if SHOW_PREVIEW:
-            cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":

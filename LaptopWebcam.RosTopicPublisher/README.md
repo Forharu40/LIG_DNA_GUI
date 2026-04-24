@@ -23,6 +23,7 @@ Jetson 쪽 YOLO 브리지는 이 토픽을 구독해서
 ## 1. Windows CMD 권장 방식
 
 Windows 노트북에서 가장 간단한 방법은 ROS2 없이 UDP 송신기를 실행하는 것입니다.
+기본값은 노트북에 별도 미리보기 창을 띄우지 않고, Jetson과 GUI만 대상으로 송신합니다.
 
 필요 조건:
 
@@ -93,8 +94,6 @@ python .\webcam_ros_topic_publisher.py
 | `FRAME_HEIGHT` | `720` | 발행 영상 높이 |
 | `TARGET_FPS` | `10` | 발행 FPS |
 | `FRAME_ID` | `laptop_webcam_eo` | ROS 이미지 `header.frame_id` |
-| `SHOW_PREVIEW` | `true` | 노트북에서 미리보기 창 표시 여부 |
-
 ## 흐름
 
 ```text

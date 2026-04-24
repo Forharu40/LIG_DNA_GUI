@@ -130,6 +130,9 @@ set JETSON_PORT=5600
 run_webcam_udp_sender.cmd
 ```
 
+기본값은 노트북에 별도 미리보기 창을 띄우지 않고, Jetson -> GUI 경로만 사용합니다.
+즉 노트북은 송신만 하고, 실제 화면 확인은 `BroadcastControl.App` 안에서만 하게 됩니다.
+
 ROS2 토픽 방식:
 
 ```bash
