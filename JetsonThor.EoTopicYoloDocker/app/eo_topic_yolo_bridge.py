@@ -44,6 +44,17 @@ class EncodedFrame:
     detections: list[dict]
     frame_index: int
     frame_stamp_ns: int
+    encode_ms: float
+
+
+@dataclass(frozen=True)
+class EncodeRequest:
+    frame: np.ndarray
+    detection_width: int
+    detection_height: int
+    detections: list[dict]
+    frame_index: int
+    frame_stamp_ns: int
 
 
 def getenv_int(name: str, default: int) -> int:
@@ -89,6 +100,7 @@ MAX_UDP_BYTES = getenv_int("MAX_UDP_BYTES", 55000)
 YOLO_DEVICE = resolve_yolo_device()
 YOLO_HALF = getenv_bool("YOLO_HALF", YOLO_DEVICE != "cpu")
 METRICS_LOG_INTERVAL = max(0.2, getenv_float("METRICS_LOG_INTERVAL", 1.0))
+HORIZONTAL_FLIP = getenv_bool("HORIZONTAL_FLIP", True)
 
 
 def resolve_torch_device_index() -> int | None:
@@ -300,9 +312,11 @@ def encode_frame_for_packet(
     frame_index: int,
     frame_stamp_ns: int,
 ) -> EncodedFrame | None:
+    started_at = time.perf_counter()
     encoded_bytes = encode_frame_for_udp(frame)
     if encoded_bytes is None:
         return None
+    encode_ms = (time.perf_counter() - started_at) * 1000.0
 
     return EncodedFrame(
         encoded_bytes=encoded_bytes,
@@ -313,6 +327,7 @@ def encode_frame_for_packet(
         detections=[dict(detection) for detection in detections],
         frame_index=frame_index,
         frame_stamp_ns=frame_stamp_ns,
+        encode_ms=encode_ms,
     )
 
 
@@ -323,7 +338,8 @@ def send_encoded_frame(
     gui_port: int,
     source: str,
     model_loaded: bool,
-) -> None:
+) -> tuple[float, int, int, int]:
+    started_at = time.perf_counter()
     image_packet = build_image_packet(
         encoded_frame.encoded_bytes,
         encoded_frame.width,
@@ -351,6 +367,8 @@ def send_encoded_frame(
     sock.sendto(image_packet, (gui_host, gui_port))
     sock.sendto(detection_packet, (gui_host, gui_port))
     sock.sendto(status_packet, (gui_host, gui_port))
+    send_ms = (time.perf_counter() - started_at) * 1000.0
+    return send_ms, len(image_packet), len(detection_packet), len(status_packet)
 
 
 class EoTopicYoloBridge(Node):
@@ -373,14 +391,22 @@ class EoTopicYoloBridge(Node):
         self._latest_detection_width = 0
         self._latest_detection_height = 0
         self._latest_inference_ms = 0.0
+        self._latest_encode_ms = 0.0
+        self._latest_send_ms = 0.0
         self._latest_frame_width = 0
         self._latest_frame_height = 0
+        self._latest_image_packet_bytes = 0
+        self._latest_detection_packet_bytes = 0
+        self._latest_status_packet_bytes = 0
         self._input_frames_since_log = 0
         self._gui_frames_since_log = 0
         self._last_metrics_log_at = time.monotonic()
         self._pending_detection: Future[DetectionResult] | None = None
         self._pending_encoded_frame: Future[EncodedFrame | None] | None = None
-        self._pending_send: Future[None] | None = None
+        self._pending_send: Future[tuple[float, int, int, int]] | None = None
+        self._queued_detection_frame: np.ndarray | None = None
+        self._queued_encode_request: EncodeRequest | None = None
+        self._queued_encoded_frame: EncodedFrame | None = None
 
         if PUBLISH_OUTPUT_TOPIC:
             self._output_publisher = self.create_publisher(Image, OUTPUT_IMAGE_TOPIC, qos_profile_sensor_data)
@@ -394,6 +420,7 @@ class EoTopicYoloBridge(Node):
         self.get_logger().info(f"Using model: {MODEL_PATH}")
         self.get_logger().info(f"YOLO device: {YOLO_DEVICE} (cuda_available={torch.cuda.is_available()})")
         self.get_logger().info(f"YOLO half precision: {YOLO_HALF}")
+        self.get_logger().info(f"Horizontal flip: {HORIZONTAL_FLIP}")
         self.get_logger().info(f"Metrics log interval: {METRICS_LOG_INTERVAL:.1f}s")
 
     def _on_image(self, message: Image) -> None:
@@ -403,6 +430,14 @@ class EoTopicYoloBridge(Node):
         )
 
         try:
+            if self._pending_send is not None and self._pending_send.done():
+                send_ms, image_packet_bytes, detection_packet_bytes, status_packet_bytes = self._pending_send.result()
+                self._latest_send_ms = send_ms
+                self._latest_image_packet_bytes = image_packet_bytes
+                self._latest_detection_packet_bytes = detection_packet_bytes
+                self._latest_status_packet_bytes = status_packet_bytes
+                self._pending_send = None
+
             if self._pending_detection is not None and self._pending_detection.done():
                 detection_result = self._pending_detection.result()
                 self._latest_detections = detection_result.detections
@@ -410,30 +445,55 @@ class EoTopicYoloBridge(Node):
                 self._latest_detection_height = detection_result.height
                 self._latest_inference_ms = detection_result.inference_ms
                 self._pending_detection = None
+                if self._queued_detection_frame is not None:
+                    queued_detection_frame = self._queued_detection_frame
+                    self._queued_detection_frame = None
+                    self._pending_detection = self._detection_executor.submit(
+                        detect_objects_for_packet,
+                        self._model,
+                        queued_detection_frame,
+                    )
 
             if self._pending_encoded_frame is not None and self._pending_encoded_frame.done():
                 encoded_frame = self._pending_encoded_frame.result()
                 self._pending_encoded_frame = None
-                if encoded_frame is not None and self._pending_send is None:
-                    self._pending_send = self._send_executor.submit(
-                        send_encoded_frame,
-                        self._sock,
-                        encoded_frame,
-                        GUI_HOST,
-                        GUI_PORT,
-                        INPUT_IMAGE_TOPIC,
-                        self._model_loaded,
+                if encoded_frame is not None:
+                    self._latest_encode_ms = encoded_frame.encode_ms
+                    # Keep only the newest encoded frame while a send is in flight.
+                    self._queued_encoded_frame = encoded_frame
+                if self._queued_encode_request is not None:
+                    queued_encode_request = self._queued_encode_request
+                    self._queued_encode_request = None
+                    self._pending_encoded_frame = self._encode_executor.submit(
+                        encode_frame_for_packet,
+                        queued_encode_request.frame,
+                        queued_encode_request.detection_width,
+                        queued_encode_request.detection_height,
+                        queued_encode_request.detections,
+                        queued_encode_request.frame_index,
+                        queued_encode_request.frame_stamp_ns,
                     )
-                    self._gui_frames_since_log += 1
-                    if not self._first_gui_frame_logged:
-                        self.get_logger().info("First EO frame sent to GUI.")
-                        self._first_gui_frame_logged = True
 
-            if self._pending_send is not None and self._pending_send.done():
-                self._pending_send.result()
-                self._pending_send = None
+            if self._pending_send is None and self._queued_encoded_frame is not None:
+                encoded_frame = self._queued_encoded_frame
+                self._queued_encoded_frame = None
+                self._pending_send = self._send_executor.submit(
+                    send_encoded_frame,
+                    self._sock,
+                    encoded_frame,
+                    GUI_HOST,
+                    GUI_PORT,
+                    INPUT_IMAGE_TOPIC,
+                    self._model_loaded,
+                )
+                self._gui_frames_since_log += 1
+                if not self._first_gui_frame_logged:
+                    self.get_logger().info("First EO frame sent to GUI.")
+                    self._first_gui_frame_logged = True
 
             frame = ros_image_to_bgr(message)
+            if HORIZONTAL_FLIP:
+                frame = cv2.flip(frame, 1)
             self._frame_index += 1
             self._input_frames_since_log += 1
             self._latest_frame_width = frame.shape[1]
@@ -449,6 +509,8 @@ class EoTopicYoloBridge(Node):
                     self._model,
                     frame.copy(),
                 )
+            else:
+                self._queued_detection_frame = frame.copy()
 
             stream_frame = fit_frame_to_stream(frame)
             if self._pending_encoded_frame is None:
@@ -460,6 +522,15 @@ class EoTopicYoloBridge(Node):
                     [dict(detection) for detection in self._latest_detections],
                     self._frame_index,
                     frame_stamp_ns or time.time_ns(),
+                )
+            else:
+                self._queued_encode_request = EncodeRequest(
+                    frame=stream_frame.copy(),
+                    detection_width=self._latest_detection_width or frame.shape[1],
+                    detection_height=self._latest_detection_height or frame.shape[0],
+                    detections=[dict(detection) for detection in self._latest_detections],
+                    frame_index=self._frame_index,
+                    frame_stamp_ns=frame_stamp_ns or time.time_ns(),
                 )
 
             if self._output_publisher is not None:
@@ -476,7 +547,12 @@ class EoTopicYoloBridge(Node):
                     f"input_fps={input_fps:.1f} "
                     f"gui_fps={gui_fps:.1f} "
                     f"infer_ms={self._latest_inference_ms:.1f} "
+                    f"encode_ms={self._latest_encode_ms:.1f} "
+                    f"send_ms={self._latest_send_ms:.1f} "
                     f"frame={self._latest_frame_width}x{self._latest_frame_height} "
+                    f"image_kb={self._latest_image_packet_bytes / 1024:.1f} "
+                    f"dets_kb={self._latest_detection_packet_bytes / 1024:.1f} "
+                    f"stat_kb={self._latest_status_packet_bytes / 1024:.1f} "
                     f"gpu_alloc_mb={gpu_alloc_mb:.1f} "
                     f"gpu_reserved_mb={gpu_reserved_mb:.1f}"
                 )
