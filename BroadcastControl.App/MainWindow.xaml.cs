@@ -656,7 +656,7 @@ public partial class MainWindow : Window
 
         if (primaryTarget == "\uBCF5\uD569")
         {
-            return CompositeTargetClasses.Contains(className);
+            return true;
         }
 
         if (primaryTarget == "\uC0AC\uB78C")
