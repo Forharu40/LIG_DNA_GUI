@@ -14,6 +14,7 @@ import time
 import cv2
 import numpy as np
 import rclpy
+import torch
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
@@ -65,6 +66,13 @@ def getenv_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+def resolve_yolo_device() -> str:
+    requested = os.getenv("YOLO_DEVICE", "").strip()
+    if requested:
+        return requested
+    return "0" if torch.cuda.is_available() else "cpu"
+
+
 GUI_HOST = os.getenv("GUI_HOST", "192.168.1.94")
 GUI_PORT = getenv_int("GUI_PORT", 5000)
 INPUT_IMAGE_TOPIC = os.getenv("INPUT_IMAGE_TOPIC", "/video/eo/preprocessed")
@@ -77,6 +85,8 @@ STREAM_MAX_WIDTH = max(320, getenv_int("STREAM_MAX_WIDTH", 854))
 STREAM_MAX_HEIGHT = max(240, getenv_int("STREAM_MAX_HEIGHT", 480))
 JPEG_QUALITY = getenv_int("JPEG_QUALITY", 45)
 MAX_UDP_BYTES = getenv_int("MAX_UDP_BYTES", 55000)
+YOLO_DEVICE = resolve_yolo_device()
+YOLO_HALF = getenv_bool("YOLO_HALF", YOLO_DEVICE != "cpu")
 
 
 def ros_image_to_bgr(message: Image) -> np.ndarray:
@@ -238,7 +248,14 @@ def extract_detections(results, source_width: int, source_height: int) -> list[d
 
 
 def detect_objects_for_packet(model: YOLO, frame: np.ndarray) -> DetectionResult:
-    results = model.predict(frame, conf=CONFIDENCE, imgsz=INFERENCE_SIZE, verbose=False)
+    results = model.predict(
+        frame,
+        conf=CONFIDENCE,
+        imgsz=INFERENCE_SIZE,
+        verbose=False,
+        device=YOLO_DEVICE,
+        half=YOLO_HALF,
+    )
     return DetectionResult(
         width=frame.shape[1],
         height=frame.shape[0],
@@ -316,6 +333,7 @@ class WebcamTopicYoloBridge(Node):
         self._first_frame_logged = False
         self._first_gui_frame_logged = False
         self._sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        torch.backends.cudnn.benchmark = True
         self._model = YOLO(MODEL_PATH)
         self._model_loaded = True
         self._output_publisher = None
@@ -339,6 +357,8 @@ class WebcamTopicYoloBridge(Node):
             self.get_logger().info(f"Output image topic: {OUTPUT_IMAGE_TOPIC}")
         self.get_logger().info(f"Streaming GUI packets to {GUI_HOST}:{GUI_PORT}")
         self.get_logger().info(f"Using model: {MODEL_PATH}")
+        self.get_logger().info(f"YOLO device: {YOLO_DEVICE} (cuda_available={torch.cuda.is_available()})")
+        self.get_logger().info(f"YOLO half precision: {YOLO_HALF}")
 
     def _on_image(self, message: Image) -> None:
         frame_stamp_ns = (

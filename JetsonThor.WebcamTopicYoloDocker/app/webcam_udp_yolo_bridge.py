@@ -13,6 +13,7 @@ import time
 
 import cv2
 import numpy as np
+import torch
 from ultralytics import YOLO
 
 
@@ -54,6 +55,20 @@ def getenv_float(name: str, default: float) -> float:
         return default
 
 
+def getenv_bool(name: str, default: bool) -> bool:
+    value = os.getenv(name)
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def resolve_yolo_device() -> str:
+    requested = os.getenv("YOLO_DEVICE", "").strip()
+    if requested:
+        return requested
+    return "0" if torch.cuda.is_available() else "cpu"
+
+
 GUI_HOST = os.getenv("GUI_HOST", "192.168.1.94")
 GUI_PORT = getenv_int("GUI_PORT", 5000)
 LISTEN_PORT = getenv_int("LISTEN_PORT", 5600)
@@ -65,6 +80,8 @@ STREAM_MAX_HEIGHT = max(240, getenv_int("STREAM_MAX_HEIGHT", 480))
 JPEG_QUALITY = getenv_int("JPEG_QUALITY", 45)
 MAX_UDP_BYTES = getenv_int("MAX_UDP_BYTES", 55000)
 RECEIVE_BUFFER_BYTES = max(1024 * 1024, getenv_int("RECEIVE_BUFFER_BYTES", 8 * 1024 * 1024))
+YOLO_DEVICE = resolve_yolo_device()
+YOLO_HALF = getenv_bool("YOLO_HALF", YOLO_DEVICE != "cpu")
 
 
 def fit_frame_to_stream(frame: np.ndarray) -> np.ndarray:
@@ -179,7 +196,14 @@ def extract_detections(results, source_width: int, source_height: int) -> list[d
 
 
 def detect_objects_for_packet(model: YOLO, frame: np.ndarray) -> DetectionResult:
-    results = model.predict(frame, conf=CONFIDENCE, imgsz=INFERENCE_SIZE, verbose=False)
+    results = model.predict(
+        frame,
+        conf=CONFIDENCE,
+        imgsz=INFERENCE_SIZE,
+        verbose=False,
+        device=YOLO_DEVICE,
+        half=YOLO_HALF,
+    )
     return DetectionResult(
         width=frame.shape[1],
         height=frame.shape[0],
@@ -286,7 +310,10 @@ def main() -> None:
     print(f"Listening for laptop webcam UDP on 0.0.0.0:{LISTEN_PORT}")
     print(f"Streaming GUI packets to {GUI_HOST}:{GUI_PORT}")
     print(f"Using model: {MODEL_PATH}")
+    print(f"YOLO device: {YOLO_DEVICE} (cuda_available={torch.cuda.is_available()})")
+    print(f"YOLO half precision: {YOLO_HALF}")
 
+    torch.backends.cudnn.benchmark = True
     model = YOLO(MODEL_PATH)
     model_loaded = True
     input_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
