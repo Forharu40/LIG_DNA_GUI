@@ -16,7 +16,7 @@ RUN apt-get update \
         > /etc/apt/sources.list.d/ros2.list \
     && apt-get update \
     && apt-get install -y --no-install-recommends \
-        python3-rclpy \
+        ros-jazzy-rclpy \
         ros-jazzy-sensor-msgs \
     && rm -rf /var/lib/apt/lists/*
 
