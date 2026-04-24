@@ -6,7 +6,7 @@
 
 실험 목표는 다음과 같습니다.
 
-1. 노트북 웹캠 영상을 ROS2 토픽으로 Jetson에 전달
+1. 노트북 웹캠 영상을 Jetson에 전달
 2. Jetson에서 그 토픽을 입력으로 YOLO 수행
 3. Jetson이 GUI가 이해하는 기존 `image + DETS + STAT` UDP 패킷을 송출
 4. GUI에서 EO 실시간 영상과 바운딩 박스를 확인
@@ -28,13 +28,14 @@
 
 역할:
 
-- 노트북 웹캠 열기
-- `sensor_msgs/msg/Image`로 변환
-- `/video/eo/preprocessed` 토픽 발행
+- ROS2가 있을 때는 `/video/eo/preprocessed` 토픽 발행
+- Windows CMD만 있을 때는 Jetson으로 UDP 송신
 
 핵심 파일:
 
 - [C:\Users\buguen\Documents\New project\LaptopWebcam.RosTopicPublisher\webcam_ros_topic_publisher.py](C:\Users\buguen\Documents\New%20project\LaptopWebcam.RosTopicPublisher\webcam_ros_topic_publisher.py)
+- [C:\Users\buguen\Documents\New project\LaptopWebcam.RosTopicPublisher\webcam_udp_sender.py](C:\Users\buguen\Documents\New%20project\LaptopWebcam.RosTopicPublisher\webcam_udp_sender.py)
+- [C:\Users\buguen\Documents\New project\LaptopWebcam.RosTopicPublisher\run_webcam_udp_sender.cmd](C:\Users\buguen\Documents\New%20project\LaptopWebcam.RosTopicPublisher\run_webcam_udp_sender.cmd)
 - [C:\Users\buguen\Documents\New project\LaptopWebcam.RosTopicPublisher\README.md](C:\Users\buguen\Documents\New%20project\LaptopWebcam.RosTopicPublisher\README.md)
 
 ### 2. Jetson 측
@@ -43,20 +44,35 @@
 
 역할:
 
-- `/video/eo/preprocessed` 구독
-- Jetson에서 YOLO 수행
-- 선택적으로 `/yolo/eo/image_raw` 재발행
-- GUI UDP `5000`으로 EO 영상 + DETS + STAT 송출
+- ROS2 입력 모드:
+  - `/video/eo/preprocessed` 구독
+- Windows UDP 입력 모드:
+  - 노트북이 보내는 UDP 웹캠 프레임 수신
+- 공통:
+  - Jetson에서 YOLO 수행
+  - 선택적으로 `/yolo/eo/image_raw` 재발행
+  - GUI UDP `5000`으로 EO 영상 + DETS + STAT 송출
 
 핵심 파일:
 
 - [C:\Users\buguen\Documents\New project\JetsonThor.WebcamTopicYoloDocker\Dockerfile](C:\Users\buguen\Documents\New%20project\JetsonThor.WebcamTopicYoloDocker\Dockerfile)
 - [C:\Users\buguen\Documents\New project\JetsonThor.WebcamTopicYoloDocker\run_webcam_topic_yolo.sh](C:\Users\buguen\Documents\New%20project\JetsonThor.WebcamTopicYoloDocker\run_webcam_topic_yolo.sh)
+- [C:\Users\buguen\Documents\New project\JetsonThor.WebcamTopicYoloDocker\run_webcam_udp_yolo.sh](C:\Users\buguen\Documents\New%20project\JetsonThor.WebcamTopicYoloDocker\run_webcam_udp_yolo.sh)
 - [C:\Users\buguen\Documents\New project\JetsonThor.WebcamTopicYoloDocker\app\webcam_topic_yolo_bridge.py](C:\Users\buguen\Documents\New%20project\JetsonThor.WebcamTopicYoloDocker\app\webcam_topic_yolo_bridge.py)
+- [C:\Users\buguen\Documents\New project\JetsonThor.WebcamTopicYoloDocker\app\webcam_udp_yolo_bridge.py](C:\Users\buguen\Documents\New%20project\JetsonThor.WebcamTopicYoloDocker\app\webcam_udp_yolo_bridge.py)
 
 ## 전체 흐름
 
 ```text
+Windows laptop webcam
+-> webcam_udp_sender.py
+-> Jetson webcam_udp_yolo_bridge.py
+-> YOLO inference on Jetson
+-> GUI UDP 5000
+-> BroadcastControl.App overlay
+
+또는
+
 Laptop webcam
 -> /video/eo/preprocessed
 -> Jetson webcam_topic_yolo_bridge.py
@@ -72,6 +88,18 @@ Laptop webcam
 운용통제 PC에서 `BroadcastControl.App`를 실행합니다.
 
 ### 2. Jetson에서 YOLO 브리지 실행
+
+Windows CMD용 권장 방식:
+
+```bash
+cd ~/LIG_DNA_GUI/JetsonThor.WebcamTopicYoloDocker
+GUI_HOST=192.168.1.94 \
+GUI_PORT=5000 \
+LISTEN_PORT=5600 \
+bash ./run_webcam_udp_yolo.sh --build
+```
+
+ROS2 토픽 방식:
 
 ```bash
 cd ~/LIG_DNA_GUI/JetsonThor.WebcamTopicYoloDocker
@@ -91,7 +119,18 @@ First webcam topic frame received.
 First EO frame sent to GUI.
 ```
 
-### 3. 노트북에서 웹캠 토픽 발행
+### 3. 노트북에서 웹캠 전송
+
+Windows CMD 권장 방식:
+
+```cmd
+cd C:\work\LIG_DNA_GUI\LaptopWebcam.RosTopicPublisher
+set JETSON_HOST=192.168.1.50
+set JETSON_PORT=5600
+run_webcam_udp_sender.cmd
+```
+
+ROS2 토픽 방식:
 
 ```bash
 cd ~/LIG_DNA_GUI/LaptopWebcam.RosTopicPublisher
@@ -106,6 +145,7 @@ python3 ./webcam_ros_topic_publisher.py
 
 1. 노트북 웹캠 실시간 입력으로 Jetson YOLO를 시험
 2. GUI는 기존 MEVA 데모와 같은 패킷 형식을 그대로 사용
+3. Windows CMD 환경에서도 ROS2 설치 없이 빠르게 시도
 
 즉 GUI를 별도로 바꾸지 않고도, 입력만 `MEVA video file`에서 `laptop webcam ROS topic`으로 바뀌도록 만든 것입니다.
 
@@ -114,4 +154,5 @@ python3 ./webcam_ros_topic_publisher.py
 - 현재 실험은 EO 1채널 기준입니다.
 - `sentinel_interfaces` 커스텀 ROS 메시지는 직접 발행하지 않습니다.
 - 바운딩 박스는 ROS detection topic이 아니라 `DETS + JSON` UDP 패킷으로 GUI에 전달됩니다.
-- 노트북과 Jetson의 `ROS_DOMAIN_ID`가 반드시 같아야 합니다.
+- ROS2 토픽 방식에서는 노트북과 Jetson의 `ROS_DOMAIN_ID`가 반드시 같아야 합니다.
+- Windows CMD UDP 방식에서는 ROS2가 없어도 됩니다.

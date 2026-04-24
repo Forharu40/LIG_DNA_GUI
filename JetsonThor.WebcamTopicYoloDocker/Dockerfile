@@ -23,6 +23,7 @@ RUN apt-get update \
 WORKDIR /app
 
 COPY app/webcam_topic_yolo_bridge.py /app/webcam_topic_yolo_bridge.py
+COPY app/webcam_udp_yolo_bridge.py /app/webcam_udp_yolo_bridge.py
 
 RUN mkdir -p /opt/models \
     && python3 -c "from ultralytics import YOLO; YOLO('${MODEL_NAME}')" \

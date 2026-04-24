@@ -1,6 +1,11 @@
 # LaptopWebcam.RosTopicPublisher
 
-노트북 웹캠 영상을 ROS2 이미지 토픽으로 발행해서 Jetson으로 보내는 실험용 폴더입니다.
+노트북 웹캠 영상을 Jetson으로 보내는 실험용 폴더입니다.
+
+이 폴더에는 두 가지 방식이 들어 있습니다.
+
+1. ROS2 토픽 발행 방식
+2. Windows CMD에서 바로 실행 가능한 UDP 송신 방식
 
 이 실험은 `YOLO_DETECTOR_GUI_INTERFACE (1).md`에 나온 EO 입력 토픽 이름을 그대로 재사용합니다.
 
@@ -14,6 +19,41 @@ Jetson 쪽 YOLO 브리지는 이 토픽을 구독해서
 - GUI UDP `5000` 포트로 실시간 EO 영상 + DETS + STAT 송출
 
 을 수행합니다.
+
+## 1. Windows CMD 권장 방식
+
+Windows 노트북에서 가장 간단한 방법은 ROS2 없이 UDP 송신기를 실행하는 것입니다.
+
+필요 조건:
+
+- Python 설치
+- OpenCV 설치
+  - `pip install opencv-python`
+
+실행:
+
+```cmd
+cd C:\work\LIG_DNA_GUI\LaptopWebcam.RosTopicPublisher
+set JETSON_HOST=192.168.1.50
+set JETSON_PORT=5600
+run_webcam_udp_sender.cmd
+```
+
+직접 Python으로 실행해도 됩니다.
+
+```cmd
+cd C:\work\LIG_DNA_GUI\LaptopWebcam.RosTopicPublisher
+set JETSON_HOST=192.168.1.50
+set JETSON_PORT=5600
+python webcam_udp_sender.py
+```
+
+주요 파일:
+
+- `webcam_udp_sender.py`
+- `run_webcam_udp_sender.cmd`
+
+## 2. ROS2 토픽 방식
 
 ## 준비 조건
 
@@ -58,8 +98,15 @@ python .\webcam_ros_topic_publisher.py
 ## 흐름
 
 ```text
+Windows CMD webcam sender
+-> Jetson UDP receiver
+-> Jetson YOLO bridge
+-> GUI UDP 5000
+
+또는
+
 Laptop webcam
 -> /video/eo/preprocessed
--> Jetson YOLO bridge
+-> Jetson topic YOLO bridge
 -> GUI UDP 5000
 ```

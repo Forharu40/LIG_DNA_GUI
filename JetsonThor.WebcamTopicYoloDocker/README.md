@@ -1,6 +1,11 @@
 # JetsonThor.WebcamTopicYoloDocker
 
-노트북 웹캠 영상을 ROS2 토픽으로 Jetson에 보내고, Jetson에서 기존 MEVA 데모와 같은 YOLO + GUI UDP 패킷 형식으로 처리하는 실험용 폴더입니다.
+노트북 웹캠 영상을 Jetson에 보내고, Jetson에서 기존 MEVA 데모와 같은 YOLO + GUI UDP 패킷 형식으로 처리하는 실험용 폴더입니다.
+
+이 폴더는 두 가지 입력 방식을 지원합니다.
+
+1. ROS2 토픽 입력
+2. 노트북 Windows CMD용 UDP 입력
 
 이 폴더는 다음 흐름을 대상으로 합니다.
 
@@ -27,13 +32,25 @@ Laptop webcam
 
 - `Dockerfile`
 - `run_webcam_topic_yolo.sh`
+- `run_webcam_udp_yolo.sh`
 - `app/webcam_topic_yolo_bridge.py`
+- `app/webcam_udp_yolo_bridge.py`
 
-## 실행
+## 1. ROS2 토픽 입력 실행
 
 ```bash
 cd ~/LIG_DNA_GUI/JetsonThor.WebcamTopicYoloDocker
 bash ./run_webcam_topic_yolo.sh --build
+```
+
+## 2. Windows CMD UDP 입력 실행
+
+```bash
+cd ~/LIG_DNA_GUI/JetsonThor.WebcamTopicYoloDocker
+GUI_HOST=192.168.1.94 \
+GUI_PORT=5000 \
+LISTEN_PORT=5600 \
+bash ./run_webcam_udp_yolo.sh --build
 ```
 
 ## 주요 환경 변수
@@ -42,9 +59,10 @@ bash ./run_webcam_topic_yolo.sh --build
 |---|---|---|
 | `GUI_HOST` | `192.168.1.94` | GUI PC IP |
 | `GUI_PORT` | `5000` | EO GUI UDP 포트 |
-| `INPUT_IMAGE_TOPIC` | `/video/eo/preprocessed` | 노트북 웹캠 입력 토픽 |
+| `INPUT_IMAGE_TOPIC` | `/video/eo/preprocessed` | ROS2 입력 토픽 |
 | `OUTPUT_IMAGE_TOPIC` | `/yolo/eo/image_raw` | YOLO 처리 후 재발행할 영상 토픽 |
 | `PUBLISH_OUTPUT_TOPIC` | `true` | `/yolo/eo/image_raw` 재발행 여부 |
+| `LISTEN_PORT` | `5600` | 노트북 UDP 웹캠 입력 포트 |
 | `CONFIDENCE` | `0.60` | YOLO confidence |
 | `INFERENCE_SIZE` | `640` | YOLO inference size |
 | `STREAM_MAX_WIDTH` | `854` | GUI 송출 폭 제한 |
@@ -63,6 +81,15 @@ Input image topic: /video/eo/preprocessed
 Output image topic: /yolo/eo/image_raw
 Streaming GUI packets to 192.168.1.94:5000
 First webcam topic frame received.
+First EO frame sent to GUI.
+```
+
+UDP 입력 모드에서는 이런 흐름이 보입니다.
+
+```text
+Listening for laptop webcam UDP on 0.0.0.0:5600
+Streaming GUI packets to 192.168.1.94:5000
+First laptop webcam packet received from ...
 First EO frame sent to GUI.
 ```
 
