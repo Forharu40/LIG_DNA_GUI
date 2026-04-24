@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 import json
 import os
 import socket
@@ -17,6 +19,25 @@ from ultralytics import YOLO
 LEGACY_IMAGE_HEADER_SIZE = 20
 DETECTION_PACKET_MAGIC = b"DETS"
 STATUS_PACKET_MAGIC = b"STAT"
+
+
+@dataclass(frozen=True)
+class DetectionResult:
+    width: int
+    height: int
+    detections: list[dict]
+
+
+@dataclass(frozen=True)
+class EncodedFrame:
+    encoded_bytes: bytes
+    width: int
+    height: int
+    detection_width: int
+    detection_height: int
+    detections: list[dict]
+    frame_index: int
+    frame_stamp_ns: int
 
 
 def getenv_int(name: str, default: int) -> int:
@@ -157,6 +178,15 @@ def extract_detections(results, source_width: int, source_height: int) -> list[d
     return detections
 
 
+def detect_objects_for_packet(model: YOLO, frame: np.ndarray) -> DetectionResult:
+    results = model.predict(frame, conf=CONFIDENCE, imgsz=INFERENCE_SIZE, verbose=False)
+    return DetectionResult(
+        width=frame.shape[1],
+        height=frame.shape[0],
+        detections=extract_detections(results, frame.shape[1], frame.shape[0]),
+    )
+
+
 def decode_laptop_packet(packet: bytes) -> tuple[int, int, int, np.ndarray]:
     if len(packet) <= LEGACY_IMAGE_HEADER_SIZE:
         raise ValueError("UDP packet is smaller than the webcam image header")
@@ -177,6 +207,65 @@ def decode_laptop_packet(packet: bytes) -> tuple[int, int, int, np.ndarray]:
     return frame_stamp_ns, frame_index, image_length, decoded
 
 
+def encode_frame_for_packet(
+    frame: np.ndarray,
+    detection_width: int,
+    detection_height: int,
+    detections: list[dict],
+    frame_index: int,
+    frame_stamp_ns: int,
+) -> EncodedFrame | None:
+    encoded_bytes = encode_frame_for_udp(frame)
+    if encoded_bytes is None:
+        return None
+
+    return EncodedFrame(
+        encoded_bytes=encoded_bytes,
+        width=frame.shape[1],
+        height=frame.shape[0],
+        detection_width=detection_width,
+        detection_height=detection_height,
+        detections=[dict(detection) for detection in detections],
+        frame_index=frame_index,
+        frame_stamp_ns=frame_stamp_ns,
+    )
+
+
+def send_encoded_frame(
+    sock: socket.socket,
+    encoded_frame: EncodedFrame,
+    gui_host: str,
+    gui_port: int,
+) -> None:
+    image_packet = build_image_packet(
+        encoded_frame.encoded_bytes,
+        encoded_frame.width,
+        encoded_frame.height,
+        encoded_frame.frame_index,
+        encoded_frame.frame_stamp_ns,
+    )
+    detection_packet = build_detection_packet(
+        encoded_frame.frame_stamp_ns,
+        encoded_frame.frame_index,
+        encoded_frame.detection_width,
+        encoded_frame.detection_height,
+        encoded_frame.detections,
+    )
+    status_packet = build_status_packet(
+        enabled=True,
+        model_loaded=True,
+        conf_threshold=CONFIDENCE,
+        last_error="",
+        source=f"udp:{LISTEN_PORT}",
+        frame_stamp_ns=encoded_frame.frame_stamp_ns,
+        frame_index=encoded_frame.frame_index,
+    )
+
+    sock.sendto(image_packet, (gui_host, gui_port))
+    sock.sendto(detection_packet, (gui_host, gui_port))
+    sock.sendto(status_packet, (gui_host, gui_port))
+
+
 def main() -> None:
     print(f"Listening for laptop webcam UDP on 0.0.0.0:{LISTEN_PORT}")
     print(f"Streaming GUI packets to {GUI_HOST}:{GUI_PORT}")
@@ -189,69 +278,90 @@ def main() -> None:
     input_sock.bind(("0.0.0.0", LISTEN_PORT))
 
     output_sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    detection_executor = ThreadPoolExecutor(max_workers=1)
+    encode_executor = ThreadPoolExecutor(max_workers=1)
+    send_executor = ThreadPoolExecutor(max_workers=1)
 
     first_input_logged = False
     first_gui_logged = False
+    latest_detections: list[dict] = []
+    latest_detection_width = 0
+    latest_detection_height = 0
+    pending_detection: Future[DetectionResult] | None = None
+    pending_encoded_frame: Future[EncodedFrame | None] | None = None
+    pending_send: Future[None] | None = None
 
-    while True:
-        packet, remote = input_sock.recvfrom(MAX_UDP_BYTES + 4096)
-        try:
-            frame_stamp_ns, frame_index, _, frame = decode_laptop_packet(packet)
-            if not first_input_logged:
-                print(f"First laptop webcam packet received from {remote[0]}:{remote[1]}")
-                first_input_logged = True
+    try:
+        while True:
+            packet, remote = input_sock.recvfrom(MAX_UDP_BYTES + 4096)
+            try:
+                if pending_detection is not None and pending_detection.done():
+                    detection_result = pending_detection.result()
+                    latest_detections = detection_result.detections
+                    latest_detection_width = detection_result.width
+                    latest_detection_height = detection_result.height
+                    pending_detection = None
 
-            results = model.predict(frame, conf=CONFIDENCE, imgsz=INFERENCE_SIZE, verbose=False)
-            detections = extract_detections(results, frame.shape[1], frame.shape[0])
+                if pending_encoded_frame is not None and pending_encoded_frame.done():
+                    encoded_frame = pending_encoded_frame.result()
+                    pending_encoded_frame = None
+                    if encoded_frame is not None and pending_send is None:
+                        pending_send = send_executor.submit(
+                            send_encoded_frame,
+                            output_sock,
+                            encoded_frame,
+                            GUI_HOST,
+                            GUI_PORT,
+                        )
+                        if not first_gui_logged:
+                            print("First EO frame sent to GUI.")
+                            first_gui_logged = True
 
-            stream_frame = fit_frame_to_stream(frame)
-            encoded_bytes = encode_frame_for_udp(stream_frame)
-            if encoded_bytes is None:
-                raise RuntimeError("JPEG encode failed within the UDP payload limit")
+                if pending_send is not None and pending_send.done():
+                    pending_send.result()
+                    pending_send = None
 
-            image_packet = build_image_packet(
-                encoded_bytes,
-                stream_frame.shape[1],
-                stream_frame.shape[0],
-                frame_index,
-                frame_stamp_ns or time.time_ns(),
-            )
-            detection_packet = build_detection_packet(
-                frame_stamp_ns or time.time_ns(),
-                frame_index,
-                frame.shape[1],
-                frame.shape[0],
-                detections,
-            )
-            status_packet = build_status_packet(
-                enabled=True,
-                model_loaded=model_loaded,
-                conf_threshold=CONFIDENCE,
-                last_error="",
-                source=f"udp:{LISTEN_PORT}",
-                frame_stamp_ns=frame_stamp_ns or time.time_ns(),
-                frame_index=frame_index,
-            )
+                frame_stamp_ns, frame_index, _, frame = decode_laptop_packet(packet)
+                if not first_input_logged:
+                    print(f"First laptop webcam packet received from {remote[0]}:{remote[1]}")
+                    first_input_logged = True
 
-            output_sock.sendto(image_packet, (GUI_HOST, GUI_PORT))
-            output_sock.sendto(detection_packet, (GUI_HOST, GUI_PORT))
-            output_sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
+                if pending_detection is None:
+                    pending_detection = detection_executor.submit(
+                        detect_objects_for_packet,
+                        model,
+                        frame.copy(),
+                    )
 
-            if not first_gui_logged:
-                print("First EO frame sent to GUI.")
-                first_gui_logged = True
-        except Exception as exc:
-            print(f"Failed to process laptop webcam UDP frame: {exc}")
-            status_packet = build_status_packet(
-                enabled=True,
-                model_loaded=model_loaded,
-                conf_threshold=CONFIDENCE,
-                last_error=str(exc),
-                source=f"udp:{LISTEN_PORT}",
-                frame_stamp_ns=time.time_ns(),
-                frame_index=0,
-            )
-            output_sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
+                stream_frame = fit_frame_to_stream(frame)
+                if pending_encoded_frame is None:
+                    pending_encoded_frame = encode_executor.submit(
+                        encode_frame_for_packet,
+                        stream_frame.copy(),
+                        latest_detection_width or frame.shape[1],
+                        latest_detection_height or frame.shape[0],
+                        [dict(detection) for detection in latest_detections],
+                        frame_index,
+                        frame_stamp_ns or time.time_ns(),
+                    )
+            except Exception as exc:
+                print(f"Failed to process laptop webcam UDP frame: {exc}")
+                status_packet = build_status_packet(
+                    enabled=True,
+                    model_loaded=model_loaded,
+                    conf_threshold=CONFIDENCE,
+                    last_error=str(exc),
+                    source=f"udp:{LISTEN_PORT}",
+                    frame_stamp_ns=time.time_ns(),
+                    frame_index=0,
+                )
+                output_sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
+    finally:
+        detection_executor.shutdown(wait=False, cancel_futures=True)
+        encode_executor.shutdown(wait=False, cancel_futures=True)
+        send_executor.shutdown(wait=False, cancel_futures=True)
+        input_sock.close()
+        output_sock.close()
 
 
 if __name__ == "__main__":

@@ -1009,8 +1009,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     {
         buttons = direction switch
         {
-            "Left" => MotorButtonMask.Left,
-            "Right" => MotorButtonMask.Right,
+            "Left" => MotorButtonMask.Right,
+            "Right" => MotorButtonMask.Left,
             "Up" => MotorButtonMask.Up,
             "Down" => MotorButtonMask.Down,
             "Center" => MotorButtonMask.Center,

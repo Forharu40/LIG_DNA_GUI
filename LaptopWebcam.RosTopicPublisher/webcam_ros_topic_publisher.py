@@ -65,6 +65,8 @@ class WebcamTopicPublisher(Node):
                     time.sleep(0.1)
                     continue
 
+                frame = cv2.flip(frame, 1)
+
                 if frame.shape[1] != FRAME_WIDTH or frame.shape[0] != FRAME_HEIGHT:
                     frame = cv2.resize(frame, (FRAME_WIDTH, FRAME_HEIGHT), interpolation=cv2.INTER_AREA)
 

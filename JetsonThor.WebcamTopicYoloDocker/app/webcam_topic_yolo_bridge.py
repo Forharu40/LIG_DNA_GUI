@@ -3,6 +3,8 @@
 
 from __future__ import annotations
 
+from concurrent.futures import Future, ThreadPoolExecutor
+from dataclasses import dataclass
 import json
 import os
 import socket
@@ -21,6 +23,25 @@ from ultralytics import YOLO
 LEGACY_IMAGE_HEADER_SIZE = 20
 DETECTION_PACKET_MAGIC = b"DETS"
 STATUS_PACKET_MAGIC = b"STAT"
+
+
+@dataclass(frozen=True)
+class DetectionResult:
+    width: int
+    height: int
+    detections: list[dict]
+
+
+@dataclass(frozen=True)
+class EncodedFrame:
+    encoded_bytes: bytes
+    width: int
+    height: int
+    detection_width: int
+    detection_height: int
+    detections: list[dict]
+    frame_index: int
+    frame_stamp_ns: int
 
 
 def getenv_int(name: str, default: int) -> int:
@@ -216,6 +237,76 @@ def extract_detections(results, source_width: int, source_height: int) -> list[d
     return detections
 
 
+def detect_objects_for_packet(model: YOLO, frame: np.ndarray) -> DetectionResult:
+    results = model.predict(frame, conf=CONFIDENCE, imgsz=INFERENCE_SIZE, verbose=False)
+    return DetectionResult(
+        width=frame.shape[1],
+        height=frame.shape[0],
+        detections=extract_detections(results, frame.shape[1], frame.shape[0]),
+    )
+
+
+def encode_frame_for_packet(
+    frame: np.ndarray,
+    detection_width: int,
+    detection_height: int,
+    detections: list[dict],
+    frame_index: int,
+    frame_stamp_ns: int,
+) -> EncodedFrame | None:
+    encoded_bytes = encode_frame_for_udp(frame)
+    if encoded_bytes is None:
+        return None
+
+    return EncodedFrame(
+        encoded_bytes=encoded_bytes,
+        width=frame.shape[1],
+        height=frame.shape[0],
+        detection_width=detection_width,
+        detection_height=detection_height,
+        detections=[dict(detection) for detection in detections],
+        frame_index=frame_index,
+        frame_stamp_ns=frame_stamp_ns,
+    )
+
+
+def send_encoded_frame(
+    sock: socket.socket,
+    encoded_frame: EncodedFrame,
+    gui_host: str,
+    gui_port: int,
+    source: str,
+    model_loaded: bool,
+) -> None:
+    image_packet = build_image_packet(
+        encoded_frame.encoded_bytes,
+        encoded_frame.width,
+        encoded_frame.height,
+        encoded_frame.frame_index,
+        encoded_frame.frame_stamp_ns,
+    )
+    detection_packet = build_detection_packet(
+        encoded_frame.frame_stamp_ns,
+        encoded_frame.frame_index,
+        encoded_frame.detection_width,
+        encoded_frame.detection_height,
+        encoded_frame.detections,
+    )
+    status_packet = build_status_packet(
+        enabled=True,
+        model_loaded=model_loaded,
+        conf_threshold=CONFIDENCE,
+        last_error="",
+        source=source,
+        frame_stamp_ns=encoded_frame.frame_stamp_ns,
+        frame_index=encoded_frame.frame_index,
+    )
+
+    sock.sendto(image_packet, (gui_host, gui_port))
+    sock.sendto(detection_packet, (gui_host, gui_port))
+    sock.sendto(status_packet, (gui_host, gui_port))
+
+
 class WebcamTopicYoloBridge(Node):
     def __init__(self) -> None:
         super().__init__("webcam_topic_yolo_bridge")
@@ -228,6 +319,15 @@ class WebcamTopicYoloBridge(Node):
         self._model = YOLO(MODEL_PATH)
         self._model_loaded = True
         self._output_publisher = None
+        self._detection_executor = ThreadPoolExecutor(max_workers=1)
+        self._encode_executor = ThreadPoolExecutor(max_workers=1)
+        self._send_executor = ThreadPoolExecutor(max_workers=1)
+        self._latest_detections: list[dict] = []
+        self._latest_detection_width = 0
+        self._latest_detection_height = 0
+        self._pending_detection: Future[DetectionResult] | None = None
+        self._pending_encoded_frame: Future[EncodedFrame | None] | None = None
+        self._pending_send: Future[None] | None = None
 
         if PUBLISH_OUTPUT_TOPIC:
             self._output_publisher = self.create_publisher(Image, OUTPUT_IMAGE_TOPIC, qos_profile_sensor_data)
@@ -247,6 +347,34 @@ class WebcamTopicYoloBridge(Node):
         )
 
         try:
+            if self._pending_detection is not None and self._pending_detection.done():
+                detection_result = self._pending_detection.result()
+                self._latest_detections = detection_result.detections
+                self._latest_detection_width = detection_result.width
+                self._latest_detection_height = detection_result.height
+                self._pending_detection = None
+
+            if self._pending_encoded_frame is not None and self._pending_encoded_frame.done():
+                encoded_frame = self._pending_encoded_frame.result()
+                self._pending_encoded_frame = None
+                if encoded_frame is not None and self._pending_send is None:
+                    self._pending_send = self._send_executor.submit(
+                        send_encoded_frame,
+                        self._sock,
+                        encoded_frame,
+                        GUI_HOST,
+                        GUI_PORT,
+                        INPUT_IMAGE_TOPIC,
+                        self._model_loaded,
+                    )
+                    if not self._first_gui_frame_logged:
+                        self.get_logger().info("First EO frame sent to GUI.")
+                        self._first_gui_frame_logged = True
+
+            if self._pending_send is not None and self._pending_send.done():
+                self._pending_send.result()
+                self._pending_send = None
+
             frame = ros_image_to_bgr(message)
             self._frame_index += 1
 
@@ -254,50 +382,24 @@ class WebcamTopicYoloBridge(Node):
                 self.get_logger().info("First webcam topic frame received.")
                 self._first_frame_logged = True
 
-            results = self._model.predict(
-                frame,
-                conf=CONFIDENCE,
-                imgsz=INFERENCE_SIZE,
-                verbose=False,
-            )
-            detections = extract_detections(results, frame.shape[1], frame.shape[0])
+            if self._pending_detection is None:
+                self._pending_detection = self._detection_executor.submit(
+                    detect_objects_for_packet,
+                    self._model,
+                    frame.copy(),
+                )
 
             stream_frame = fit_frame_to_stream(frame)
-            encoded_bytes = encode_frame_for_udp(stream_frame)
-            if encoded_bytes is None:
-                raise RuntimeError("JPEG encode failed within the UDP payload limit")
-
-            image_packet = build_image_packet(
-                encoded_bytes,
-                stream_frame.shape[1],
-                stream_frame.shape[0],
-                self._frame_index,
-                frame_stamp_ns or time.time_ns(),
-            )
-            detection_packet = build_detection_packet(
-                frame_stamp_ns or time.time_ns(),
-                self._frame_index,
-                frame.shape[1],
-                frame.shape[0],
-                detections,
-            )
-            status_packet = build_status_packet(
-                enabled=True,
-                model_loaded=self._model_loaded,
-                conf_threshold=CONFIDENCE,
-                last_error="",
-                source=INPUT_IMAGE_TOPIC,
-                frame_stamp_ns=frame_stamp_ns or time.time_ns(),
-                frame_index=self._frame_index,
-            )
-
-            self._sock.sendto(image_packet, (GUI_HOST, GUI_PORT))
-            self._sock.sendto(detection_packet, (GUI_HOST, GUI_PORT))
-            self._sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
-
-            if not self._first_gui_frame_logged:
-                self.get_logger().info("First EO frame sent to GUI.")
-                self._first_gui_frame_logged = True
+            if self._pending_encoded_frame is None:
+                self._pending_encoded_frame = self._encode_executor.submit(
+                    encode_frame_for_packet,
+                    stream_frame.copy(),
+                    self._latest_detection_width or frame.shape[1],
+                    self._latest_detection_height or frame.shape[0],
+                    [dict(detection) for detection in self._latest_detections],
+                    self._frame_index,
+                    frame_stamp_ns or time.time_ns(),
+                )
 
             if self._output_publisher is not None:
                 self._output_publisher.publish(bgr_to_ros_image(stream_frame, message))
@@ -314,6 +416,13 @@ class WebcamTopicYoloBridge(Node):
             )
             self._sock.sendto(status_packet, (GUI_HOST, GUI_PORT))
             self.get_logger().error(f"Failed to process webcam EO topic frame: {exc}")
+
+    def destroy_node(self) -> bool:
+        self._detection_executor.shutdown(wait=False, cancel_futures=True)
+        self._encode_executor.shutdown(wait=False, cancel_futures=True)
+        self._send_executor.shutdown(wait=False, cancel_futures=True)
+        self._sock.close()
+        return super().destroy_node()
 
 
 def main() -> None:
