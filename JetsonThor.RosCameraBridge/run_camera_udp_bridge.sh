@@ -64,7 +64,7 @@ if [[ "$BUILD_IMAGE" -eq 1 ]]; then
   echo "Building Docker image: $IMAGE_NAME"
   sudo docker build \
     --build-arg "BASE_IMAGE=$BASE_IMAGE" \
-    -f "$SCRIPT_DIR/Dockerfile.camera_udp_bridge" \
+    -f "$SCRIPT_DIR/Dockerfile" \
     -t "$IMAGE_NAME" \
     "$SCRIPT_DIR"
 fi
