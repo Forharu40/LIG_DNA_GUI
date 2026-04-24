@@ -152,7 +152,12 @@ def fit_frame_to_stream(frame: np.ndarray) -> np.ndarray:
 
 
 def extract_stamp_ns(message_or_header) -> int:
-    stamp = message_or_header.stamp if hasattr(message_or_header, "stamp") else message_or_header
+    if hasattr(message_or_header, "header") and hasattr(message_or_header.header, "stamp"):
+        stamp = message_or_header.header.stamp
+    elif hasattr(message_or_header, "stamp"):
+        stamp = message_or_header.stamp
+    else:
+        stamp = message_or_header
     return int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec)
 
 
@@ -217,7 +222,7 @@ class StreamBridge:
             self.sock.sendto(status_packet, (self.host, self.port))
 
     def send_detection(self, message: Detection2DArray) -> None:
-        stamp_ns = extract_stamp_ns(message.header)
+        stamp_ns = extract_stamp_ns(message)
         with self._lock:
             frame_info = self._match_frame_info(stamp_ns)
 
