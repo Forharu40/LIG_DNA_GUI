@@ -17,7 +17,13 @@ import numpy as np
 import rclpy
 import torch
 from rclpy.node import Node
-from rclpy.qos import qos_profile_sensor_data
+from rclpy.qos import (
+    DurabilityPolicy,
+    HistoryPolicy,
+    QoSProfile,
+    ReliabilityPolicy,
+    qos_profile_sensor_data,
+)
 from sensor_msgs.msg import Image
 from ultralytics import YOLO
 
@@ -102,6 +108,13 @@ YOLO_DEVICE = resolve_yolo_device()
 YOLO_HALF = getenv_bool("YOLO_HALF", YOLO_DEVICE != "cpu")
 METRICS_LOG_INTERVAL = max(0.2, getenv_float("METRICS_LOG_INTERVAL", 1.0))
 HORIZONTAL_FLIP = getenv_bool("HORIZONTAL_FLIP", False)
+
+INPUT_TOPIC_QOS = QoSProfile(
+    history=HistoryPolicy.KEEP_LAST,
+    depth=5,
+    reliability=ReliabilityPolicy.RELIABLE,
+    durability=DurabilityPolicy.VOLATILE,
+)
 
 
 def resolve_torch_device_index() -> int | None:
@@ -419,7 +432,7 @@ class EoTopicYoloBridge(Node):
         if PUBLISH_OUTPUT_TOPIC:
             self._output_publisher = self.create_publisher(Image, OUTPUT_IMAGE_TOPIC, qos_profile_sensor_data)
 
-        self.create_subscription(Image, INPUT_IMAGE_TOPIC, self._on_image, qos_profile_sensor_data)
+        self.create_subscription(Image, INPUT_IMAGE_TOPIC, self._on_image, INPUT_TOPIC_QOS)
         self.create_timer(0.001, self._pump_pipeline)
 
         self.get_logger().info(f"Input image topic: {INPUT_IMAGE_TOPIC}")
@@ -430,6 +443,7 @@ class EoTopicYoloBridge(Node):
         self.get_logger().info(f"YOLO device: {YOLO_DEVICE} (cuda_available={torch.cuda.is_available()})")
         self.get_logger().info(f"YOLO half precision: {YOLO_HALF}")
         self.get_logger().info(f"Horizontal flip: {HORIZONTAL_FLIP}")
+        self.get_logger().info("Input topic QoS: reliable/keep_last(depth=5)")
         self.get_logger().info(f"Metrics log interval: {METRICS_LOG_INTERVAL:.1f}s")
 
     def _on_image(self, message: Image) -> None:
