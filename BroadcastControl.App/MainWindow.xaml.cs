@@ -8,6 +8,7 @@ using System.Windows.Media.Animation;
 using System.Windows.Media.Effects;
 using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
+using System.Windows.Threading;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels;
 using System.Collections.Generic;
@@ -28,11 +29,12 @@ public partial class MainWindow : Window
     private const double WindowedHeight = 900;
     private const int EoUdpPort = 5000;
     private const int IrUdpPort = 5001;
-
     private readonly MainViewModel _viewModel;
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
     private readonly UdpEncodedVideoReceiverService _irUdpCaptureService;
     private readonly ViewportRecordingService _viewportRecordingService;
+    private readonly UdpMotorControlService _motorControlService;
+    private readonly DispatcherTimer _motorHoldTimer;
 
     private bool _isDraggingZoom;
     private Point _lastZoomDragPoint;
@@ -53,6 +55,8 @@ public partial class MainWindow : Window
     private string? _lastDetectionAlertSignature;
     private string? _lastFilteredOutTargetSignature;
     private string? _lastOverlaySignature;
+    private readonly Dictionary<string, int> _activeMotorDirections = new(StringComparer.Ordinal);
+    private readonly HashSet<Key> _pressedMotorKeys = new();
     private const int OverlayCacheLimit = 48;
     private const uint OverlayFrameTolerance = 12;
     private const float DisplayScoreThreshold = 0.60f;
@@ -95,14 +99,22 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        _viewModel = new MainViewModel();
+        _motorControlService = new UdpMotorControlService();
+        _viewModel = new MainViewModel(_motorControlService);
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
         _irUdpCaptureService = new UdpEncodedVideoReceiverService();
         _viewportRecordingService = new ViewportRecordingService();
+        _motorHoldTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(50)
+        };
+        _motorHoldTimer.Tick += MotorHoldTimer_OnTick;
         DataContext = _viewModel;
 
         Loaded += OnLoaded;
         Closed += OnClosed;
+        PreviewKeyDown += MainWindow_OnPreviewKeyDown;
+        PreviewKeyUp += MainWindow_OnPreviewKeyUp;
     }
 
     private void OnLoaded(object sender, RoutedEventArgs e)
@@ -122,10 +134,12 @@ public partial class MainWindow : Window
         _eoUdpCaptureService.SetContrast(_viewModel.Contrast);
         _irUdpCaptureService.SetBrightness(_viewModel.Brightness);
         _irUdpCaptureService.SetContrast(_viewModel.Contrast);
+        _viewModel.InitializeMotorControlState();
 
         _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
         UpdateRecordingViewportState();
         RenderDetectionOverlay();
+        UpdateMotorAutomationState();
 
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
 
@@ -139,7 +153,6 @@ public partial class MainWindow : Window
 
         if (_irUdpCaptureService.Start(IrUdpPort))
         {
-            _viewModel.AppendImportantLog($"IR UDP stream receiver is waiting on port {IrUdpPort}.");
         }
         else
         {
@@ -176,6 +189,11 @@ public partial class MainWindow : Window
 
             case nameof(MainViewModel.IsSettingsOpen):
                 AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: true);
+                break;
+
+            case nameof(MainViewModel.CurrentMode):
+            case nameof(MainViewModel.IsSystemPoweredOn):
+                UpdateMotorAutomationState();
                 break;
         }
     }
@@ -323,7 +341,6 @@ public partial class MainWindow : Window
         if (!_hasReceivedIrFrame)
         {
             _hasReceivedIrFrame = true;
-            _viewModel.AppendImportantLog("IR UDP camera first frame received.");
         }
 
         _viewModel.UpdateIrFrame(frame.Bitmap);
@@ -853,6 +870,201 @@ public partial class MainWindow : Window
             : "전체화면으로 전환";
     }
 
+    private void MotorButton_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string direction })
+        {
+            return;
+        }
+
+        StartMotorRepeat(direction);
+        e.Handled = true;
+    }
+
+    private void MotorButton_OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        if (sender is not FrameworkElement { Tag: string direction })
+        {
+            return;
+        }
+
+        StopMotorRepeat(direction);
+        e.Handled = true;
+    }
+
+    private void MotorButton_OnMouseLeave(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed ||
+            sender is not FrameworkElement { Tag: string direction })
+        {
+            return;
+        }
+
+        StopMotorRepeat(direction);
+    }
+
+    private void MainWindow_OnPreviewKeyDown(object sender, KeyEventArgs e)
+    {
+        if (!TryMapKeyToMotorDirection(e.Key, out var direction))
+        {
+            return;
+        }
+
+        if (_pressedMotorKeys.Add(e.Key))
+        {
+            StartMotorRepeat(direction);
+        }
+
+        e.Handled = true;
+    }
+
+    private void MainWindow_OnPreviewKeyUp(object sender, KeyEventArgs e)
+    {
+        if (!TryMapKeyToMotorDirection(e.Key, out var direction))
+        {
+            return;
+        }
+
+        _pressedMotorKeys.Remove(e.Key);
+        StopMotorRepeat(direction);
+        e.Handled = true;
+    }
+
+    private void StartMotorRepeat(string direction)
+    {
+        if (!_viewModel.IsManualMode)
+        {
+            return;
+        }
+
+        if (_activeMotorDirections.TryGetValue(direction, out var count))
+        {
+            _activeMotorDirections[direction] = count + 1;
+        }
+        else
+        {
+            _activeMotorDirections[direction] = 1;
+        }
+
+        SendActiveMotorButtons();
+
+        if (_activeMotorDirections.Count > 0)
+        {
+            _motorHoldTimer.Start();
+        }
+    }
+
+    private void StopMotorRepeat(string direction)
+    {
+        if (!_activeMotorDirections.TryGetValue(direction, out var count))
+        {
+            return;
+        }
+
+        if (count <= 1)
+        {
+            _activeMotorDirections.Remove(direction);
+        }
+        else
+        {
+            _activeMotorDirections[direction] = count - 1;
+        }
+
+        SendActiveMotorButtons();
+
+        if (_activeMotorDirections.Count == 0)
+        {
+            _motorHoldTimer.Stop();
+        }
+    }
+
+    private void MotorHoldTimer_OnTick(object? sender, EventArgs e)
+    {
+        if (_activeMotorDirections.Count == 0 || !_viewModel.IsManualMode)
+        {
+            _motorHoldTimer.Stop();
+            return;
+        }
+
+        SendActiveMotorButtons();
+    }
+
+    private void SendActiveMotorButtons()
+    {
+        if (!_viewModel.IsManualMode)
+        {
+            return;
+        }
+
+        _viewModel.UpdateManualButtonState(GetActiveMotorButtons());
+    }
+
+    private void UpdateMotorAutomationState()
+    {
+        if (_viewModel.IsAutoMode)
+        {
+            StopManualMotorInput();
+        }
+    }
+
+    private void StopManualMotorInput()
+    {
+        _motorHoldTimer.Stop();
+        _activeMotorDirections.Clear();
+        _pressedMotorKeys.Clear();
+    }
+
+    private static bool TryMapKeyToMotorDirection(Key key, out string direction)
+    {
+        direction = key switch
+        {
+            Key.Left => "Left",
+            Key.Right => "Right",
+            Key.Up => "Up",
+            Key.Down => "Down",
+            _ => string.Empty
+        };
+
+        return !string.IsNullOrWhiteSpace(direction);
+    }
+
+    private MotorButtonMask GetActiveMotorButtons()
+    {
+        if (_activeMotorDirections.Count == 0)
+        {
+            return MotorButtonMask.None;
+        }
+
+        if (_activeMotorDirections.ContainsKey("Center"))
+        {
+            return MotorButtonMask.Center;
+        }
+
+        var buttons = MotorButtonMask.None;
+
+        if (_activeMotorDirections.ContainsKey("Left"))
+        {
+            buttons |= MotorButtonMask.Left;
+        }
+
+        if (_activeMotorDirections.ContainsKey("Right"))
+        {
+            buttons |= MotorButtonMask.Right;
+        }
+
+        if (_activeMotorDirections.ContainsKey("Up"))
+        {
+            buttons |= MotorButtonMask.Up;
+        }
+
+        if (_activeMotorDirections.ContainsKey("Down"))
+        {
+            buttons |= MotorButtonMask.Down;
+        }
+
+        return buttons;
+    }
+
     private void AnimateSettingsDrawer(bool isOpen, bool animate)
     {
         if (!animate)
@@ -918,6 +1130,7 @@ public partial class MainWindow : Window
 
     private void OnClosed(object? sender, EventArgs e)
     {
+        StopManualMotorInput();
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
@@ -928,6 +1141,7 @@ public partial class MainWindow : Window
         _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
         _irUdpCaptureService.Dispose();
+        _motorControlService.Dispose();
     }
 }
 

@@ -47,35 +47,37 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double _viewportHeight = 1;
     private int _motorPan;
     private int _motorTilt;
+    private bool _hasTrackedTarget;
+    private readonly UdpMotorControlService _motorControlService;
+    private const int MotorStepDegrees = 20;
+    private const int MotorPanLimitDegrees = 180;
+    private const int MotorTiltLimitDegrees = 180;
+    private const int VisibleLogItemLimit = 30;
+    private const int StoredLogItemLimit = 100;
+    private readonly List<AnalysisItem> _analysisHistory = new();
+    private readonly List<SystemLogItem> _systemLogHistory = new();
 
     // EO와 IR 모두 Jetson에서 전달되는 UDP 영상을 표시한다.
     // 실제 프레임을 아직 받지 못한 경우에도 화면이 비어 보이지 않도록 EO/IR 기본 안내 이미지를 미리 준비해둔다.
     private ImageSource? _eoFrame;
     private ImageSource? _irFrame;
-    private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame("MEVA DEMO", Color.FromRgb(51, 94, 160));
-    private readonly ImageSource _irPlaceholderFrame = CreateCameraPlaceholderFrame("IR UDP", Color.FromRgb(192, 109, 40));
+    private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame(string.Empty, Color.FromRgb(51, 94, 160));
+    private readonly ImageSource _irPlaceholderFrame = CreateCameraPlaceholderFrame(string.Empty, Color.FromRgb(192, 109, 40));
 
-    public MainViewModel()
+    public MainViewModel(UdpMotorControlService? motorControlService = null)
     {
+        _motorControlService = motorControlService ?? new UdpMotorControlService();
+
         // 앱이 현재 사용 중인 테마를 읽어서 설정 창 버튼 상태와 맞춘다.
         if (Application.Current is App app)
         {
             _currentThemeMode = app.CurrentThemeMode;
         }
 
-        AnalysisItems = new ObservableCollection<AnalysisItem>
-        {
-            new("10:05:00", "\uC2DC\uC2A4\uD15C \uCD08\uAE30\uD654 \uB2E8\uACC4\uC5D0\uC11C\uB294 \uAE30\uBCF8 \uC704\uD5D8 \uB4F1\uAE09\uC744 \uB0AE\uC74C\uC73C\uB85C \uC720\uC9C0\uD569\uB2C8\uB2E4."),
-            new("10:05:03", "\uD604\uC7AC \uC8FC \uD0D0\uC9C0\uCCB4\uB294 \uBCF5\uD569\uC774\uBA70 \uC6B4\uC6A9\uC790\uAC00 \uD0D0\uC9C0 \uC870\uAC74\uC744 \uC870\uC815\uD560 \uC218 \uC788\uC2B5\uB2C8\uB2E4."),
-            new("10:05:05", "VLM \uACE0\uC704\uD5D8 \uBD84\uC11D \uACB0\uACFC\uAC00 \uB4E4\uC5B4\uC624\uAE30 \uC804\uAE4C\uC9C0 \uACBD\uBCF4 \uB2E8\uACC4\uB294 \uC0C1\uC2B9\uD558\uC9C0 \uC54A\uC2B5\uB2C8\uB2E4."),
-        };
+        AnalysisItems = new ObservableCollection<AnalysisItem>();
+        SystemLogs = new ObservableCollection<SystemLogItem>();
 
-        SystemLogs = new ObservableCollection<SystemLogItem>
-        {
-            new("10:05:00", "\uC2DC\uC2A4\uD15C \uC804\uC6D0\uC744 \uCF1C\uC2B5\uB2C8\uB2E4."),
-            new("10:05:02", "\uCE74\uBA54\uB77C \uC81C\uC5B4 \uBAA8\uB4DC\uAC00 \uC790\uB3D9\uC73C\uB85C \uC124\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4."),
-            new("10:05:04", "\uCD08\uAE30 \uC704\uD5D8 \uB4F1\uAE09\uC740 \uB0AE\uC74C\uC73C\uB85C \uC124\uC815\uB418\uC5C8\uC2B5\uB2C8\uB2E4."),
-        };
+        AddSystemLogItem(new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), "\uC2DC\uC2A4\uD15C \uAC00\uB3D9\uC744 \uC2DC\uC791\uD569\uB2C8\uB2E4."));
 
         PrimaryTargets = new ReadOnlyCollection<string>(new[]
         {
@@ -99,6 +101,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         ResetZoomCommand = new RelayCommand(_ => ZoomLevel = 1.0, _ => CanUseZoomControls);
         ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsManualMode);
         SetThemeCommand = new RelayCommand(SetTheme);
+        SaveAnalysisLogsCommand = new RelayCommand(_ => SaveAnalysisLogsToDesktop());
         SaveSystemLogsCommand = new RelayCommand(_ => SaveSystemLogsToDesktop());
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         MoveMotorCommand = new RelayCommand(MoveMotor, _ => CanUseMotorControls);
@@ -130,6 +133,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public ICommand SetThemeCommand { get; }
 
+    public ICommand SaveAnalysisLogsCommand { get; }
+
     public ICommand SaveSystemLogsCommand { get; }
 
     public ICommand SwapFeedsCommand { get; }
@@ -155,6 +160,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanSelectManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
                 OnPropertyChanged(nameof(CanUseZoomControls));
+                OnPropertyChanged(nameof(IsAutoMode));
                 RaiseAllCommandStates();
             }
         }
@@ -182,6 +188,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanUseMotorControls));
                 OnPropertyChanged(nameof(CanUseZoomControls));
                 OnPropertyChanged(nameof(ShowZoomMiniMap));
+                OnPropertyChanged(nameof(IsAutoMode));
                 RaiseAllCommandStates();
             }
         }
@@ -209,6 +216,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public double RecordingIndicatorOpacity => IsRecordingActive ? 1.0 : 0.42;
 
     public bool IsManualMode => IsSystemPoweredOn && CurrentMode == "\uC218\uB3D9";
+
+    public bool IsAutoMode => IsSystemPoweredOn && CurrentMode == "\uC790\uB3D9";
 
     public bool CanSelectAutoMode => IsSystemPoweredOn && CurrentMode != "\uC790\uB3D9";
 
@@ -461,7 +470,80 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
     {
         // VLM 도입 전까지는 YOLO 탐지 개수만으로 위험 등급을 바꾸지 않는다.
-        // 현재 위험 등급은 기본값(낮음)을 유지하고, 이후 VLM 판단이 들어오면 그때 반영한다.
+        // 대신 자동 모드에서는 탐지 유무를 보고 스캔(0)과 추적(1) 모드 패킷을 전환한다.
+        var hasTrackedTarget = detections.Count > 0;
+        if (_hasTrackedTarget == hasTrackedTarget)
+        {
+            return;
+        }
+
+        _hasTrackedTarget = hasTrackedTarget;
+
+        if (!IsAutoMode)
+        {
+            return;
+        }
+
+        if (!TrySendCurrentModeToController(out var modeError))
+        {
+            AppendImportantLog($"자동 모드 상태 전송에 실패했습니다: {modeError}");
+            return;
+        }
+
+    }
+
+    public void InitializeMotorControlState()
+    {
+        if (!TrySendCurrentModeToController(out var modeError))
+        {
+            AppendImportantLog($"초기 모터 모드 전송에 실패했습니다: {modeError}");
+            return;
+        }
+
+        if (!TrySendButtonPacket(MotorButtonMask.None, out var buttonError))
+        {
+            AppendImportantLog($"초기 버튼 패킷 전송에 실패했습니다: {buttonError}");
+        }
+    }
+
+    public void MoveMotorStep(string direction)
+    {
+        if (!TryMapDirectionToButton(direction, out var buttons))
+        {
+            return;
+        }
+
+        UpdateManualButtonState(buttons);
+    }
+
+    public void SetMotorPosition(int panDegrees, int tiltDegrees)
+    {
+        _motorPan = Math.Clamp(panDegrees, -MotorPanLimitDegrees, MotorPanLimitDegrees);
+        _motorTilt = Math.Clamp(tiltDegrees, -MotorTiltLimitDegrees, MotorTiltLimitDegrees);
+
+        OnPropertyChanged(nameof(MotorPanText));
+        OnPropertyChanged(nameof(MotorTiltText));
+    }
+
+    public void UpdateManualButtonState(MotorButtonMask buttons)
+    {
+        if (!IsManualMode)
+        {
+            return;
+        }
+
+        ApplyMotorButtonStateToUi(buttons);
+
+        if (!TrySendCurrentModeToController(out var modeError))
+        {
+            AppendImportantLog($"모터 수동 모드 전송에 실패했습니다: {modeError}");
+            return;
+        }
+
+        if (!TrySendButtonPacket(buttons, out var buttonError))
+        {
+            AppendImportantLog($"모터 버튼 패킷 전송에 실패했습니다: {buttonError}");
+        }
     }
 
     /// <summary>
@@ -512,9 +594,39 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void AppendImportantLog(string message)
     {
-        // 가장 최근 로그가 위에 보이도록 목록 앞부분에 추가한다.
-        SystemLogs.Insert(0, new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), message));
-        TrimCollection(SystemLogs, 8);
+        AddSystemLogItem(new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), message));
+    }
+
+    public void AppendAnalysisLog(string message)
+    {
+        AddAnalysisItem(new AnalysisItem(DateTime.Now.ToString("HH:mm:ss"), message));
+    }
+
+    private void SaveAnalysisLogsToDesktop()
+    {
+        try
+        {
+            var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
+            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
+            var filePath = Path.Combine(desktopPath, $"analysis_log_{timestamp}.txt");
+
+            var builder = new StringBuilder();
+            builder.AppendLine("LIG DNA GUI Situation Analysis Log");
+            builder.AppendLine($"Saved At: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+            builder.AppendLine();
+
+            foreach (var item in _analysisHistory)
+            {
+                builder.AppendLine($"[{item.Time}] {item.Message}");
+            }
+
+            File.WriteAllText(filePath, builder.ToString(), new UTF8Encoding(false));
+            AppendImportantLog($"\uC0C1\uD669 \uBD84\uC11D \uAE30\uB85D\uC744 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4: {Path.GetFileName(filePath)}");
+        }
+        catch (Exception ex)
+        {
+            AppendImportantLog($"\uC0C1\uD669 \uBD84\uC11D \uAE30\uB85D \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4: {ex.Message}");
+        }
     }
 
     /// <summary>
@@ -534,7 +646,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             builder.AppendLine($"Saved At: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
             builder.AppendLine();
 
-            foreach (var log in SystemLogs)
+            foreach (var log in _systemLogHistory)
             {
                 builder.AppendLine($"[{log.Time}] {log.Message}");
             }
@@ -565,9 +677,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 자동 모드와 수동 모드를 전환한다.
-    /// 자동 모드로 돌아가면 수동 녹화, 모터 각도, 확대 상태를 기본값으로 정리한다.
-    /// </summary>
+     /// 자동 모드와 수동 모드를 전환한다.
+    /// 모드 전환 시 모터 각도는 유지하고, 전송할 모드 패킷만 현재 상태에 맞게 갱신한다.
+     /// </summary>
     private void SetMode(object? parameter)
     {
         if (!IsSystemPoweredOn || parameter is not string mode)
@@ -589,12 +701,19 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 // 자동 모드로 바뀌면 수동 녹화는 즉시 종료 상태로 맞춘다.
                 IsManualRecordingEnabled = false;
             }
+        }
 
-            _motorPan = 0;
-            _motorTilt = 0;
-            ZoomLevel = 1.0;
-            OnPropertyChanged(nameof(MotorPanText));
-            OnPropertyChanged(nameof(MotorTiltText));
+        if (!TrySendCurrentModeToController(out var modeError))
+        {
+            AppendImportantLog($"모터 모드 전송에 실패했습니다: {modeError}");
+        }
+
+        if (IsAutoMode)
+        {
+            if (!TrySendButtonPacket(MotorButtonMask.None, out var buttonError))
+            {
+                AppendImportantLog($"자동 모드 버튼 패킷 전송에 실패했습니다: {buttonError}");
+            }
         }
 
         AppendImportantLog($"\uCE74\uBA54\uB77C \uC81C\uC5B4 \uBAA8\uB4DC\uAC00 {CurrentMode}(\uC73C)\uB85C \uC804\uD658\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
@@ -669,10 +788,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 수동 모드에서 모터 방향 버튼을 누르면 좌우/상하 각도를 변경한다.
-    /// 현재는 UI 상태값만 바꾸지만, 이후 실제 모터 제어 명령과 연결하기 쉽게 분리해둔 구조다.
-    /// 중앙 버튼을 누르면 기본 중립 위치로 복귀한다.
-    /// </summary>
+    /// 수동 모드에서 모터 방향 버튼을 누르면 UI 표시용 각도와 버튼 비트마스크를 함께 갱신한다.
+    /// 실제 이동량은 미션 PC가 결정하므로 GUI는 0x02 버튼 패킷만 전송한다.
+     /// </summary>
     private void MoveMotor(object? parameter)
     {
         if (!CanUseMotorControls || parameter is not string direction)
@@ -680,29 +798,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        switch (direction)
+        if (!TryMapDirectionToButton(direction, out var buttons))
         {
-            case "Left":
-                _motorPan = Math.Clamp(_motorPan - 5, -90, 90);
-                break;
-            case "Right":
-                _motorPan = Math.Clamp(_motorPan + 5, -90, 90);
-                break;
-            case "Up":
-                _motorTilt = Math.Clamp(_motorTilt + 5, -45, 45);
-                break;
-            case "Down":
-                _motorTilt = Math.Clamp(_motorTilt - 5, -45, 45);
-                break;
-            case "Center":
-                _motorPan = 0;
-                _motorTilt = 0;
-                AppendImportantLog("모터가 기본 중립 위치로 복귀했습니다.");
-                break;
+            return;
         }
 
-        OnPropertyChanged(nameof(MotorPanText));
-        OnPropertyChanged(nameof(MotorTiltText));
+        UpdateManualButtonState(buttons);
     }
 
     /// <summary>
@@ -764,6 +865,32 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
+    private static void TrimList<T>(List<T> items, int maxCount)
+    {
+        while (items.Count > maxCount)
+        {
+            items.RemoveAt(items.Count - 1);
+        }
+    }
+
+    private void AddAnalysisItem(AnalysisItem item)
+    {
+        _analysisHistory.Insert(0, item);
+        TrimList(_analysisHistory, StoredLogItemLimit);
+
+        AnalysisItems.Insert(0, item);
+        TrimCollection(AnalysisItems, VisibleLogItemLimit);
+    }
+
+    private void AddSystemLogItem(SystemLogItem item)
+    {
+        _systemLogHistory.Insert(0, item);
+        TrimList(_systemLogHistory, StoredLogItemLimit);
+
+        SystemLogs.Insert(0, item);
+        TrimCollection(SystemLogs, VisibleLogItemLimit);
+    }
+
     /// <summary>
     /// 여러 곳에서 반복해서 사용하는 고정 색상 브러시를 생성한다.
     /// Freeze 처리로 성능과 메모리 사용을 조금 더 안정적으로 유지한다.
@@ -806,23 +933,91 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 dc.DrawLine(gridPen, new Point(0, y), new Point(320, y));
             }
 
-            var textBrush = new SolidColorBrush(Color.FromRgb(240, 243, 248));
-            textBrush.Freeze();
-            var typeface = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
-            var formattedText = new FormattedText(
-                label,
-                System.Globalization.CultureInfo.InvariantCulture,
-                FlowDirection.LeftToRight,
-                typeface,
-                30,
-                textBrush,
-                1.0);
-            dc.DrawText(formattedText, new Point(22, 20));
+            if (!string.IsNullOrWhiteSpace(label))
+            {
+                var textBrush = new SolidColorBrush(Color.FromRgb(240, 243, 248));
+                textBrush.Freeze();
+                var typeface = new Typeface(new FontFamily("Segoe UI"), FontStyles.Normal, FontWeights.Bold, FontStretches.Normal);
+                var formattedText = new FormattedText(
+                    label,
+                    System.Globalization.CultureInfo.InvariantCulture,
+                    FlowDirection.LeftToRight,
+                    typeface,
+                    30,
+                    textBrush,
+                    1.0);
+                dc.DrawText(formattedText, new Point(22, 20));
+            }
         }
 
         var image = new DrawingImage(group);
         image.Freeze();
         return image;
+    }
+
+    private bool TrySendCurrentModeToController(out string? error)
+    {
+        var mode = IsManualMode
+            ? MotorPacketMode.Manual
+            : _hasTrackedTarget
+                ? MotorPacketMode.Tracking
+                : MotorPacketMode.Scan;
+
+        return _motorControlService.TrySendModePacket(mode, out error);
+    }
+
+    private bool TrySendButtonPacket(MotorButtonMask buttons, out string? error)
+    {
+        return _motorControlService.TrySendButtonPacket(buttons, out error);
+    }
+
+    private void ApplyMotorButtonStateToUi(MotorButtonMask buttons)
+    {
+        if ((buttons & MotorButtonMask.Center) == MotorButtonMask.Center)
+        {
+            _motorPan = 0;
+            _motorTilt = 0;
+        }
+        else
+        {
+            if ((buttons & MotorButtonMask.Left) == MotorButtonMask.Left)
+            {
+                _motorPan = Math.Clamp(_motorPan - MotorStepDegrees, -MotorPanLimitDegrees, MotorPanLimitDegrees);
+            }
+
+            if ((buttons & MotorButtonMask.Right) == MotorButtonMask.Right)
+            {
+                _motorPan = Math.Clamp(_motorPan + MotorStepDegrees, -MotorPanLimitDegrees, MotorPanLimitDegrees);
+            }
+
+            if ((buttons & MotorButtonMask.Up) == MotorButtonMask.Up)
+            {
+                _motorTilt = Math.Clamp(_motorTilt + MotorStepDegrees, -MotorTiltLimitDegrees, MotorTiltLimitDegrees);
+            }
+
+            if ((buttons & MotorButtonMask.Down) == MotorButtonMask.Down)
+            {
+                _motorTilt = Math.Clamp(_motorTilt - MotorStepDegrees, -MotorTiltLimitDegrees, MotorTiltLimitDegrees);
+            }
+        }
+
+        OnPropertyChanged(nameof(MotorPanText));
+        OnPropertyChanged(nameof(MotorTiltText));
+    }
+
+    private static bool TryMapDirectionToButton(string direction, out MotorButtonMask buttons)
+    {
+        buttons = direction switch
+        {
+            "Left" => MotorButtonMask.Left,
+            "Right" => MotorButtonMask.Right,
+            "Up" => MotorButtonMask.Up,
+            "Down" => MotorButtonMask.Down,
+            "Center" => MotorButtonMask.Center,
+            _ => MotorButtonMask.None
+        };
+
+        return buttons != MotorButtonMask.None;
     }
 
     /// <summary>
@@ -856,3 +1051,4 @@ public sealed record AnalysisItem(string Time, string Message);
 /// 시스템 로그 영역에 표시할 주요 상태 변경 항목 한 줄을 나타낸다.
 /// </summary>
 public sealed record SystemLogItem(string Time, string Message);
+
