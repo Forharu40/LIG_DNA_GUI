@@ -27,6 +27,7 @@ class DetectionResult:
     width: int
     height: int
     detections: list[dict]
+    inference_ms: float
 
 
 @dataclass(frozen=True)
@@ -82,6 +83,31 @@ MAX_UDP_BYTES = getenv_int("MAX_UDP_BYTES", 55000)
 RECEIVE_BUFFER_BYTES = max(1024 * 1024, getenv_int("RECEIVE_BUFFER_BYTES", 8 * 1024 * 1024))
 YOLO_DEVICE = resolve_yolo_device()
 YOLO_HALF = getenv_bool("YOLO_HALF", YOLO_DEVICE != "cpu")
+METRICS_LOG_INTERVAL = max(0.2, getenv_float("METRICS_LOG_INTERVAL", 1.0))
+
+
+def resolve_torch_device_index() -> int | None:
+    if not torch.cuda.is_available() or YOLO_DEVICE == "cpu":
+        return None
+    if YOLO_DEVICE.isdigit():
+        return int(YOLO_DEVICE)
+    if YOLO_DEVICE.startswith("cuda:"):
+        try:
+            return int(YOLO_DEVICE.split(":", 1)[1])
+        except ValueError:
+            return 0
+    if YOLO_DEVICE == "cuda":
+        return 0
+    return torch.cuda.current_device()
+
+
+def get_gpu_memory_metrics_mb() -> tuple[float, float]:
+    device_index = resolve_torch_device_index()
+    if device_index is None:
+        return 0.0, 0.0
+    allocated = torch.cuda.memory_allocated(device_index) / (1024 * 1024)
+    reserved = torch.cuda.memory_reserved(device_index) / (1024 * 1024)
+    return allocated, reserved
 
 
 def fit_frame_to_stream(frame: np.ndarray) -> np.ndarray:
@@ -196,6 +222,7 @@ def extract_detections(results, source_width: int, source_height: int) -> list[d
 
 
 def detect_objects_for_packet(model: YOLO, frame: np.ndarray) -> DetectionResult:
+    started_at = time.perf_counter()
     results = model.predict(
         frame,
         conf=CONFIDENCE,
@@ -204,10 +231,12 @@ def detect_objects_for_packet(model: YOLO, frame: np.ndarray) -> DetectionResult
         device=YOLO_DEVICE,
         half=YOLO_HALF,
     )
+    inference_ms = (time.perf_counter() - started_at) * 1000.0
     return DetectionResult(
         width=frame.shape[1],
         height=frame.shape[0],
         detections=extract_detections(results, frame.shape[1], frame.shape[0]),
+        inference_ms=inference_ms,
     )
 
 
@@ -312,6 +341,7 @@ def main() -> None:
     print(f"Using model: {MODEL_PATH}")
     print(f"YOLO device: {YOLO_DEVICE} (cuda_available={torch.cuda.is_available()})")
     print(f"YOLO half precision: {YOLO_HALF}")
+    print(f"Metrics log interval: {METRICS_LOG_INTERVAL:.1f}s")
 
     torch.backends.cudnn.benchmark = True
     model = YOLO(MODEL_PATH)
@@ -331,6 +361,13 @@ def main() -> None:
     latest_detections: list[dict] = []
     latest_detection_width = 0
     latest_detection_height = 0
+    latest_inference_ms = 0.0
+    latest_frame_width = 0
+    latest_frame_height = 0
+    input_frames_since_log = 0
+    gui_frames_since_log = 0
+    dropped_packets_since_log = 0
+    last_metrics_log_at = time.monotonic()
     pending_detection: Future[DetectionResult] | None = None
     pending_encoded_frame: Future[EncodedFrame | None] | None = None
     pending_send: Future[None] | None = None
@@ -340,6 +377,7 @@ def main() -> None:
             packet, remote, dropped_packets = recv_latest_packet(input_sock, MAX_UDP_BYTES + 4096)
             try:
                 if dropped_packets > 0:
+                    dropped_packets_since_log += dropped_packets
                     now = time.monotonic()
                     if now - last_drop_log_at >= 2.0:
                         print(f"Dropped {dropped_packets} stale webcam packet(s) to keep latency low.")
@@ -350,6 +388,7 @@ def main() -> None:
                     latest_detections = detection_result.detections
                     latest_detection_width = detection_result.width
                     latest_detection_height = detection_result.height
+                    latest_inference_ms = detection_result.inference_ms
                     pending_detection = None
 
                 if pending_encoded_frame is not None and pending_encoded_frame.done():
@@ -363,6 +402,7 @@ def main() -> None:
                             GUI_HOST,
                             GUI_PORT,
                         )
+                        gui_frames_since_log += 1
                         if not first_gui_logged:
                             print("First EO frame sent to GUI.")
                             first_gui_logged = True
@@ -372,6 +412,9 @@ def main() -> None:
                     pending_send = None
 
                 frame_stamp_ns, frame_index, _, frame = decode_laptop_packet(packet)
+                input_frames_since_log += 1
+                latest_frame_width = frame.shape[1]
+                latest_frame_height = frame.shape[0]
                 if not first_input_logged:
                     print(f"First laptop webcam packet received from {remote[0]}:{remote[1]}")
                     first_input_logged = True
@@ -394,6 +437,27 @@ def main() -> None:
                         frame_index,
                         frame_stamp_ns or time.time_ns(),
                     )
+
+                now = time.monotonic()
+                elapsed = now - last_metrics_log_at
+                if elapsed >= METRICS_LOG_INTERVAL:
+                    input_fps = input_frames_since_log / elapsed
+                    gui_fps = gui_frames_since_log / elapsed
+                    gpu_alloc_mb, gpu_reserved_mb = get_gpu_memory_metrics_mb()
+                    print(
+                        "[metrics] "
+                        f"input_fps={input_fps:.1f} "
+                        f"gui_fps={gui_fps:.1f} "
+                        f"infer_ms={latest_inference_ms:.1f} "
+                        f"frame={latest_frame_width}x{latest_frame_height} "
+                        f"gpu_alloc_mb={gpu_alloc_mb:.1f} "
+                        f"gpu_reserved_mb={gpu_reserved_mb:.1f} "
+                        f"stale_drops={dropped_packets_since_log}"
+                    )
+                    input_frames_since_log = 0
+                    gui_frames_since_log = 0
+                    dropped_packets_since_log = 0
+                    last_metrics_log_at = now
             except Exception as exc:
                 print(f"Failed to process laptop webcam UDP frame: {exc}")
                 status_packet = build_status_packet(

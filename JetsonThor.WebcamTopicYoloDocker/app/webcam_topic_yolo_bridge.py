@@ -31,6 +31,7 @@ class DetectionResult:
     width: int
     height: int
     detections: list[dict]
+    inference_ms: float
 
 
 @dataclass(frozen=True)
@@ -87,6 +88,31 @@ JPEG_QUALITY = getenv_int("JPEG_QUALITY", 45)
 MAX_UDP_BYTES = getenv_int("MAX_UDP_BYTES", 55000)
 YOLO_DEVICE = resolve_yolo_device()
 YOLO_HALF = getenv_bool("YOLO_HALF", YOLO_DEVICE != "cpu")
+METRICS_LOG_INTERVAL = max(0.2, getenv_float("METRICS_LOG_INTERVAL", 1.0))
+
+
+def resolve_torch_device_index() -> int | None:
+    if not torch.cuda.is_available() or YOLO_DEVICE == "cpu":
+        return None
+    if YOLO_DEVICE.isdigit():
+        return int(YOLO_DEVICE)
+    if YOLO_DEVICE.startswith("cuda:"):
+        try:
+            return int(YOLO_DEVICE.split(":", 1)[1])
+        except ValueError:
+            return 0
+    if YOLO_DEVICE == "cuda":
+        return 0
+    return torch.cuda.current_device()
+
+
+def get_gpu_memory_metrics_mb() -> tuple[float, float]:
+    device_index = resolve_torch_device_index()
+    if device_index is None:
+        return 0.0, 0.0
+    allocated = torch.cuda.memory_allocated(device_index) / (1024 * 1024)
+    reserved = torch.cuda.memory_reserved(device_index) / (1024 * 1024)
+    return allocated, reserved
 
 
 def ros_image_to_bgr(message: Image) -> np.ndarray:
@@ -248,6 +274,7 @@ def extract_detections(results, source_width: int, source_height: int) -> list[d
 
 
 def detect_objects_for_packet(model: YOLO, frame: np.ndarray) -> DetectionResult:
+    started_at = time.perf_counter()
     results = model.predict(
         frame,
         conf=CONFIDENCE,
@@ -256,10 +283,12 @@ def detect_objects_for_packet(model: YOLO, frame: np.ndarray) -> DetectionResult
         device=YOLO_DEVICE,
         half=YOLO_HALF,
     )
+    inference_ms = (time.perf_counter() - started_at) * 1000.0
     return DetectionResult(
         width=frame.shape[1],
         height=frame.shape[0],
         detections=extract_detections(results, frame.shape[1], frame.shape[0]),
+        inference_ms=inference_ms,
     )
 
 
@@ -343,6 +372,12 @@ class WebcamTopicYoloBridge(Node):
         self._latest_detections: list[dict] = []
         self._latest_detection_width = 0
         self._latest_detection_height = 0
+        self._latest_inference_ms = 0.0
+        self._latest_frame_width = 0
+        self._latest_frame_height = 0
+        self._input_frames_since_log = 0
+        self._gui_frames_since_log = 0
+        self._last_metrics_log_at = time.monotonic()
         self._pending_detection: Future[DetectionResult] | None = None
         self._pending_encoded_frame: Future[EncodedFrame | None] | None = None
         self._pending_send: Future[None] | None = None
@@ -359,6 +394,7 @@ class WebcamTopicYoloBridge(Node):
         self.get_logger().info(f"Using model: {MODEL_PATH}")
         self.get_logger().info(f"YOLO device: {YOLO_DEVICE} (cuda_available={torch.cuda.is_available()})")
         self.get_logger().info(f"YOLO half precision: {YOLO_HALF}")
+        self.get_logger().info(f"Metrics log interval: {METRICS_LOG_INTERVAL:.1f}s")
 
     def _on_image(self, message: Image) -> None:
         frame_stamp_ns = (
@@ -372,6 +408,7 @@ class WebcamTopicYoloBridge(Node):
                 self._latest_detections = detection_result.detections
                 self._latest_detection_width = detection_result.width
                 self._latest_detection_height = detection_result.height
+                self._latest_inference_ms = detection_result.inference_ms
                 self._pending_detection = None
 
             if self._pending_encoded_frame is not None and self._pending_encoded_frame.done():
@@ -387,6 +424,7 @@ class WebcamTopicYoloBridge(Node):
                         INPUT_IMAGE_TOPIC,
                         self._model_loaded,
                     )
+                    self._gui_frames_since_log += 1
                     if not self._first_gui_frame_logged:
                         self.get_logger().info("First EO frame sent to GUI.")
                         self._first_gui_frame_logged = True
@@ -397,6 +435,9 @@ class WebcamTopicYoloBridge(Node):
 
             frame = ros_image_to_bgr(message)
             self._frame_index += 1
+            self._input_frames_since_log += 1
+            self._latest_frame_width = frame.shape[1]
+            self._latest_frame_height = frame.shape[0]
 
             if not self._first_frame_logged:
                 self.get_logger().info("First webcam topic frame received.")
@@ -423,6 +464,25 @@ class WebcamTopicYoloBridge(Node):
 
             if self._output_publisher is not None:
                 self._output_publisher.publish(bgr_to_ros_image(stream_frame, message))
+
+            now = time.monotonic()
+            elapsed = now - self._last_metrics_log_at
+            if elapsed >= METRICS_LOG_INTERVAL:
+                input_fps = self._input_frames_since_log / elapsed
+                gui_fps = self._gui_frames_since_log / elapsed
+                gpu_alloc_mb, gpu_reserved_mb = get_gpu_memory_metrics_mb()
+                self.get_logger().info(
+                    "[metrics] "
+                    f"input_fps={input_fps:.1f} "
+                    f"gui_fps={gui_fps:.1f} "
+                    f"infer_ms={self._latest_inference_ms:.1f} "
+                    f"frame={self._latest_frame_width}x{self._latest_frame_height} "
+                    f"gpu_alloc_mb={gpu_alloc_mb:.1f} "
+                    f"gpu_reserved_mb={gpu_reserved_mb:.1f}"
+                )
+                self._input_frames_since_log = 0
+                self._gui_frames_since_log = 0
+                self._last_metrics_log_at = now
         except Exception as exc:
             self._last_error = str(exc)
             status_packet = build_status_packet(
