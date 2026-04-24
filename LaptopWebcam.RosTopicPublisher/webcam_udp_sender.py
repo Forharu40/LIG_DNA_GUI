@@ -42,6 +42,7 @@ def build_packet(encoded_bytes: bytes, frame_index: int, width: int, height: int
 
 def main() -> None:
     capture = cv2.VideoCapture(CAMERA_INDEX)
+    capture.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     capture.set(cv2.CAP_PROP_FRAME_WIDTH, FRAME_WIDTH)
     capture.set(cv2.CAP_PROP_FRAME_HEIGHT, FRAME_HEIGHT)
     capture.set(cv2.CAP_PROP_FPS, TARGET_FPS)

@@ -207,6 +207,22 @@ def decode_laptop_packet(packet: bytes) -> tuple[int, int, int, np.ndarray]:
     return frame_stamp_ns, frame_index, image_length, decoded
 
 
+def recv_latest_packet(sock: socket.socket, max_bytes: int) -> tuple[bytes, tuple[str, int], int]:
+    packet, remote = sock.recvfrom(max_bytes)
+    dropped_packets = 0
+
+    sock.setblocking(False)
+    try:
+        while True:
+            next_packet, next_remote = sock.recvfrom(max_bytes)
+            packet, remote = next_packet, next_remote
+            dropped_packets += 1
+    except BlockingIOError:
+        return packet, remote, dropped_packets
+    finally:
+        sock.setblocking(True)
+
+
 def encode_frame_for_packet(
     frame: np.ndarray,
     detection_width: int,
@@ -284,6 +300,7 @@ def main() -> None:
 
     first_input_logged = False
     first_gui_logged = False
+    last_drop_log_at = 0.0
     latest_detections: list[dict] = []
     latest_detection_width = 0
     latest_detection_height = 0
@@ -293,8 +310,14 @@ def main() -> None:
 
     try:
         while True:
-            packet, remote = input_sock.recvfrom(MAX_UDP_BYTES + 4096)
+            packet, remote, dropped_packets = recv_latest_packet(input_sock, MAX_UDP_BYTES + 4096)
             try:
+                if dropped_packets > 0:
+                    now = time.monotonic()
+                    if now - last_drop_log_at >= 2.0:
+                        print(f"Dropped {dropped_packets} stale webcam packet(s) to keep latency low.")
+                        last_drop_log_at = now
+
                 if pending_detection is not None and pending_detection.done():
                     detection_result = pending_detection.result()
                     latest_detections = detection_result.detections
