@@ -1,11 +1,12 @@
 #!/usr/bin/env python3
-"""Forward EO/IR ROS2 image topics to GUI UDP image packets."""
+"""Forward /camera/eo and /camera/ir ROS2 images to GUI UDP JPEG streams."""
 
 from __future__ import annotations
 
 import os
 import socket
 import struct
+import time
 
 import cv2
 import numpy as np
@@ -15,9 +16,6 @@ from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
 
 
-IMAGE_HEADER_SIZE = 20
-
-
 def getenv_int(name: str, default: int) -> int:
     try:
         return int(os.getenv(name, str(default)))
@@ -25,21 +23,15 @@ def getenv_int(name: str, default: int) -> int:
         return default
 
 
-EO_GUI_HOST = os.getenv("EO_GUI_HOST", os.getenv("GUI_HOST", "192.168.1.94"))
-IR_GUI_HOST = os.getenv("IR_GUI_HOST", os.getenv("GUI_HOST", "192.168.1.94"))
+GUI_HOST = os.getenv("GUI_HOST", "192.168.1.94")
 EO_GUI_PORT = getenv_int("EO_GUI_PORT", 5000)
 IR_GUI_PORT = getenv_int("IR_GUI_PORT", 5001)
 EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/camera/eo")
 IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
-JPEG_QUALITY = getenv_int("JPEG_QUALITY", 35)
-MAX_UDP_BYTES = getenv_int("MAX_UDP_BYTES", 55000)
 STREAM_WIDTH = getenv_int("STREAM_WIDTH", 640)
 STREAM_HEIGHT = getenv_int("STREAM_HEIGHT", 360)
+JPEG_QUALITY = getenv_int("JPEG_QUALITY", 35)
 UDP_SEND_BUFFER_BYTES = getenv_int("UDP_SEND_BUFFER_BYTES", 4 * 1024 * 1024)
-
-
-def stamp_to_ns(stamp) -> int:
-    return max(0, int(stamp.sec) * 1_000_000_000 + int(stamp.nanosec))
 
 
 def ros_image_to_bgr(message: Image) -> np.ndarray:
@@ -72,27 +64,21 @@ def ros_image_to_bgr(message: Image) -> np.ndarray:
     raise ValueError(f"Unsupported image encoding: {message.encoding}")
 
 
-def build_image_packet(
-    encoded_bytes: bytes,
-    frame_stamp_ns: int,
-    frame_index: int,
-    width: int,
-    height: int,
-) -> bytes:
+def build_packet(encoded_bytes: bytes, frame_index: int) -> bytes:
     header = struct.pack(
         "!QIIHH",
-        max(0, frame_stamp_ns),
+        time.time_ns(),
         max(0, frame_index),
         len(encoded_bytes),
-        max(0, min(width, 65535)),
-        max(0, min(height, 65535)),
+        STREAM_WIDTH,
+        STREAM_HEIGHT,
     )
     return header + encoded_bytes
 
 
-class StreamForwarder:
-    def __init__(self, source_name: str, host: str, port: int) -> None:
-        self.source_name = source_name
+class UdpImageForwarder:
+    def __init__(self, name: str, host: str, port: int) -> None:
+        self.name = name
         self.host = host
         self.port = port
         self.frame_index = 0
@@ -101,63 +87,50 @@ class StreamForwarder:
         if UDP_SEND_BUFFER_BYTES > 0:
             self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_SNDBUF, UDP_SEND_BUFFER_BYTES)
 
-    def send_ros_image(self, message: Image) -> None:
+    def send(self, message: Image) -> None:
         frame = ros_image_to_bgr(message)
         frame = cv2.resize(frame, (STREAM_WIDTH, STREAM_HEIGHT), interpolation=cv2.INTER_AREA)
-
         ok, encoded = cv2.imencode(
             ".jpg",
             frame,
             [int(cv2.IMWRITE_JPEG_QUALITY), JPEG_QUALITY],
         )
         if not ok:
-            raise RuntimeError(f"{self.source_name.upper()} JPEG encode failed")
+            raise RuntimeError(f"{self.name.upper()} JPEG encode failed")
 
-        encoded_bytes = encoded.tobytes()
-        if len(encoded_bytes) + IMAGE_HEADER_SIZE > MAX_UDP_BYTES:
-            raise RuntimeError(
-                f"{self.source_name.upper()} frame exceeds UDP size limit: {len(encoded_bytes)} bytes"
-            )
-
-        packet = build_image_packet(
-            encoded_bytes=encoded_bytes,
-            frame_stamp_ns=stamp_to_ns(message.header.stamp),
-            frame_index=self.frame_index,
-            width=STREAM_WIDTH,
-            height=STREAM_HEIGHT,
-        )
+        packet = build_packet(encoded.tobytes(), self.frame_index)
         self.sock.sendto(packet, (self.host, self.port))
         self.frame_index += 1
 
 
-class GuiCameraBridge(Node):
+class CameraUdpBridge(Node):
     def __init__(self) -> None:
-        super().__init__("gui_camera_bridge")
-        self._eo = StreamForwarder("eo", EO_GUI_HOST, EO_GUI_PORT)
-        self._ir = StreamForwarder("ir", IR_GUI_HOST, IR_GUI_PORT)
+        super().__init__("camera_udp_bridge")
+        self._eo = UdpImageForwarder("eo", GUI_HOST, EO_GUI_PORT)
+        self._ir = UdpImageForwarder("ir", GUI_HOST, IR_GUI_PORT)
 
         self.create_subscription(Image, EO_IMAGE_TOPIC, self._on_eo_image, qos_profile_sensor_data)
         self.create_subscription(Image, IR_IMAGE_TOPIC, self._on_ir_image, qos_profile_sensor_data)
 
         self.get_logger().info(f"EO image topic: {EO_IMAGE_TOPIC}")
         self.get_logger().info(f"IR image topic: {IR_IMAGE_TOPIC}")
-        self.get_logger().info(f"Streaming EO GUI packets to {EO_GUI_HOST}:{EO_GUI_PORT}")
-        self.get_logger().info(f"Streaming IR GUI packets to {IR_GUI_HOST}:{IR_GUI_PORT}")
+        self.get_logger().info(f"Streaming EO UDP packets to {GUI_HOST}:{EO_GUI_PORT}")
+        self.get_logger().info(f"Streaming IR UDP packets to {GUI_HOST}:{IR_GUI_PORT}")
 
     def _on_eo_image(self, message: Image) -> None:
         try:
-            self._eo.send_ros_image(message)
+            self._eo.send(message)
             if not self._eo.first_frame_logged:
-                self.get_logger().info("First EO frame forwarded to GUI.")
+                self.get_logger().info("EO first frame sent!")
                 self._eo.first_frame_logged = True
         except Exception as exc:
             self.get_logger().error(f"Failed to forward EO image: {exc}")
 
     def _on_ir_image(self, message: Image) -> None:
         try:
-            self._ir.send_ros_image(message)
+            self._ir.send(message)
             if not self._ir.first_frame_logged:
-                self.get_logger().info("First IR frame forwarded to GUI.")
+                self.get_logger().info("IR first frame sent!")
                 self._ir.first_frame_logged = True
         except Exception as exc:
             self.get_logger().error(f"Failed to forward IR image: {exc}")
@@ -165,7 +138,7 @@ class GuiCameraBridge(Node):
 
 def main() -> None:
     rclpy.init()
-    node = GuiCameraBridge()
+    node = CameraUdpBridge()
     try:
         rclpy.spin(node)
     finally:
