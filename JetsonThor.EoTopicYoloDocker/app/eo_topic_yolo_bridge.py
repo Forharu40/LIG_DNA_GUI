@@ -9,6 +9,7 @@ import json
 import os
 import socket
 import struct
+import threading
 import time
 
 import cv2
@@ -100,7 +101,7 @@ MAX_UDP_BYTES = getenv_int("MAX_UDP_BYTES", 55000)
 YOLO_DEVICE = resolve_yolo_device()
 YOLO_HALF = getenv_bool("YOLO_HALF", YOLO_DEVICE != "cpu")
 METRICS_LOG_INTERVAL = max(0.2, getenv_float("METRICS_LOG_INTERVAL", 1.0))
-HORIZONTAL_FLIP = getenv_bool("HORIZONTAL_FLIP", True)
+HORIZONTAL_FLIP = getenv_bool("HORIZONTAL_FLIP", False)
 
 
 def resolve_torch_device_index() -> int | None:
@@ -338,7 +339,7 @@ def send_encoded_frame(
     gui_port: int,
     source: str,
     model_loaded: bool,
-) -> tuple[float, int, int, int]:
+) -> tuple[float, int, int, int, float]:
     started_at = time.perf_counter()
     image_packet = build_image_packet(
         encoded_frame.encoded_bytes,
@@ -368,7 +369,10 @@ def send_encoded_frame(
     sock.sendto(detection_packet, (gui_host, gui_port))
     sock.sendto(status_packet, (gui_host, gui_port))
     send_ms = (time.perf_counter() - started_at) * 1000.0
-    return send_ms, len(image_packet), len(detection_packet), len(status_packet)
+    bridge_age_ms = 0.0
+    if encoded_frame.frame_stamp_ns > 0:
+        bridge_age_ms = max(0.0, (time.time_ns() - encoded_frame.frame_stamp_ns) / 1_000_000.0)
+    return send_ms, len(image_packet), len(detection_packet), len(status_packet), bridge_age_ms
 
 
 class EoTopicYoloBridge(Node):
@@ -393,6 +397,8 @@ class EoTopicYoloBridge(Node):
         self._latest_inference_ms = 0.0
         self._latest_encode_ms = 0.0
         self._latest_send_ms = 0.0
+        self._latest_input_age_ms = 0.0
+        self._latest_bridge_age_ms = 0.0
         self._latest_frame_width = 0
         self._latest_frame_height = 0
         self._latest_image_packet_bytes = 0
@@ -401,9 +407,11 @@ class EoTopicYoloBridge(Node):
         self._input_frames_since_log = 0
         self._gui_frames_since_log = 0
         self._last_metrics_log_at = time.monotonic()
+        self._latest_message_lock = threading.Lock()
+        self._latest_input_message: Image | None = None
         self._pending_detection: Future[DetectionResult] | None = None
         self._pending_encoded_frame: Future[EncodedFrame | None] | None = None
-        self._pending_send: Future[tuple[float, int, int, int]] | None = None
+        self._pending_send: Future[tuple[float, int, int, int, float]] | None = None
         self._queued_detection_frame: np.ndarray | None = None
         self._queued_encode_request: EncodeRequest | None = None
         self._queued_encoded_frame: EncodedFrame | None = None
@@ -412,6 +420,7 @@ class EoTopicYoloBridge(Node):
             self._output_publisher = self.create_publisher(Image, OUTPUT_IMAGE_TOPIC, qos_profile_sensor_data)
 
         self.create_subscription(Image, INPUT_IMAGE_TOPIC, self._on_image, qos_profile_sensor_data)
+        self.create_timer(0.001, self._pump_pipeline)
 
         self.get_logger().info(f"Input image topic: {INPUT_IMAGE_TOPIC}")
         if PUBLISH_OUTPUT_TOPIC:
@@ -424,18 +433,42 @@ class EoTopicYoloBridge(Node):
         self.get_logger().info(f"Metrics log interval: {METRICS_LOG_INTERVAL:.1f}s")
 
     def _on_image(self, message: Image) -> None:
-        frame_stamp_ns = (
-            int(message.header.stamp.sec) * 1_000_000_000
-            + int(message.header.stamp.nanosec)
-        )
+        with self._latest_message_lock:
+            self._latest_input_message = message
+
+        self._input_frames_since_log += 1
+        if not self._first_frame_logged:
+            self.get_logger().info("First EO camera topic frame received.")
+            self._first_frame_logged = True
+
+    def _pump_pipeline(self) -> None:
+        message: Image | None = None
+        with self._latest_message_lock:
+            if self._latest_input_message is not None:
+                message = self._latest_input_message
+                self._latest_input_message = None
+
+        frame_stamp_ns = 0
+        if message is not None:
+            frame_stamp_ns = (
+                int(message.header.stamp.sec) * 1_000_000_000
+                + int(message.header.stamp.nanosec)
+            )
 
         try:
             if self._pending_send is not None and self._pending_send.done():
-                send_ms, image_packet_bytes, detection_packet_bytes, status_packet_bytes = self._pending_send.result()
+                (
+                    send_ms,
+                    image_packet_bytes,
+                    detection_packet_bytes,
+                    status_packet_bytes,
+                    bridge_age_ms,
+                ) = self._pending_send.result()
                 self._latest_send_ms = send_ms
                 self._latest_image_packet_bytes = image_packet_bytes
                 self._latest_detection_packet_bytes = detection_packet_bytes
                 self._latest_status_packet_bytes = status_packet_bytes
+                self._latest_bridge_age_ms = bridge_age_ms
                 self._pending_send = None
 
             if self._pending_detection is not None and self._pending_detection.done():
@@ -491,50 +524,48 @@ class EoTopicYoloBridge(Node):
                     self.get_logger().info("First EO frame sent to GUI.")
                     self._first_gui_frame_logged = True
 
-            frame = ros_image_to_bgr(message)
-            if HORIZONTAL_FLIP:
-                frame = cv2.flip(frame, 1)
-            self._frame_index += 1
-            self._input_frames_since_log += 1
-            self._latest_frame_width = frame.shape[1]
-            self._latest_frame_height = frame.shape[0]
+            if message is not None:
+                frame = ros_image_to_bgr(message)
+                if HORIZONTAL_FLIP:
+                    frame = cv2.flip(frame, 1)
+                if frame_stamp_ns > 0:
+                    self._latest_input_age_ms = max(0.0, (time.time_ns() - frame_stamp_ns) / 1_000_000.0)
+                self._frame_index += 1
+                self._latest_frame_width = frame.shape[1]
+                self._latest_frame_height = frame.shape[0]
 
-            if not self._first_frame_logged:
-                self.get_logger().info("First EO camera topic frame received.")
-                self._first_frame_logged = True
+                if self._pending_detection is None:
+                    self._pending_detection = self._detection_executor.submit(
+                        detect_objects_for_packet,
+                        self._model,
+                        frame.copy(),
+                    )
+                else:
+                    self._queued_detection_frame = frame.copy()
 
-            if self._pending_detection is None:
-                self._pending_detection = self._detection_executor.submit(
-                    detect_objects_for_packet,
-                    self._model,
-                    frame.copy(),
-                )
-            else:
-                self._queued_detection_frame = frame.copy()
+                stream_frame = fit_frame_to_stream(frame)
+                if self._pending_encoded_frame is None:
+                    self._pending_encoded_frame = self._encode_executor.submit(
+                        encode_frame_for_packet,
+                        stream_frame.copy(),
+                        self._latest_detection_width or frame.shape[1],
+                        self._latest_detection_height or frame.shape[0],
+                        [dict(detection) for detection in self._latest_detections],
+                        self._frame_index,
+                        frame_stamp_ns or time.time_ns(),
+                    )
+                else:
+                    self._queued_encode_request = EncodeRequest(
+                        frame=stream_frame.copy(),
+                        detection_width=self._latest_detection_width or frame.shape[1],
+                        detection_height=self._latest_detection_height or frame.shape[0],
+                        detections=[dict(detection) for detection in self._latest_detections],
+                        frame_index=self._frame_index,
+                        frame_stamp_ns=frame_stamp_ns or time.time_ns(),
+                    )
 
-            stream_frame = fit_frame_to_stream(frame)
-            if self._pending_encoded_frame is None:
-                self._pending_encoded_frame = self._encode_executor.submit(
-                    encode_frame_for_packet,
-                    stream_frame.copy(),
-                    self._latest_detection_width or frame.shape[1],
-                    self._latest_detection_height or frame.shape[0],
-                    [dict(detection) for detection in self._latest_detections],
-                    self._frame_index,
-                    frame_stamp_ns or time.time_ns(),
-                )
-            else:
-                self._queued_encode_request = EncodeRequest(
-                    frame=stream_frame.copy(),
-                    detection_width=self._latest_detection_width or frame.shape[1],
-                    detection_height=self._latest_detection_height or frame.shape[0],
-                    detections=[dict(detection) for detection in self._latest_detections],
-                    frame_index=self._frame_index,
-                    frame_stamp_ns=frame_stamp_ns or time.time_ns(),
-                )
-
-            if self._output_publisher is not None:
-                self._output_publisher.publish(bgr_to_ros_image(stream_frame, message))
+                if self._output_publisher is not None:
+                    self._output_publisher.publish(bgr_to_ros_image(stream_frame, message))
 
             now = time.monotonic()
             elapsed = now - self._last_metrics_log_at
@@ -549,6 +580,8 @@ class EoTopicYoloBridge(Node):
                     f"infer_ms={self._latest_inference_ms:.1f} "
                     f"encode_ms={self._latest_encode_ms:.1f} "
                     f"send_ms={self._latest_send_ms:.1f} "
+                    f"input_age_ms={self._latest_input_age_ms:.1f} "
+                    f"bridge_age_ms={self._latest_bridge_age_ms:.1f} "
                     f"frame={self._latest_frame_width}x{self._latest_frame_height} "
                     f"image_kb={self._latest_image_packet_bytes / 1024:.1f} "
                     f"dets_kb={self._latest_detection_packet_bytes / 1024:.1f} "
