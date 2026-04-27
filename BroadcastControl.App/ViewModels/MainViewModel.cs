@@ -433,19 +433,19 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     /// </summary>
     public void UpdateEoFrame(ImageSource? frame)
     {
-        _eoFrame = frame;
+        _eoFrame = RotateFrame(frame, 180);
         OnPropertyChanged(nameof(LargeFeedImage));
         OnPropertyChanged(nameof(InsetFeedImage));
     }
 
     /// <summary>
     /// IR 카메라 프레임을 ViewModel에 반영한다.
-    /// 현재 장착 방향을 맞추기 위해 수신 프레임을 왼쪽으로 90도 회전한 뒤 화면에 사용한다.
+    /// 현재 장착 방향을 맞추기 위해 수신 프레임을 오른쪽으로 90도 회전한 뒤 화면에 사용한다.
     /// EO/IR 화면이 서로 바뀐 상태여도 메인 화면과 보조 화면 모두 즉시 갱신된다.
     /// </summary>
     public void UpdateIrFrame(ImageSource? frame)
     {
-        _irFrame = RotateFrame(frame, -90);
+        _irFrame = RotateFrame(frame, 90);
         OnPropertyChanged(nameof(LargeFeedImage));
         OnPropertyChanged(nameof(InsetFeedImage));
     }

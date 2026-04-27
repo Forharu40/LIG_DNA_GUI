@@ -1,41 +1,40 @@
 # JetsonThor.RosCameraBridge
 
-ROS2 토픽을 받아서 GUI로 넘기는 EO/IR 통합 브리지 폴더다.
+This folder is for the case where ROS already provides:
 
-이 폴더는 기존 `JetsonThor.RosIrBridge`의 IR 전용 구조를 대신해서, EO와 IR를 한 번에 다룬다.
+- EO image topic
+- IR image topic
+- EO detection topic
+- IR detection topic
 
-## 포함 내용
+and you only want to bridge those ROS topics into the existing GUI UDP format.
+
+## Current role
+
+Use this folder when another YOLO system already publishes detections such as:
+
+- `/detections/eo`
+- `/detections/ir`
+
+and you want to forward:
+
+- `/video/eo/preprocessed` -> GUI UDP `5000`
+- `/video/ir/preprocessed` -> GUI UDP `5001`
+
+## Not the recommended path for the current local YOLO workflow
+
+If you want:
+
+```text
+camera -> Jetson -> local YOLO -> laptop GUI
+```
+
+use [../JetsonThor.EoTopicYoloDocker](../JetsonThor.EoTopicYoloDocker) instead.
+
+This folder is only for bridging ROS image/detection topics that already exist.
+
+## Files
 
 - `Dockerfile`
 - `run_camera_udp_bridge.sh`
 - `app/camera_udp_bridge.py`
-
-## 기본 입력 topic
-
-- EO: `/camera/eo`
-- IR: `/camera/ir`
-
-## 기본 GUI UDP port
-
-- EO: `5000`
-- IR: `5001`
-
-## 용도
-
-- ROS2 이미지 토픽을 구독
-- 640x360 JPEG로 압축
-- GUI로 UDP 전송
-
-즉 구조는 아래와 같다.
-
-```text
-ROS2 /camera/eo -> GUI UDP 5000
-ROS2 /camera/ir -> GUI UDP 5001
-```
-
-## 실행
-
-```bash
-cd ~/LIG_DNA_GUI/JetsonThor.RosCameraBridge
-bash ./run_camera_udp_bridge.sh --build
-```

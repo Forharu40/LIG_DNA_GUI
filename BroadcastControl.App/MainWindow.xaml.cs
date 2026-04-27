@@ -21,7 +21,7 @@ public partial class MainWindow : Window
     {
         None,
         Rotate180,
-        RotateLeft90
+        RotateRight90
     }
 
     private const double SettingsDrawerClosedOffset = 320;
@@ -470,8 +470,8 @@ public partial class MainWindow : Window
     private DisplayRotation GetCurrentDisplayRotation()
     {
         return _viewModel.IsEoPrimary
-            ? DisplayRotation.None
-            : DisplayRotation.RotateLeft90;
+            ? DisplayRotation.Rotate180
+            : DisplayRotation.RotateRight90;
     }
 
     private static string BuildOverlaySignature(IReadOnlyList<DetectionInfo> detections)
@@ -483,12 +483,12 @@ public partial class MainWindow : Window
 
     private static int GetRotatedWidth(int sourceWidth, int sourceHeight, DisplayRotation rotation)
     {
-        return rotation == DisplayRotation.RotateLeft90 ? sourceHeight : sourceWidth;
+        return rotation == DisplayRotation.RotateRight90 ? sourceHeight : sourceWidth;
     }
 
     private static int GetRotatedHeight(int sourceWidth, int sourceHeight, DisplayRotation rotation)
     {
-        return rotation == DisplayRotation.RotateLeft90 ? sourceWidth : sourceHeight;
+        return rotation == DisplayRotation.RotateRight90 ? sourceWidth : sourceHeight;
     }
 
     private static DetectionInfo RotateDetectionForDisplay(
@@ -507,19 +507,19 @@ public partial class MainWindow : Window
                 (float)(sourceWidth - detection.X1),
                 (float)(sourceHeight - detection.Y1),
                 detection.ObjectId),
-            DisplayRotation.RotateLeft90 => RotateDetectionLeft90(detection, sourceWidth),
+            DisplayRotation.RotateRight90 => RotateDetectionRight90(detection, sourceHeight),
             _ => detection
         };
     }
 
-    private static DetectionInfo RotateDetectionLeft90(DetectionInfo detection, int sourceWidth)
+    private static DetectionInfo RotateDetectionRight90(DetectionInfo detection, int sourceHeight)
     {
         var rotatedCorners = new[]
         {
-            RotatePointLeft90(detection.X1, detection.Y1, sourceWidth),
-            RotatePointLeft90(detection.X2, detection.Y1, sourceWidth),
-            RotatePointLeft90(detection.X2, detection.Y2, sourceWidth),
-            RotatePointLeft90(detection.X1, detection.Y2, sourceWidth)
+            RotatePointRight90(detection.X1, detection.Y1, sourceHeight),
+            RotatePointRight90(detection.X2, detection.Y1, sourceHeight),
+            RotatePointRight90(detection.X2, detection.Y2, sourceHeight),
+            RotatePointRight90(detection.X1, detection.Y2, sourceHeight)
         };
 
         var x1 = rotatedCorners.Min(point => point.X);
@@ -537,9 +537,9 @@ public partial class MainWindow : Window
             detection.ObjectId);
     }
 
-    private static Point RotatePointLeft90(double x, double y, int sourceWidth)
+    private static Point RotatePointRight90(double x, double y, int sourceHeight)
     {
-        return new Point(y, sourceWidth - x);
+        return new Point(sourceHeight - y, x);
     }
 
     private static void CacheFrame(ReceivedVideoFrame frame, Dictionary<uint, ReceivedVideoFrame> frameCache)
