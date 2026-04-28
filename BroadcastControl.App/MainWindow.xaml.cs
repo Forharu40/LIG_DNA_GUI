@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private readonly UdpEncodedVideoReceiverService _irUdpCaptureService;
     private readonly ViewportRecordingService _viewportRecordingService;
     private readonly UdpMotorControlService _motorControlService;
+    private readonly RosTopicBridgeProcessService _rosTopicBridgeProcessService;
     private readonly DispatcherTimer _motorHoldTimer;
 
     private bool _isDraggingZoom;
@@ -104,6 +105,8 @@ public partial class MainWindow : Window
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
         _irUdpCaptureService = new UdpEncodedVideoReceiverService();
         _viewportRecordingService = new ViewportRecordingService();
+        _rosTopicBridgeProcessService = new RosTopicBridgeProcessService();
+        _rosTopicBridgeProcessService.MessageReady += OnRosTopicBridgeMessageReady;
         _motorHoldTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(50)
@@ -158,6 +161,8 @@ public partial class MainWindow : Window
         {
             _viewModel.AppendImportantLog($"Failed to start the IR UDP stream receiver on port {IrUdpPort}.");
         }
+
+        _rosTopicBridgeProcessService.Start(EoUdpPort, IrUdpPort);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -356,6 +361,11 @@ public partial class MainWindow : Window
 
     private void OnEoDiagnosticsMessageReady(string message)
     {
+    }
+
+    private void OnRosTopicBridgeMessageReady(string message)
+    {
+        Dispatcher.BeginInvoke(() => _viewModel.AppendImportantLog(message));
     }
 
     private void UpdateRecordingViewportState()
@@ -1138,6 +1148,8 @@ public partial class MainWindow : Window
         _irUdpCaptureService.FrameReady -= OnIrFrameReady;
         _irUdpCaptureService.DetectionsReceived -= OnIrDetectionsReceived;
         _irUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
+        _rosTopicBridgeProcessService.MessageReady -= OnRosTopicBridgeMessageReady;
+        _rosTopicBridgeProcessService.Dispose();
         _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
         _irUdpCaptureService.Dispose();
