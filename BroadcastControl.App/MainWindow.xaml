@@ -821,20 +821,20 @@
                                 <ColumnDefinition Width="1.25*" />
                             </Grid.ColumnDefinitions>
 
-                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,14,0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,6,0" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button Width="92" Margin="0,0,10,0" Command="{Binding ResetContrastCommand}" Style="{StaticResource TopBarSmallButton}" Content="{Binding ContrastText}" />
                                 <Slider Width="220" Minimum="0" Maximum="100" Value="{Binding Contrast, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsSystemPoweredOn}" Style="{StaticResource TopBarCompactSlider}" />
                             </StackPanel>
 
-                            <Button Grid.Row="0" Grid.Column="1" Margin="4,0" Command="{Binding SetModeCommand}" CommandParameter="&#xC790;&#xB3D9;" IsHitTestVisible="{Binding CanSelectAutoMode}" Opacity="{Binding AutoModeOpacity}" Style="{StaticResource TopBarButton}" Content="&#xC790;&#xB3D9;" />
-                            <Button Grid.Row="0" Grid.Column="2" Margin="4,0" Command="{Binding SetModeCommand}" CommandParameter="&#xC218;&#xB3D9;" IsHitTestVisible="{Binding CanSelectManualMode}" Opacity="{Binding ManualModeOpacity}" Style="{StaticResource TopBarButton}" Content="&#xC218;&#xB3D9;" />
+                            <Button Grid.Row="0" Grid.Column="1" Margin="6,0" Command="{Binding SetModeCommand}" CommandParameter="&#xC790;&#xB3D9;" IsHitTestVisible="{Binding CanSelectAutoMode}" Opacity="{Binding AutoModeOpacity}" Style="{StaticResource TopBarButton}" Content="&#xC790;&#xB3D9;" />
+                            <Button Grid.Row="0" Grid.Column="2" Margin="6,0" Command="{Binding SetModeCommand}" CommandParameter="&#xC218;&#xB3D9;" IsHitTestVisible="{Binding CanSelectManualMode}" Opacity="{Binding ManualModeOpacity}" Style="{StaticResource TopBarButton}" Content="&#xC218;&#xB3D9;" />
 
-                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,14,0" Orientation="Horizontal" VerticalAlignment="Center">
+                            <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,6,0" Orientation="Horizontal" VerticalAlignment="Center">
                                 <Button Width="92" Margin="0,0,10,0" Command="{Binding ResetBrightnessCommand}" Style="{StaticResource TopBarSmallButton}" Content="{Binding BrightnessText}" />
                                 <Slider Width="220" Minimum="0" Maximum="100" Value="{Binding Brightness, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsSystemPoweredOn}" Style="{StaticResource TopBarCompactSlider}" />
                             </StackPanel>
 
-                            <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="4,0" VerticalAlignment="Center">
+                            <Grid Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Margin="6,0" VerticalAlignment="Center">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="92" />
                                     <ColumnDefinition Width="10" />
@@ -847,13 +847,13 @@
                                 <TextBlock Grid.Column="4" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" FontWeight="SemiBold" TextAlignment="Right" Text="{Binding ZoomLevelText}" />
                             </Grid>
 
-                            <Button Grid.Row="0" Grid.Column="3" Margin="4,0" Command="{Binding ToggleManualRecordingCommand}" Opacity="{Binding ManualRecordingButtonOpacity}" IsEnabled="{Binding IsSystemPoweredOn}" Style="{StaticResource TopBarButton}" Content="{Binding ManualRecordingButtonText}" />
-                            <StackPanel Grid.Row="1" Grid.Column="3" Margin="4,0" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal" Opacity="{Binding RecordingIndicatorOpacity}">
+                            <Button Grid.Row="0" Grid.Column="3" Margin="6,0" Command="{Binding ToggleManualRecordingCommand}" Opacity="{Binding ManualRecordingButtonOpacity}" IsEnabled="{Binding IsSystemPoweredOn}" Style="{StaticResource TopBarButton}" Content="{Binding ManualRecordingButtonText}" />
+                            <StackPanel Grid.Row="1" Grid.Column="3" Margin="6,0" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal" Opacity="{Binding RecordingIndicatorOpacity}">
                                 <Ellipse Width="12" Height="12" Margin="0,0,7,0" VerticalAlignment="Center" Fill="{Binding RecordingIndicatorBrush}" />
                                 <TextBlock VerticalAlignment="Center" Foreground="{Binding RecordingTextBrush}" FontSize="15" FontWeight="Bold" Text="&#xC601;&#xC0C1; &#xB179;&#xD654; &#xC911;" />
                             </StackPanel>
 
-                            <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="4" Margin="8,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
+                            <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="4" Margin="6,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Foreground="{DynamicResource PrimaryTextBrush}" FontSize="16" FontWeight="Bold" Text="&#xC2DC;&#xC2A4;&#xD15C; &#xD604;&#xD669;" />
                                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">

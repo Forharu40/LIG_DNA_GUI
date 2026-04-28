@@ -65,7 +65,7 @@ public sealed class MobileAlertHubService : IDisposable
         }
     }
 
-    public async Task PublishAlertAsync(string title, string analysis, string threatLevel, byte[]? evidencePng)
+    public async Task PublishAlertAsync(string title, string vlmAnalysis, string detectionSummary, string threatLevel, byte[]? evidencePng)
     {
         var id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var evidenceUrl = string.Empty;
@@ -80,7 +80,8 @@ public sealed class MobileAlertHubService : IDisposable
             id,
             DateTimeOffset.Now.ToString("yyyy-MM-dd HH:mm:ss"),
             title,
-            analysis,
+            vlmAnalysis,
+            detectionSummary,
             threatLevel,
             evidenceUrl);
         _latestAlert = alert;
@@ -341,6 +342,112 @@ public sealed class MobileAlertHubService : IDisposable
         <head>
         <meta charset="utf-8">
         <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+        <title>&#xC704;&#xD5D8; &#xC54C;&#xB9BC;</title>
+        <style>
+        :root { color-scheme: dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #07090c; color: #f5f7fb; }
+        body { margin: 0; min-height: 100vh; background: #07090c; }
+        main { min-height: 100vh; display: grid; grid-template-rows: auto 1fr auto; }
+        header { padding: 18px 18px 12px; border-bottom: 1px solid #222936; background: #111722; }
+        h1 { margin: 0; font-size: 22px; letter-spacing: 0; }
+        .status { margin-top: 6px; color: #9aa6b8; font-size: 13px; }
+        .alert { padding: 18px; display: grid; gap: 14px; align-content: start; }
+        .level { display: inline-flex; align-items: center; gap: 8px; color: #ff7777; font-weight: 800; font-size: 18px; }
+        .dot { width: 12px; height: 12px; border-radius: 99px; background: #ff4d4f; box-shadow: 0 0 16px #ff4d4f; }
+        .time { color: #b8c1cf; font-size: 13px; }
+        .detail-grid { display: grid; gap: 12px; }
+        .detail-card { padding: 14px; border: 1px solid #2f3d52; border-radius: 8px; background: #111722; }
+        .detail-title { margin: 0 0 8px; color: #8fd3ff; font-size: 14px; font-weight: 800; letter-spacing: 0; }
+        .detail-text { margin: 0; line-height: 1.55; color: #e8edf5; font-size: 16px; white-space: pre-wrap; }
+        img { width: 100%; max-height: 58vh; object-fit: contain; background: #010204; border: 1px solid #263142; }
+        button { width: calc(100% - 36px); margin: 0 18px 18px; height: 48px; border: 1px solid #42526a; background: #172131; color: #fff; font-size: 16px; font-weight: 700; border-radius: 6px; }
+        .empty { color: #98a4b5; }
+        </style>
+        </head>
+        <body>
+        <main>
+        <header>
+        <h1>&#xC6B4;&#xC6A9;&#xD1B5;&#xC81C; &#xC704;&#xD5D8; &#xC54C;&#xB9BC;</h1>
+        <div id="status" class="status">GUI &#xC54C;&#xB9BC; &#xB300;&#xAE30; &#xC911;</div>
+        </header>
+        <section id="alert" class="alert">
+        <div class="empty">&#xC704;&#xD5D8; &#xC774;&#xBCA4;&#xD2B8;&#xAC00; &#xBC1C;&#xC0DD;&#xD558;&#xBA74; YOLO &#xBC14;&#xC6B4;&#xB529; &#xBC15;&#xC2A4; &#xD654;&#xBA74;&#xACFC; VLM &#xBD84;&#xC11D;, &#xD0D0;&#xC9C0; &#xB0B4;&#xC6A9;&#xC774; &#xBD84;&#xB9AC;&#xB418;&#xC5B4; &#xD45C;&#xC2DC;&#xB429;&#xB2C8;&#xB2E4;.</div>
+        </section>
+        <button id="enable">&#xC54C;&#xB9BC;&#xC74C; / &#xC9C4;&#xB3D9; &#xD65C;&#xC131;&#xD654;</button>
+        </main>
+        <script>
+        let audioReady = false;
+        const statusEl = document.getElementById("status");
+        const alertEl = document.getElementById("alert");
+        document.getElementById("enable").addEventListener("click", async () => {
+          audioReady = true;
+          if ("Notification" in window && Notification.permission === "default") await Notification.requestPermission();
+          playAlarm();
+          if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+        });
+        function playAlarm() {
+          if (!audioReady) return;
+          const ctx = new (window.AudioContext || window.webkitAudioContext)();
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.type = "square";
+          osc.frequency.value = 880;
+          gain.gain.setValueAtTime(0.0001, ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.25, ctx.currentTime + 0.03);
+          gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.65);
+          osc.connect(gain).connect(ctx.destination);
+          osc.start();
+          osc.stop(ctx.currentTime + 0.7);
+        }
+        function renderAlert(alert) {
+          if (!alert) return;
+          const vlmAnalysis = escapeHtml(alert.vlmAnalysis || alert.analysis || "");
+          const detectionSummary = escapeHtml(alert.detectionSummary || "\uD0D0\uC9C0 \uB0B4\uC6A9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
+          statusEl.textContent = "\uB9C8\uC9C0\uB9C9 \uC218\uC2E0: " + alert.createdAt;
+          alertEl.innerHTML = `
+            <div class="level"><span class="dot"></span>${escapeHtml(alert.threatLevel)} \uC704\uD5D8</div>
+            <div class="time">${escapeHtml(alert.createdAt)}</div>
+            ${alert.evidenceUrl ? `<img src="${alert.evidenceUrl}?t=${encodeURIComponent(alert.id)}" alt="\uC704\uD5D8 \uD654\uBA74">` : ""}
+            <div class="detail-grid">
+              <article class="detail-card">
+                <h2 class="detail-title">VLM \uBD84\uC11D</h2>
+                <p class="detail-text">${vlmAnalysis}</p>
+              </article>
+              <article class="detail-card">
+                <h2 class="detail-title">\uD0D0\uC9C0 \uB0B4\uC6A9</h2>
+                <p class="detail-text">${detectionSummary}</p>
+              </article>
+            </div>`;
+          playAlarm();
+          if (navigator.vibrate) navigator.vibrate([220, 90, 220, 90, 420]);
+          if ("Notification" in window && Notification.permission === "granted") {
+            new Notification(alert.title, { body: alert.vlmAnalysis || alert.analysis });
+          }
+        }
+        function escapeHtml(value) {
+          return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
+        }
+        fetch("/latest").then(r => r.json()).then(renderAlert).catch(() => {});
+        const events = new EventSource("/events");
+        events.onopen = () => statusEl.textContent = "GUI\uC640 \uC5F0\uACB0\uB428";
+        events.onerror = () => statusEl.textContent = "\uC5F0\uACB0 \uC7AC\uC2DC\uB3C4 \uC911";
+        events.addEventListener("alert", event => renderAlert(JSON.parse(event.data)));
+        </script>
+        </body>
+        </html>
+        """;
+
+    private static string BuildLegacyMobileAppHtml() =>
+        """
+        <!doctype html>
+        <html lang="ko">
+        <head>
+        <meta charset="utf-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
         <title>위험 알림</title>
         <style>
         :root { color-scheme: dark; font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #07090c; color: #f5f7fb; }
@@ -353,7 +460,10 @@ public sealed class MobileAlertHubService : IDisposable
         .level { display: inline-flex; align-items: center; gap: 8px; color: #ff7777; font-weight: 800; font-size: 18px; }
         .dot { width: 12px; height: 12px; border-radius: 99px; background: #ff4d4f; box-shadow: 0 0 16px #ff4d4f; }
         .time { color: #b8c1cf; font-size: 13px; }
-        .analysis { margin: 0; line-height: 1.55; color: #e8edf5; font-size: 16px; white-space: pre-wrap; }
+        .detail-grid { display: grid; gap: 12px; }
+        .detail-card { padding: 14px; border: 1px solid #2f3d52; border-radius: 8px; background: #111722; }
+        .detail-title { margin: 0 0 8px; color: #8fd3ff; font-size: 14px; font-weight: 800; letter-spacing: 0; }
+        .detail-text { margin: 0; line-height: 1.55; color: #e8edf5; font-size: 16px; white-space: pre-wrap; }
         img { width: 100%; max-height: 58vh; object-fit: contain; background: #010204; border: 1px solid #263142; }
         button { width: calc(100% - 36px); margin: 0 18px 18px; height: 48px; border: 1px solid #42526a; background: #172131; color: #fff; font-size: 16px; font-weight: 700; border-radius: 6px; }
         .empty { color: #98a4b5; }
@@ -397,16 +507,35 @@ public sealed class MobileAlertHubService : IDisposable
         function renderAlert(alert) {
           if (!alert) return;
           statusEl.textContent = "마지막 수신: " + alert.createdAt;
+          const vlmAnalysis = escapeHtml(alert.vlmAnalysis || alert.analysis || "");
+          const detectionSummary = escapeHtml(alert.detectionSummary || "\uD0D0\uC9C0 \uB0B4\uC6A9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
           alertEl.innerHTML = `
             <div class="level"><span class="dot"></span>${alert.threatLevel} 위험</div>
             <div class="time">${alert.createdAt}</div>
             ${alert.evidenceUrl ? `<img src="${alert.evidenceUrl}?t=${encodeURIComponent(alert.id)}" alt="위험 화면">` : ""}
-            <p class="analysis">${alert.analysis}</p>`;
+            <div class="detail-grid">
+              <article class="detail-card">
+                <h2 class="detail-title">VLM \uBD84\uC11D</h2>
+                <p class="detail-text">${vlmAnalysis}</p>
+              </article>
+              <article class="detail-card">
+                <h2 class="detail-title">\uD0D0\uC9C0 \uB0B4\uC6A9</h2>
+                <p class="detail-text">${detectionSummary}</p>
+              </article>
+            </div>`;
           playAlarm();
           if (navigator.vibrate) navigator.vibrate([220, 90, 220, 90, 420]);
           if ("Notification" in window && Notification.permission === "granted") {
-            new Notification(alert.title, { body: alert.analysis });
+            new Notification(alert.title, { body: alert.vlmAnalysis || alert.analysis });
           }
+        }
+        function escapeHtml(value) {
+          return String(value)
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#39;");
         }
         fetch("/latest").then(r => r.json()).then(renderAlert).catch(() => {});
         const events = new EventSource("/events");
@@ -450,6 +579,7 @@ public sealed record MobileAlertEvent(
     string Id,
     string CreatedAt,
     string Title,
-    string Analysis,
+    string VlmAnalysis,
+    string DetectionSummary,
     string ThreatLevel,
     string EvidenceUrl);

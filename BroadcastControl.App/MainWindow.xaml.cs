@@ -725,7 +725,8 @@ public partial class MainWindow : Window
         }
 
         var analysis = BuildVlmStyleAnalysis(detections);
-        _viewModel.ApplyVlmAnalysisResult("높음", analysis);
+        var detectionSummary = BuildDetectionSummary(detections);
+        _viewModel.ApplyVlmAnalysisResult("높음", $"{analysis} 탐지 내용: {detectionSummary}");
 
         var alertSignature = $"{_viewModel.SelectedPrimaryTarget}:{frameId}:{BuildOverlaySignature(detections)}";
         var now = DateTimeOffset.Now;
@@ -741,6 +742,7 @@ public partial class MainWindow : Window
         _ = _mobileAlertHubService.PublishAlertAsync(
             "운용통제 위험 알림",
             analysis,
+            detectionSummary,
             _viewModel.CurrentThreatLevel,
             evidencePng);
         _viewModel.AppendImportantLog("모바일 앱으로 위험 알림을 전송했습니다.");
@@ -748,17 +750,19 @@ public partial class MainWindow : Window
 
     private string BuildVlmStyleAnalysis(IReadOnlyList<DetectionInfo> detections)
     {
-        var ordered = detections
-            .OrderByDescending(d => d.Score)
-            .Take(4)
-            .ToArray();
-        var targetSummary = string.Join(
-            ", ",
-            ordered.Select(d => $"{d.ClassName} object{d.ObjectId} 신뢰도 {d.Score:0.00}"));
-
         return
-            $"VLM 분석: {_viewModel.LargeFeedTitle} 영상에서 주 탐지체 '{_viewModel.SelectedPrimaryTarget}' 기준 위험 객체 {detections.Count}개가 확인되었습니다. " +
-            $"탐지 내용: {targetSummary}. 운용자는 현 화면의 바운딩 박스 위치를 확인하고 추적/녹화 상태를 유지하십시오.";
+            $"{_viewModel.LargeFeedTitle} 영상에서 주 탐지체 '{_viewModel.SelectedPrimaryTarget}' 기준 위험 객체 {detections.Count}개가 확인되었습니다. " +
+            "운용자는 현 화면의 바운딩 박스 위치를 확인하고 추적/녹화 상태를 유지하십시오.";
+    }
+
+    private static string BuildDetectionSummary(IReadOnlyList<DetectionInfo> detections)
+    {
+        return string.Join(
+            "\n",
+            detections
+                .OrderByDescending(d => d.Score)
+                .Take(8)
+                .Select((d, index) => $"{index + 1}. {d.ClassName} object{d.ObjectId} / 신뢰도 {d.Score:0.00} / bbox ({d.X1:0}, {d.Y1:0})-({d.X2:0}, {d.Y2:0})"));
     }
 
     private static byte[]? CaptureElementAsPng(FrameworkElement element)

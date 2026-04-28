@@ -40,6 +40,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double _contrast = 50;
     private bool _isManualRecordingEnabled;
     private bool _isRecordingSuppressed;
+    private bool _isAutoRecordingLatched;
     private AppThemeMode _currentThemeMode;
     private double _eoDisplayRotationAngle;
     private double _irDisplayRotationAngle;
@@ -220,9 +221,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     // 수동 모드에서는 사용자가 직접 녹화를 켠 경우에만 활성화된다.
 
     public bool IsRecordingActive =>
+        IsSystemPoweredOn &&
         !_isRecordingSuppressed &&
-        (IsManualRecordingEnabled ||
-         (IsSystemPoweredOn && CurrentMode == "\uC790\uB3D9" && CurrentThreatLevel == "\uB192\uC74C"));
+        (IsManualRecordingEnabled || _isAutoRecordingLatched);
 
     public Brush RecordingIndicatorBrush => IsRecordingActive ? RecordingOnBrush : RecordingOffBrush;
 
@@ -278,9 +279,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         {
             if (SetProperty(ref _currentThreatLevel, value))
             {
-                if (value != "\uB192\uC74C")
+                if (value == "\uB192\uC74C" && IsAutoMode)
                 {
-                    _isRecordingSuppressed = false;
+                    _isAutoRecordingLatched = true;
                 }
 
                 OnPropertyChanged(nameof(CurrentThreatText));
@@ -740,6 +741,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         CurrentMode = mode;
 
+        if (IsAutoMode && CurrentThreatLevel == "\uB192\uC74C" && !_isRecordingSuppressed)
+        {
+            _isAutoRecordingLatched = true;
+        }
+
         if (!IsManualMode)
         {
             if (IsManualRecordingEnabled)
@@ -749,7 +755,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
         }
 
-        _isRecordingSuppressed = false;
         OnRecordingStateChanged();
 
         if (!TrySendCurrentModeToController(out var modeError))
@@ -782,6 +787,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         if (IsRecordingActive)
         {
             _isRecordingSuppressed = true;
+            _isAutoRecordingLatched = false;
             IsManualRecordingEnabled = false;
         }
         else
