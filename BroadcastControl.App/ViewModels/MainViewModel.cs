@@ -56,6 +56,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private const int StoredLogItemLimit = 100;
     private readonly List<AnalysisItem> _analysisHistory = new();
     private readonly List<SystemLogItem> _systemLogHistory = new();
+    private string? _lastAnalysisMessage;
 
     // EO와 IR 모두 Jetson에서 전달되는 UDP 영상을 표시한다.
     // 실제 프레임을 아직 받지 못한 경우에도 화면이 비어 보이지 않도록 EO/IR 기본 안내 이미지를 미리 준비해둔다.
@@ -469,8 +470,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
     {
-        // VLM 도입 전까지는 YOLO 탐지 개수만으로 위험 등급을 바꾸지 않는다.
-        // 대신 자동 모드에서는 탐지 유무를 보고 스캔(0)과 추적(1) 모드 패킷을 전환한다.
+        // 자동 모드에서는 탐지 유무를 보고 스캔(0)과 추적(1) 모드 패킷을 전환한다.
         var hasTrackedTarget = detections.Count > 0;
         if (_hasTrackedTarget == hasTrackedTarget)
         {
@@ -490,6 +490,25 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             return;
         }
 
+    }
+
+    public void ApplyVlmAnalysisResult(string threatLevel, string analysisMessage)
+    {
+        var normalizedThreatLevel = NormalizeThreatLevel(threatLevel);
+        var threatChanged = !string.Equals(CurrentThreatLevel, normalizedThreatLevel, StringComparison.Ordinal);
+        CurrentThreatLevel = normalizedThreatLevel;
+
+        if (!string.IsNullOrWhiteSpace(analysisMessage) &&
+            !string.Equals(_lastAnalysisMessage, analysisMessage, StringComparison.Ordinal))
+        {
+            _lastAnalysisMessage = analysisMessage;
+            AppendAnalysisLog(analysisMessage);
+        }
+
+        if (threatChanged)
+        {
+            AppendImportantLog($"위험 등급이 {CurrentThreatLevel}(으)로 변경되었습니다.");
+        }
     }
 
     public void InitializeMotorControlState()
@@ -900,6 +919,16 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
         brush.Freeze();
         return brush;
+    }
+
+    private static string NormalizeThreatLevel(string threatLevel)
+    {
+        return threatLevel.Trim().ToLowerInvariant() switch
+        {
+            "high" or "높음" => "\uB192\uC74C",
+            "medium" or "중간" => "\uC911\uAC04",
+            _ => "\uB0AE\uC74C"
+        };
     }
 
     /// <summary>

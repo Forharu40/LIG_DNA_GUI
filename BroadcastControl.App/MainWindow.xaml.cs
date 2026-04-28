@@ -12,6 +12,7 @@ using System.Windows.Threading;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels;
 using System.Collections.Generic;
+using System.IO;
 
 namespace BroadcastControl.App;
 
@@ -29,10 +30,13 @@ public partial class MainWindow : Window
     private const double WindowedHeight = 900;
     private const int EoUdpPort = 5000;
     private const int IrUdpPort = 5001;
+    private const int MobileAlertPort = 8088;
+    private static readonly TimeSpan MobileAlertCooldown = TimeSpan.FromSeconds(10);
     private readonly MainViewModel _viewModel;
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
     private readonly UdpEncodedVideoReceiverService _irUdpCaptureService;
     private readonly ViewportRecordingService _viewportRecordingService;
+    private readonly MobileAlertHubService _mobileAlertHubService;
     private readonly UdpMotorControlService _motorControlService;
     private readonly DispatcherTimer _motorHoldTimer;
 
@@ -53,6 +57,7 @@ public partial class MainWindow : Window
     private bool _hasRenderedDetectionOverlay;
     private bool _isRenderingOverlay;
     private string? _lastDetectionAlertSignature;
+    private DateTimeOffset _lastMobileAlertAt = DateTimeOffset.MinValue;
     private string? _lastFilteredOutTargetSignature;
     private string? _lastOverlaySignature;
     private readonly Dictionary<string, int> _activeMotorDirections = new(StringComparer.Ordinal);
@@ -104,6 +109,7 @@ public partial class MainWindow : Window
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
         _irUdpCaptureService = new UdpEncodedVideoReceiverService();
         _viewportRecordingService = new ViewportRecordingService();
+        _mobileAlertHubService = new MobileAlertHubService();
         _motorHoldTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(50)
@@ -157,6 +163,15 @@ public partial class MainWindow : Window
         else
         {
             _viewModel.AppendImportantLog($"Failed to start the IR UDP stream receiver on port {IrUdpPort}.");
+        }
+
+        if (_mobileAlertHubService.Start(MobileAlertPort))
+        {
+            _viewModel.AppendImportantLog($"모바일 위험 알림 앱이 시작되었습니다: {_mobileAlertHubService.AccessHintUrls}");
+        }
+        else
+        {
+            _viewModel.AppendImportantLog($"모바일 위험 알림 앱 시작에 실패했습니다. 포트 {MobileAlertPort}를 확인하세요.");
         }
     }
 
@@ -310,6 +325,7 @@ public partial class MainWindow : Window
         NotifyDetectionAlertIfNeeded(detectionPacket.FrameId, displayDetections);
         _viewModel.UpdateDetectionSummary(displayDetections);
         RenderDetectionOverlay(forceRefresh: true);
+        UpdateRiskAndMobileAlert(detectionPacket.FrameId, displayDetections);
     }
 
     private void OnYoloStatusReceived(YoloStatusPacket statusPacket)
@@ -697,6 +713,80 @@ public partial class MainWindow : Window
     private void NotifyDetectionAlertIfNeeded(uint frameId, IReadOnlyList<DetectionInfo> detections)
     {
         _lastDetectionAlertSignature = detections.Count == 0 ? null : $"{frameId}:{detections.Count}";
+    }
+
+    private void UpdateRiskAndMobileAlert(uint frameId, IReadOnlyList<DetectionInfo> detections)
+    {
+        if (detections.Count == 0)
+        {
+            _viewModel.ApplyVlmAnalysisResult("낮음", "VLM 분석: 현재 선택된 주 탐지체 기준 위험 객체가 확인되지 않았습니다.");
+            return;
+        }
+
+        var analysis = BuildVlmStyleAnalysis(detections);
+        _viewModel.ApplyVlmAnalysisResult("높음", analysis);
+
+        var alertSignature = $"{_viewModel.SelectedPrimaryTarget}:{frameId}:{BuildOverlaySignature(detections)}";
+        var now = DateTimeOffset.Now;
+        if (string.Equals(_lastDetectionAlertSignature, alertSignature, StringComparison.Ordinal) ||
+            now - _lastMobileAlertAt < MobileAlertCooldown)
+        {
+            return;
+        }
+
+        _lastDetectionAlertSignature = alertSignature;
+        _lastMobileAlertAt = now;
+        var evidencePng = CaptureElementAsPng(CameraPanel);
+        _ = _mobileAlertHubService.PublishAlertAsync(
+            "운용통제 위험 알림",
+            analysis,
+            _viewModel.CurrentThreatLevel,
+            evidencePng);
+        _viewModel.AppendImportantLog("모바일 앱으로 위험 알림을 전송했습니다.");
+    }
+
+    private string BuildVlmStyleAnalysis(IReadOnlyList<DetectionInfo> detections)
+    {
+        var ordered = detections
+            .OrderByDescending(d => d.Score)
+            .Take(4)
+            .ToArray();
+        var targetSummary = string.Join(
+            ", ",
+            ordered.Select(d => $"{d.ClassName} object{d.ObjectId} 신뢰도 {d.Score:0.00}"));
+
+        return
+            $"VLM 분석: {_viewModel.LargeFeedTitle} 영상에서 주 탐지체 '{_viewModel.SelectedPrimaryTarget}' 기준 위험 객체 {detections.Count}개가 확인되었습니다. " +
+            $"탐지 내용: {targetSummary}. 운용자는 현 화면의 바운딩 박스 위치를 확인하고 추적/녹화 상태를 유지하십시오.";
+    }
+
+    private static byte[]? CaptureElementAsPng(FrameworkElement element)
+    {
+        var width = Math.Max(1, (int)Math.Round(element.ActualWidth));
+        var height = Math.Max(1, (int)Math.Round(element.ActualHeight));
+        if (width < 2 || height < 2)
+        {
+            return null;
+        }
+
+        try
+        {
+            element.UpdateLayout();
+            var renderTarget = new RenderTargetBitmap(width, height, 96, 96, PixelFormats.Pbgra32);
+            renderTarget.Render(element);
+            renderTarget.Freeze();
+
+            var encoder = new PngBitmapEncoder();
+            encoder.Frames.Add(BitmapFrame.Create(renderTarget));
+
+            using var stream = new MemoryStream();
+            encoder.Save(stream);
+            return stream.ToArray();
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static void TrimCache<T>(Dictionary<uint, T> cache)
@@ -1138,6 +1228,7 @@ public partial class MainWindow : Window
         _irUdpCaptureService.FrameReady -= OnIrFrameReady;
         _irUdpCaptureService.DetectionsReceived -= OnIrDetectionsReceived;
         _irUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
+        _mobileAlertHubService.Dispose();
         _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
         _irUdpCaptureService.Dispose();
