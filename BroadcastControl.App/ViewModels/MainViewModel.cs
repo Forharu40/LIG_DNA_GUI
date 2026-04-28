@@ -39,7 +39,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double _brightness = 50;
     private double _contrast = 50;
     private bool _isManualRecordingEnabled;
+    private bool _isRecordingSuppressed;
     private AppThemeMode _currentThemeMode;
+    private double _eoDisplayRotationAngle;
+    private double _irDisplayRotationAngle;
     private double _zoomLevel = 1.0;
     private double _zoomPanX;
     private double _zoomPanY;
@@ -56,6 +59,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private const int StoredLogItemLimit = 100;
     private readonly List<AnalysisItem> _analysisHistory = new();
     private readonly List<SystemLogItem> _systemLogHistory = new();
+    private string? _lastAnalysisMessage;
 
     // EO와 IR 모두 Jetson에서 전달되는 UDP 영상을 표시한다.
     // 실제 프레임을 아직 받지 못한 경우에도 화면이 비어 보이지 않도록 EO/IR 기본 안내 이미지를 미리 준비해둔다.
@@ -99,7 +103,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         ResetContrastCommand = new RelayCommand(_ => Contrast = 50, _ => IsSystemPoweredOn);
         // 확대 제목 버튼을 누르면 기본 배율 x1.0으로 즉시 복귀한다.
         ResetZoomCommand = new RelayCommand(_ => ZoomLevel = 1.0, _ => CanUseZoomControls);
-        ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsManualMode);
+        ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsSystemPoweredOn);
         SetThemeCommand = new RelayCommand(SetTheme);
         SaveAnalysisLogsCommand = new RelayCommand(_ => SaveAnalysisLogsToDesktop());
         SaveSystemLogsCommand = new RelayCommand(_ => SaveSystemLogsToDesktop());
@@ -156,11 +160,16 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             {
                 OnPropertyChanged(nameof(IsManualMode));
                 OnPropertyChanged(nameof(ManualRecordingButtonOpacity));
+                OnPropertyChanged(nameof(ManualRecordingButtonText));
                 OnPropertyChanged(nameof(CanSelectAutoMode));
                 OnPropertyChanged(nameof(CanSelectManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
                 OnPropertyChanged(nameof(CanUseZoomControls));
                 OnPropertyChanged(nameof(IsAutoMode));
+                OnPropertyChanged(nameof(IsRecordingActive));
+                OnPropertyChanged(nameof(RecordingIndicatorBrush));
+                OnPropertyChanged(nameof(RecordingTextBrush));
+                OnPropertyChanged(nameof(RecordingIndicatorOpacity));
                 RaiseAllCommandStates();
             }
         }
@@ -183,12 +192,17 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(ManualModeOpacity));
                 OnPropertyChanged(nameof(IsManualMode));
                 OnPropertyChanged(nameof(ManualRecordingButtonOpacity));
+                OnPropertyChanged(nameof(ManualRecordingButtonText));
                 OnPropertyChanged(nameof(CanSelectAutoMode));
                 OnPropertyChanged(nameof(CanSelectManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
                 OnPropertyChanged(nameof(CanUseZoomControls));
                 OnPropertyChanged(nameof(ShowZoomMiniMap));
                 OnPropertyChanged(nameof(IsAutoMode));
+                OnPropertyChanged(nameof(IsRecordingActive));
+                OnPropertyChanged(nameof(RecordingIndicatorBrush));
+                OnPropertyChanged(nameof(RecordingTextBrush));
+                OnPropertyChanged(nameof(RecordingIndicatorOpacity));
                 RaiseAllCommandStates();
             }
         }
@@ -206,8 +220,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     // 수동 모드에서는 사용자가 직접 녹화를 켠 경우에만 활성화된다.
 
     public bool IsRecordingActive =>
-        IsManualRecordingEnabled ||
-        (IsSystemPoweredOn && CurrentMode == "\uC790\uB3D9" && CurrentThreatLevel == "\uB192\uC74C");
+        !_isRecordingSuppressed &&
+        (IsManualRecordingEnabled ||
+         (IsSystemPoweredOn && CurrentMode == "\uC790\uB3D9" && CurrentThreatLevel == "\uB192\uC74C"));
 
     public Brush RecordingIndicatorBrush => IsRecordingActive ? RecordingOnBrush : RecordingOffBrush;
 
@@ -225,9 +240,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public bool CanUseMotorControls => IsManualMode;
 
-    public bool CanUseZoomControls => IsManualMode;
+    public bool CanUseZoomControls => IsSystemPoweredOn;
 
-    public double ManualRecordingButtonOpacity => IsManualMode ? 1.0 : 0.0;
+    public double ManualRecordingButtonOpacity => IsSystemPoweredOn ? 1.0 : 0.45;
 
     public bool IsDarkThemeActive => _currentThemeMode == AppThemeMode.Dark;
 
@@ -254,7 +269,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ManualRecordingButtonText => IsManualRecordingEnabled ? "\uB179\uD654 \uC885\uB8CC" : "\uB179\uD654 \uC2DC\uC791";
+    public string ManualRecordingButtonText => IsRecordingActive ? "\uB179\uD654 \uC885\uB8CC" : "\uB179\uD654 \uC2DC\uC791";
 
     public string CurrentThreatLevel
     {
@@ -263,12 +278,18 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         {
             if (SetProperty(ref _currentThreatLevel, value))
             {
+                if (value != "\uB192\uC74C")
+                {
+                    _isRecordingSuppressed = false;
+                }
+
                 OnPropertyChanged(nameof(CurrentThreatText));
                 OnPropertyChanged(nameof(CurrentThreatBrush));
                 OnPropertyChanged(nameof(IsRecordingActive));
                 OnPropertyChanged(nameof(RecordingIndicatorBrush));
                 OnPropertyChanged(nameof(RecordingTextBrush));
                 OnPropertyChanged(nameof(RecordingIndicatorOpacity));
+                OnPropertyChanged(nameof(ManualRecordingButtonText));
             }
         }
     }
@@ -290,11 +311,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             if (SetProperty(ref _selectedPrimaryTarget, value))
             {
                 OnPropertyChanged(nameof(PrimaryTargetText));
+                OnPropertyChanged(nameof(PrimaryTargetShortText));
             }
         }
     }
 
     public string PrimaryTargetText => $"\uC8FC \uD0D0\uC9C0\uCCB4: {SelectedPrimaryTarget}";
+
+    public string PrimaryTargetShortText => $"\uC8FC \uD0D0\uC9C0\uCCB4: {GetShortPrimaryTargetName(SelectedPrimaryTarget)}";
 
     // 카메라 이름은 짧고 명확하게 유지해서 실제 화면을 가리지 않도록 한다.
     public string EoTitle => "EO cam";
@@ -316,6 +340,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public string LargeFeedTitle => _isEoPrimary ? EoTitle : IrTitle;
 
     public string InsetFeedTitle => _isEoPrimary ? IrTitle : EoTitle;
+
+    public double LargeFeedRotationAngle => _isEoPrimary ? _eoDisplayRotationAngle : _irDisplayRotationAngle;
+
+    public double InsetFeedRotationAngle => _isEoPrimary ? _irDisplayRotationAngle : _eoDisplayRotationAngle;
 
     public string LargeFeedSubtitle => _isEoPrimary ? EoSubtitle : IrSubtitle;
 
@@ -377,7 +405,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ZoomLevelText => $"x{ZoomLevel:0.0}";
+    public string ZoomLevelText => $"x{ZoomLevel:0.00}";
 
     public double LargeFeedScale => ZoomLevel;
 
@@ -385,7 +413,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double ZoomTransformY => _zoomPanY;
 
-    public bool ShowZoomMiniMap => CanUseZoomControls && ZoomLevel > 1.0;
+    public bool ShowZoomMiniMap => IsSystemPoweredOn && ZoomLevel > 1.0;
 
     public double MiniMapViewportWidth => MiniMapWidth / ZoomLevel;
 
@@ -469,8 +497,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
     {
-        // VLM 도입 전까지는 YOLO 탐지 개수만으로 위험 등급을 바꾸지 않는다.
-        // 대신 자동 모드에서는 탐지 유무를 보고 스캔(0)과 추적(1) 모드 패킷을 전환한다.
+        // 자동 모드에서는 탐지 유무를 보고 스캔(0)과 추적(1) 모드 패킷을 전환한다.
         var hasTrackedTarget = detections.Count > 0;
         if (_hasTrackedTarget == hasTrackedTarget)
         {
@@ -490,6 +517,25 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             return;
         }
 
+    }
+
+    public void ApplyVlmAnalysisResult(string threatLevel, string analysisMessage)
+    {
+        var normalizedThreatLevel = NormalizeThreatLevel(threatLevel);
+        var threatChanged = !string.Equals(CurrentThreatLevel, normalizedThreatLevel, StringComparison.Ordinal);
+        CurrentThreatLevel = normalizedThreatLevel;
+
+        if (!string.IsNullOrWhiteSpace(analysisMessage) &&
+            !string.Equals(_lastAnalysisMessage, analysisMessage, StringComparison.Ordinal))
+        {
+            _lastAnalysisMessage = analysisMessage;
+            AppendAnalysisLog(analysisMessage);
+        }
+
+        if (threatChanged)
+        {
+            AppendImportantLog($"위험 등급이 {CurrentThreatLevel}(으)로 변경되었습니다.");
+        }
     }
 
     public void InitializeMotorControlState()
@@ -703,6 +749,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
         }
 
+        _isRecordingSuppressed = false;
+        OnRecordingStateChanged();
+
         if (!TrySendCurrentModeToController(out var modeError))
         {
             AppendImportantLog($"모터 모드 전송에 실패했습니다: {modeError}");
@@ -720,17 +769,28 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 수동 녹화 버튼을 눌렀을 때 상태를 반전한다.
-    /// 실제 파일 저장 시작/종료는 이후 서비스 계층이나 MainWindow 연동에서 처리할 수 있도록 상태만 관리한다.
+    /// 녹화 버튼을 눌렀을 때 현재 녹화 상태를 기준으로 시작/종료를 전환한다.
+    /// 자동 모드 녹화 중에도 사용자가 즉시 종료할 수 있도록 별도 억제 상태를 둔다.
     /// </summary>
     private void ToggleManualRecording()
     {
-        if (!IsManualMode)
+        if (!IsSystemPoweredOn)
         {
             return;
         }
 
-        IsManualRecordingEnabled = !IsManualRecordingEnabled;
+        if (IsRecordingActive)
+        {
+            _isRecordingSuppressed = true;
+            IsManualRecordingEnabled = false;
+        }
+        else
+        {
+            _isRecordingSuppressed = false;
+            IsManualRecordingEnabled = true;
+        }
+
+        OnRecordingStateChanged();
     }
 
     /// <summary>
@@ -783,8 +843,64 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(InsetFeedTitle));
         OnPropertyChanged(nameof(LargeFeedSubtitle));
         OnPropertyChanged(nameof(InsetFeedSubtitle));
+        OnPropertyChanged(nameof(LargeFeedRotationAngle));
+        OnPropertyChanged(nameof(InsetFeedRotationAngle));
 
         AppendImportantLog($"{LargeFeedTitle}\uAC00 \uBA54\uC778 \uD654\uBA74\uC73C\uB85C \uC804\uD658\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
+    }
+
+    public void RotateLargeFeedClockwise()
+    {
+        if (_isEoPrimary)
+        {
+            _eoDisplayRotationAngle = NextRotationAngle(_eoDisplayRotationAngle);
+        }
+        else
+        {
+            _irDisplayRotationAngle = NextRotationAngle(_irDisplayRotationAngle);
+        }
+
+        OnPropertyChanged(nameof(LargeFeedRotationAngle));
+        AppendImportantLog($"{LargeFeedTitle} 화면이 회전되었습니다.");
+    }
+
+    public void RotateInsetFeedClockwise()
+    {
+        if (_isEoPrimary)
+        {
+            _irDisplayRotationAngle = NextRotationAngle(_irDisplayRotationAngle);
+        }
+        else
+        {
+            _eoDisplayRotationAngle = NextRotationAngle(_eoDisplayRotationAngle);
+        }
+
+        OnPropertyChanged(nameof(InsetFeedRotationAngle));
+        AppendImportantLog($"{InsetFeedTitle} 화면이 회전되었습니다.");
+    }
+
+    private static double NextRotationAngle(double currentAngle) => (currentAngle + 90) % 360;
+
+    private static string GetShortPrimaryTargetName(string target)
+    {
+        return target switch
+        {
+            "\uACF5\uC911 \uBB34\uAE30\uCCB4\uACC4" => "\uACF5\uC911",
+            "\uC721\uC0C1 \uBB34\uAE30\uCCB4\uACC4" => "\uC721\uC0C1",
+            "\uD574\uC0C1 \uBB34\uAE30\uCCB4\uACC4" => "\uD574\uC0C1",
+            "\uD1B5\uC2E0 \uC7A5\uBE44" => "\uD1B5\uC2E0",
+            "\uBE44\uAD70\uC0AC \uD45C\uC801" => "\uBE44\uAD70\uC0AC",
+            _ => target,
+        };
+    }
+
+    private void OnRecordingStateChanged()
+    {
+        OnPropertyChanged(nameof(ManualRecordingButtonText));
+        OnPropertyChanged(nameof(IsRecordingActive));
+        OnPropertyChanged(nameof(RecordingIndicatorBrush));
+        OnPropertyChanged(nameof(RecordingTextBrush));
+        OnPropertyChanged(nameof(RecordingIndicatorOpacity));
     }
 
     /// <summary>
@@ -900,6 +1016,16 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         var brush = new SolidColorBrush(Color.FromRgb(r, g, b));
         brush.Freeze();
         return brush;
+    }
+
+    private static string NormalizeThreatLevel(string threatLevel)
+    {
+        return threatLevel.Trim().ToLowerInvariant() switch
+        {
+            "high" or "높음" => "\uB192\uC74C",
+            "medium" or "중간" => "\uC911\uAC04",
+            _ => "\uB0AE\uC74C"
+        };
     }
 
     /// <summary>
