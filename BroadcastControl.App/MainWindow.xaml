@@ -877,21 +877,21 @@
                     <Grid Grid.Row="0"
                           Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="147" />
+                            <ColumnDefinition Width="6" />
+                            <ColumnDefinition Width="147" />
+                            <ColumnDefinition Width="6" />
                             <ColumnDefinition Width="54" />
                         </Grid.ColumnDefinitions>
                         <Button Grid.Column="0"
-                                Margin="0,0,6,0"
                                 Click="RotateLargeFeedButton_OnClick"
                                 Style="{StaticResource TopBarButton}"
                                 Content="&#xC8FC; &#xD654;&#xBA74; &#xD68C;&#xC804;" />
-                        <Button Grid.Column="1"
-                                Margin="6,0,6,0"
+                        <Button Grid.Column="2"
                                 Click="RotateInsetFeedButton_OnClick"
                                 Style="{StaticResource TopBarButton}"
                                 Content="&#xBCF4;&#xC870; &#xD654;&#xBA74; &#xD68C;&#xC804;" />
-                        <Button Grid.Column="2"
+                        <Button Grid.Column="4"
                                 Command="{Binding ToggleSettingsCommand}"
                                 Style="{StaticResource TopBarButton}"
                                 Padding="0">
