@@ -1,219 +1,205 @@
-# LIG_DNA_GUI
+# LIG DNA GUI
 
-WPF + Material Design 기반 EO/IR 영상 관제 GUI 프로토타입
+운용통제용 WPF GUI 프로젝트입니다. Jetson/Zybo 쪽에서 들어오는 EO/IR 영상과 YOLO 탐지 결과를 GUI에서 표시하고, 위험 상황이 발생하면 모바일 웹앱으로 위험 화면, VLM 분석, 탐지 내용을 알림으로 전달합니다.
 
-현재 구조는 외부 EO 카메라 영상을 UDP로 수신하고, IR 화면은 노트북 카메라를 임시 출력.
-이후 VLM/탐지기/모터 제어기와 연결해 객체 인식, 위험도 판단, 전자 줌, 수동 녹화, 시스템 로그 저장을 확장하는 것을 목표
-
-
-
-## 현재 기능
-
-- `EO cam`: 외부 UDP JPEG 영상 수신 및 표시
-- `IR cam`: 노트북 카메라 임시 입력 표시
-- `화면 스왑`: 작은 화면 클릭 시 큰 화면과 교체
-- `자동/수동 모드`: 자동 모드 기본 실행, 수동 모드에서 전자 줌/수동 녹화/모터 사용 (모터는 이후 개발 예정)
-- `전자 ZOOM`: 수동 모드에서 슬라이더, 마우스 휠, 드래그 패닝 지원
-- `줌 미니맵`: 전자 줌 중 현재 보고 있는 영역 표시
-- `밝기/대조비`: 상단바 슬라이더로 EO 영상 보정
-- `수동 녹화`: 수동 모드에서 영상 녹화, 현재 전자 줌 구도 반영 (현재 바탕화면에 파일 저장)
-- `시스템 현황`: 위험 등급과 주 탐지체 표시 (이후 개발 예정)
-- `상황 분석`: 향후 VLM 분석 문장 표시 영역 (이후 개발 예정)
-- `시스템 로그`: 중요한 이벤트만 기록하고 바탕화면 텍스트 파일로 저장 (이후 고도화 예정, 현재 바탕화면에 파일 저장)
-- `테마`: Windows 시스템 테마를 따라 다크/라이트 모드로 시작, 설정창에서 수동 변경 가능
-
-
-
-## 화면 구성
-```mermaid
-flowchart TB
-    Top["상단바: 전원 종료 | 녹화 상태 | 밝기 | 대조비 | 자동/수동 | 수동 녹화 | 설정"]
-
-    subgraph Body["본문"]
-        direction LR
-        subgraph Camera["카메라 영역"]
-            direction TB
-            Main["큰 화면: EO cam 기본 표시"]
-            Inset["우상단 작은 화면: IR cam 임시 표시"]
-            Motor["우하단 모터 방향 버튼: 수동 모드 전용"]
-            Zoom["하단 전자 ZOOM 슬라이더 + 미니맵: 수동 모드 전용"]
-        end
-
-        subgraph Info["정보 영역"]
-            direction TB
-            Status["시스템 현황: 위험 등급, 주 탐지체"]
-            Analysis["상황 분석: VLM 분석 문장"]
-            Log["시스템 로그: 중요 이벤트 + 저장 버튼"]
-        end
-    end
-
-    Top --> Body
-```
-
-## 데이터 흐름
+## 현재 구성
 
 ```mermaid
 flowchart LR
-    ExternalCamera["외부 EO 카메라<br/>Python UDP 송신"] --> UdpReceiver["C# UDP 수신<br/>!QIIHH 헤더 파싱"]
-    UdpReceiver --> Decode["JPEG 디코드<br/>OpenCV ImDecode"]
-    Decode --> Render["WPF EO 화면 표시"]
-    Decode --> Record["수동 녹화<br/>전자 줌 구도 반영"]
-
-    LaptopCamera["노트북 카메라"] --> IrRender["WPF IR 임시 화면"]
-
-    Render --> FutureDetector["향후 Detector / Tracker"]
-    FutureDetector --> FutureVlm["향후 VLM 상황 분석"]
-    FutureVlm --> AnalysisPanel["상황 분석 패널"]
-    FutureVlm --> Threat["위험 등급 갱신"]
-    Threat --> LogPanel["시스템 로그"]
+    Zybo["Zybo 카메라"] --> Jetson["Jetson"]
+    Jetson -->|"UDP 영상\nEO: 5000 / IR: 5001"| GUI["노트북 GUI"]
+    Jetson -->|"YOLO 탐지 결과\nDETS JSON"| GUI
+    GUI -->|"바운딩 박스 렌더링"| Screen["EO/IR 화면"]
+    GUI -->|"위험 알림\nhttp://노트북IP:8088"| Mobile["모바일 웹앱"]
 ```
 
-## 외부 시스템 연동 데이터
+## 주요 기능
 
-### 1. EO 외부 카메라 UDP 영상
+- EO/IR 영상 표시
+  - Jetson에서 전송한 JPEG UDP 프레임을 GUI에서 수신해 표시합니다.
+  - EO 화면을 주 화면으로, IR 화면을 보조 화면으로 표시합니다.
+  - 주 화면/보조 화면 전환과 각각의 화면 회전을 지원합니다.
 
-| 항목 | 타입 | 크기 | 설명 |
-| --- | --- | ---: | --- |
-| `utc_time` | `uint64` | 8 byte | 이미지 촬영 UTC 시간 |
-| `frame_index` | `uint32` | 4 byte | 프레임 순서 동기화 값 |
-| `image_byte_length` | `uint32` | 4 byte | JPEG 이미지 바이트 길이 |
-| `width` | `uint16` | 2 byte | 이미지 너비 |
-| `height` | `uint16` | 2 byte | 이미지 높이 |
-| `image_bytes` | `byte[]` | 가변 | JPEG 인코딩 이미지 바이트 |
+- YOLO 탐지 결과 표시
+  - GUI가 탐지 결과 좌표를 받아 현재 영상 위에 직접 바운딩 박스를 그립니다.
+  - 탐지 좌표는 원본 이미지 기준 픽셀 좌표를 그대로 사용합니다.
+  - 라벨은 `className`, 신뢰도는 `score`, 객체 ID는 `objectId`를 표시합니다.
 
-송신 예시:
+- 위험 등급 및 시스템 현황
+  - 탐지 객체가 있으면 위험 등급을 `높음`으로 반영합니다.
+  - 탐지 객체가 없으면 위험 등급을 `낮음`으로 반영합니다.
+  - 전원 종료 버튼과 시스템 현황에는 위험 등급 색상 원형 표시가 함께 표시됩니다.
+  - 시스템 현황에는 위험 등급과 주 탐지체만 간단히 표시합니다.
 
-```python
-header = struct.pack("!QIIHH", utc_time, frame_index, len(jpeg_bytes), width, height)
-sock.sendto(header + jpeg_bytes, ("<GUI_PC_IP>", 5000))
+- 녹화
+  - 녹화 버튼은 자동/수동 모드와 상관없이 항상 사용할 수 있습니다.
+  - 자동 모드에서 위험 등급이 한 번 `높음`이 되면 녹화를 시작합니다.
+  - 위험 등급이 잠깐 `낮음`으로 내려가도 자동으로 녹화를 멈추지 않습니다.
+  - 녹화는 사용자가 `녹화 종료` 버튼을 눌러야 종료됩니다.
+
+- 전자 ZOOM, 밝기, 대조비
+  - 전자 ZOOM은 자동/수동 모드와 상관없이 전원이 켜져 있으면 사용할 수 있습니다.
+  - 배율은 `x1.00` 형식으로 표시됩니다.
+  - 밝기/대조비 슬라이더와 전자 ZOOM 슬라이더는 하단 컨트롤 패널에서 조작합니다.
+
+- 모바일 웹앱 알림
+  - GUI 실행 시 모바일 알림 웹앱이 `8088` 포트에서 함께 시작됩니다.
+  - 같은 네트워크의 모바일 기기에서 `http://<노트북 IP>:8088`로 접속합니다.
+  - 위험 발생 시 모바일 웹앱으로 다음 항목을 전송합니다.
+    - YOLO 바운딩 박스가 표시된 위험 화면 캡처
+    - VLM 분석
+    - 탐지 내용
+  - 모바일 웹앱에서는 영상 아래에 `VLM 분석`과 `탐지 내용`을 별도 카드로 분리해 표시합니다.
+  - 모바일 브라우저에서 알림음/진동 활성화 버튼을 누르면 이후 위험 발생 시 소리와 진동으로 알림을 받을 수 있습니다.
+
+## GUI 화면 구성
+
+```mermaid
+flowchart TB
+    Left["왼쪽 패널\n전원 종료\nCAM 1~CAM 4"]
+    Center["중앙 패널\n주 화면 EO/IR\n보조 화면 IR/EO\n하단 컨트롤"]
+    Right["오른쪽 패널\n주 화면 회전\n보조 화면 회전\n설정\n상황 분석\n시스템 로그"]
+
+    Left --- Center --- Right
 ```
 
-현재 수신 조건:
+하단 컨트롤 패널에는 다음 기능이 배치되어 있습니다.
 
-- 기본 포트: `UDP 5000`
-- 바디 형식: JPEG 바이트
+- 대조비
+- 자동/수동 모드
+- 밝기
+- 전자 ZOOM 및 배율 표시
+- 녹화 시작/종료
+- 영상 녹화 상태
+- 시스템 현황
 
-### 2. IR 카메라 (추가 개발 예정)
+## 입력 데이터 형식
 
-| 항목 | 현재 값 | 설명 |
-| --- | --- | --- |
-| 입력 장치 | 노트북 기본 카메라 index `0` | 실제 IR 카메라 연결 전 GUI 테스트용 |
-| 출력 | WPF `BitmapSource` | 작은 인셋 화면 또는 스왑 시 큰 화면에 표시 |
-| 향후 교체 | 실제 IR 카메라 SDK/RTSP/UDP 입력 | 외부 IR 장비 확정 후 서비스 교체 가능 |
+### UDP 영상 패킷
 
-### 3. VLM 상황 분석
-
-탐지/추적 결과와 프레임 메타데이터를 받아 실시간 상황 분석 문장과 위험 등급 출력 예정.
-
-예시 입력:
-
-```json
-{
-  "timestamp": "2026-04-10T10:05:08+09:00",
-  "frame_index": 12345,
-  "camera_id": "EO-01",
-  "primary_target": "공중 무기체계",
-  "detections": [
-    {
-      "track_id": "T-001",
-      "class": "uav",
-      "confidence": 0.94,
-      "bbox": { "x": 620, "y": 152, "width": 140, "height": 82 },
-      "velocity": { "dx": -12.3, "dy": 4.8 }
-    }
-  ]
-}
-```
-
-예시 출력:
-
-```json
-{
-  "timestamp": "2026-04-10T10:05:09+09:00",
-  "summary": "EO 영상에서 공중 표적으로 보이는 객체 1개가 확인됨.",
-  "threat_level": "medium",
-  "recommended_action": "수동 모드에서 대상 중심 확대 후 추적 유지 권장."
-}
-```
-
-GUI 반영:
-
-| VLM 출력 | GUI 반영 위치 |
-| --- | --- |
-| `summary` | 상황 분석 패널 |
-| `threat_level` | 시스템 현황 위험 등급 LED |
-| `recommended_action` | 상황 분석 또는 시스템 로그 |
-| 고위험 판단 | 향후 자동 녹화 트리거 |
-
-### 4. 탐지/추적 오버레이 (개발 예정)
-
-향후 Detector/Tracker가 객체 좌표를 제공하면 EO/IR 화면 위에 채움 없는 사각형과 라벨을 표시할 계획
-
-권장 데이터:
-
-```json
-{
-  "camera_id": "EO-01",
-  "frame_index": 12345,
-  "objects": [
-    {
-      "track_id": "T-001",
-      "label": "UAV",
-      "confidence": 0.94,
-      "bbox": { "x": 620, "y": 152, "width": 140, "height": 82 },
-      "threat_level": "high"
-    }
-  ]
-}
-```
-
-표시 규칙:
-
-| 위험 등급 | 박스/텍스트 색 |
-| --- | --- |
-| 낮음 | 초록 |
-| 중간 | 노랑 |
-| 높음 | 빨강 |
-
-### 5. 모터 제어 (개발 예정)
-
-개발 예정
-
-제어 규칙:
-
-- 자동 모드: 모터 제어 버튼 숨김
-- 수동 모드: 모터 상/하/좌/우 버튼 표시
-
-### 6. 로그 저장
-
-바탕화면에 텍스트 파일로 저장
-
-파일명 형식: 저장 시점의 날짜 및 시간
+GUI는 JPEG 영상 패킷을 다음 구조로 수신합니다.
 
 ```text
-system_log_yyyyMMdd_HHmmss.txt
+[20바이트 헤더] + [JPEG 바이트]
 ```
 
-로그에 남길 이벤트 예시:
+헤더 포맷:
 
-- 위험 등급 변경
-- 수동 녹화 시작/종료
-- EO UDP 첫 프레임 수신
-- IR 임시 카메라 연결 실패
-- 주 탐지체 변경
-- VLM 고위험 분석 결과 수신
+```text
+!QIIHH
+```
+
+| 필드 | 타입 | 설명 |
+| --- | --- | --- |
+| `frame_stamp_ns` | `uint64` | 프레임 타임스탬프 |
+| `frame_index` | `uint32` | 프레임 번호 |
+| `image_byte_length` | `uint32` | JPEG 바이트 길이 |
+| `width` | `uint16` | 원본 이미지 너비 |
+| `height` | `uint16` | 원본 이미지 높이 |
+
+기본 포트:
+
+| 영상 | 포트 |
+| --- | --- |
+| EO | `5000` |
+| IR | `5001` |
+
+### YOLO 탐지 패킷
+
+현재 GUI는 ROS2 토픽 브릿지를 자동 실행하지 않고, UDP로 들어오는 탐지 패킷을 기준으로 바운딩 박스를 표시합니다.
+
+탐지 패킷 구조:
+
+```text
+[4바이트 magic = DETS] + [UTF-8 JSON]
+```
+
+JSON 예시:
+
+```json
+{
+  "stampNs": 1713582000000000000,
+  "frameId": 123,
+  "width": 1280,
+  "height": 720,
+  "detections": [
+    {
+      "className": "person",
+      "score": 0.91,
+      "x1": 210,
+      "y1": 130,
+      "x2": 320,
+      "y2": 410,
+      "objectId": 1
+    }
+  ]
+}
+```
+
+좌표 규칙:
+
+- `x1`, `y1`: 좌상단
+- `x2`, `y2`: 우하단
+- 단위: 원본 이미지 기준 픽셀
+- GUI는 별도 역변환 없이 해당 좌표를 영상 위에 표시합니다.
+
+## 모바일 알림 데이터
+
+위험 발생 시 모바일 웹앱으로 전달되는 데이터는 다음처럼 분리됩니다.
+
+| 항목 | 설명 |
+| --- | --- |
+| `title` | 알림 제목 |
+| `threatLevel` | 위험 등급 |
+| `evidenceUrl` | 위험 화면 캡처 이미지 URL |
+| `vlmAnalysis` | VLM 분석 문장 |
+| `detectionSummary` | 탐지 객체 목록, 신뢰도, bbox 좌표 |
+
+모바일 웹앱 주소:
+
+```text
+http://<노트북 IP>:8088
+```
+
+예시:
+
+```text
+http://192.168.1.94:8088
+```
+
+## 실행 방법
+
+### GUI 실행
+
+```powershell
+cd "C:\Users\buguen\Documents\New project"
+dotnet run --project .\BroadcastControl.App\BroadcastControl.App.csproj
+```
+
+### 빌드 확인
+
+```powershell
+cd "C:\Users\buguen\Documents\New project"
+dotnet build .\BroadcastControl.App\BroadcastControl.App.csproj -c Debug -p:UseAppHost=false
+```
 
 ## 코드 구조
 
 | 파일 | 역할 |
 | --- | --- |
-| `BroadcastControl.App/App.xaml` | Material Design 리소스와 공통 색상 리소스 정의 |
-| `BroadcastControl.App/App.xaml.cs` | 시스템 테마 감지, 다크/라이트 테마 적용 |
-| `BroadcastControl.App/MainWindow.xaml` | 전체 GUI 레이아웃과 스타일 정의 |
-| `BroadcastControl.App/MainWindow.xaml.cs` | ViewModel과 영상 입력/녹화/설정창 애니메이션 연결 |
-| `BroadcastControl.App/ViewModels/MainViewModel.cs` | 화면 상태, 버튼 명령, 로그, 줌, 테마 상태 관리 |
-| `BroadcastControl.App/Services/UdpEncodedVideoReceiverService.cs` | EO UDP 영상 수신, JPEG 디코드, 전자 줌 구도 녹화 |
-| `BroadcastControl.App/Services/WebcamCaptureService.cs` | IR 임시 노트북 카메라 프레임 입력 |
-| `BroadcastControl.App/Infrastructure/RelayCommand.cs` | WPF Command 바인딩용 공통 명령 클래스 |
+| `BroadcastControl.App/MainWindow.xaml` | GUI 레이아웃, 카메라 화면, 컨트롤 패널, 설정 창 |
+| `BroadcastControl.App/MainWindow.xaml.cs` | UDP 영상/탐지 이벤트 연결, 바운딩 박스 렌더링, 모바일 알림 전송, 녹화 처리 |
+| `BroadcastControl.App/ViewModels/MainViewModel.cs` | 화면 상태, 위험 등급, 녹화 상태, 모드, 로그, 설정 값 관리 |
+| `BroadcastControl.App/Services/UdpEncodedVideoReceiverService.cs` | UDP 영상 및 탐지 패킷 수신, JPEG 디코딩 |
+| `BroadcastControl.App/Services/ViewportRecordingService.cs` | 현재 GUI 화면 녹화 저장 |
+| `BroadcastControl.App/Services/MobileAlertHubService.cs` | 모바일 웹앱 HTTP/SSE 서버, 위험 알림 전송 |
+| `BroadcastControl.App/Services/UdpMotorControlService.cs` | 수동 모드 모터 제어 패킷 전송 |
+| `BroadcastControl.App/Infrastructure/RelayCommand.cs` | WPF Command 바인딩 공통 구현 |
 
-## 개발 메모
+## 현재 주의사항
+
+- 모바일 알림을 받으려면 노트북과 모바일 기기가 같은 네트워크에 있어야 합니다.
+- Windows 방화벽에서 `8088`, `5000`, `5001` 포트가 막혀 있으면 영상이나 모바일 웹앱 접속이 실패할 수 있습니다.
+- 모바일 브라우저의 알림음/진동은 사용자 터치 이후에만 허용되는 경우가 많으므로 웹앱에서 활성화 버튼을 먼저 눌러야 합니다.
+- 자동 녹화는 위험 발생 후 사용자가 끄기 전까지 유지됩니다.
+- 창 모드에서 창 크기를 줄이면 전체 UI가 기준 해상도에 맞춰 비례 축소됩니다.

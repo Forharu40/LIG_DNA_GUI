@@ -24,6 +24,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     };
 
     private readonly Dispatcher _dispatcher;
+    private readonly bool _applyIrFalseColor;
 
     private UdpClient? _udpClient;
     private CancellationTokenSource? _cancellationTokenSource;
@@ -54,8 +55,9 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     private ReceivedVideoFrame? _pendingFrame;
     private bool _frameDispatchScheduled;
 
-    public UdpEncodedVideoReceiverService()
+    public UdpEncodedVideoReceiverService(bool applyIrFalseColor = false)
     {
+        _applyIrFalseColor = applyIrFalseColor;
         _dispatcher = System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
     }
 
@@ -391,10 +393,13 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             {
             }
 
+            using var falseColorFrame = _applyIrFalseColor ? CreateIrFalseColorFrame(decoded) : new Mat();
+            var displaySource = _applyIrFalseColor ? falseColorFrame : decoded;
+
             using var adjusted = new Mat();
             var alpha = 0.5 + (_contrast / 100.0);
             var beta = (_brightness - 50.0) * 2.0;
-            decoded.ConvertTo(adjusted, MatType.CV_8UC3, alpha, beta);
+            displaySource.ConvertTo(adjusted, MatType.CV_8UC3, alpha, beta);
 
             _latestRecordableFrame?.Dispose();
             _latestRecordableFrame = adjusted.Clone();
@@ -474,6 +479,37 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
             FrameReady?.Invoke(frameToPublish.Value);
         }
+    }
+
+    private static Mat CreateIrFalseColorFrame(Mat source)
+    {
+        using var gray = new Mat();
+        if (source.Channels() == 3)
+        {
+            Cv2.CvtColor(source, gray, ColorConversionCodes.BGR2GRAY);
+        }
+        else if (source.Channels() == 4)
+        {
+            Cv2.CvtColor(source, gray, ColorConversionCodes.BGRA2GRAY);
+        }
+        else
+        {
+            source.CopyTo(gray);
+        }
+
+        using var gray8 = new Mat();
+        if (gray.Type() == MatType.CV_8UC1)
+        {
+            gray.CopyTo(gray8);
+        }
+        else
+        {
+            Cv2.Normalize(gray, gray8, 0, 255, NormTypes.MinMax, MatType.CV_8U);
+        }
+
+        var colorized = new Mat();
+        Cv2.ApplyColorMap(gray8, colorized, ColormapTypes.Jet);
+        return colorized;
     }
 
     private Mat CreateRecordedFrame(Mat source)

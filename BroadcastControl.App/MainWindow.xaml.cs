@@ -108,7 +108,7 @@ public partial class MainWindow : Window
         _motorControlService = new UdpMotorControlService();
         _viewModel = new MainViewModel(_motorControlService);
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
-        _irUdpCaptureService = new UdpEncodedVideoReceiverService();
+        _irUdpCaptureService = new UdpEncodedVideoReceiverService(applyIrFalseColor: true);
         _viewportRecordingService = new ViewportRecordingService();
         _mobileAlertHubService = new MobileAlertHubService();
         _motorHoldTimer = new DispatcherTimer
