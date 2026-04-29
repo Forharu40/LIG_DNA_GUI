@@ -113,6 +113,46 @@
             <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
         </Style>
 
+        <Style x:Key="MotorPadButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="#33475663" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#55475663" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#66475663" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="InlineRotateButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="#1AFFFFFF" />
+            <Setter Property="BorderBrush" Value="#66FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#33475663" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#55475663" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="PanelTitle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Setter Property="FontSize" Value="18" />
@@ -341,12 +381,10 @@
                                                FontSize="12"
                                                FontWeight="Bold" />
                                     <Button DockPanel.Dock="Right"
-                                            Width="20"
-                                            Height="20"
-                                            Padding="0"
+                                            Margin="8,0,0,0"
                                             Tag="CAM 1"
                                             Click="RotateAuxCameraButton_OnClick"
-                                            Style="{StaticResource TopBarSmallButton}">
+                                            Style="{StaticResource InlineRotateButton}">
                                         <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
                                     </Button>
                                 </DockPanel>
@@ -374,12 +412,10 @@
                                                FontSize="12"
                                                FontWeight="Bold" />
                                     <Button DockPanel.Dock="Right"
-                                            Width="20"
-                                            Height="20"
-                                            Padding="0"
+                                            Margin="8,0,0,0"
                                             Tag="CAM 2"
                                             Click="RotateAuxCameraButton_OnClick"
-                                            Style="{StaticResource TopBarSmallButton}">
+                                            Style="{StaticResource InlineRotateButton}">
                                         <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
                                     </Button>
                                 </DockPanel>
@@ -407,12 +443,10 @@
                                                FontSize="12"
                                                FontWeight="Bold" />
                                     <Button DockPanel.Dock="Right"
-                                            Width="20"
-                                            Height="20"
-                                            Padding="0"
+                                            Margin="8,0,0,0"
                                             Tag="CAM 3"
                                             Click="RotateAuxCameraButton_OnClick"
-                                            Style="{StaticResource TopBarSmallButton}">
+                                            Style="{StaticResource InlineRotateButton}">
                                         <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
                                     </Button>
                                 </DockPanel>
@@ -439,12 +473,10 @@
                                                FontSize="12"
                                                FontWeight="Bold" />
                                     <Button DockPanel.Dock="Right"
-                                            Width="20"
-                                            Height="20"
-                                            Padding="0"
+                                            Margin="8,0,0,0"
                                             Tag="CAM 4"
                                             Click="RotateAuxCameraButton_OnClick"
-                                            Style="{StaticResource TopBarSmallButton}">
+                                            Style="{StaticResource InlineRotateButton}">
                                         <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
                                     </Button>
                                 </DockPanel>
@@ -511,12 +543,9 @@
                                            FontWeight="Bold"
                                            Text="{Binding LargeFeedTitle}" />
                                 <Button DockPanel.Dock="Right"
-                                        Width="24"
-                                        Height="24"
                                         Margin="10,0,0,0"
-                                        Padding="0"
                                         Click="RotateLargeFeedButton_OnClick"
-                                        Style="{StaticResource TopBarSmallButton}">
+                                        Style="{StaticResource InlineRotateButton}">
                                     <materialDesign:PackIcon Kind="RotateRight" Width="14" Height="14" />
                                 </Button>
                             </DockPanel>
@@ -614,12 +643,9 @@
                                                        FontWeight="Bold"
                                                        Text="{Binding InsetFeedTitle}" />
                                             <Button DockPanel.Dock="Right"
-                                                    Width="20"
-                                                    Height="20"
                                                     Margin="8,0,0,0"
-                                                    Padding="0"
                                                     Click="RotateInsetFeedButton_OnClick"
-                                                    Style="{StaticResource TopBarSmallButton}">
+                                                    Style="{StaticResource InlineRotateButton}">
                                                 <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
                                             </Button>
                                         </DockPanel>
@@ -915,74 +941,94 @@
                                 <TextBlock Grid.Column="4" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" FontWeight="SemiBold" TextAlignment="Right" Text="{Binding ZoomLevelText}" />
                             </Grid>
 
-                            <Grid Grid.Row="0"
-                                  Grid.RowSpan="2"
-                                  Grid.Column="3"
-                                  Margin="6,0"
-                                  Opacity="{Binding MotorControlsOpacity}">
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="22" />
-                                    <RowDefinition Height="36" />
-                                    <RowDefinition Height="22" />
-                                </Grid.RowDefinitions>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="36" />
-                                    <ColumnDefinition Width="*" />
-                                </Grid.ColumnDefinitions>
-
-                                <Button Grid.Row="0"
-                                        Grid.Column="1"
-                                        Tag="Up"
-                                        IsEnabled="{Binding CanUseMotorControls}"
-                                        PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
-                                        PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
-                                        MouseLeave="MotorButton_OnMouseLeave"
-                                        Style="{StaticResource ArrowButton}">
-                                    <materialDesign:PackIcon Kind="ArrowUpBold" Width="16" Height="16" />
-                                </Button>
-                                <Button Grid.Row="1"
-                                        Grid.Column="0"
-                                        Tag="Left"
-                                        IsEnabled="{Binding CanUseMotorControls}"
-                                        PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
-                                        PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
-                                        MouseLeave="MotorButton_OnMouseLeave"
-                                        Style="{StaticResource ArrowButton}">
-                                    <materialDesign:PackIcon Kind="ArrowLeftBold" Width="16" Height="16" />
-                                </Button>
-                                <Button Grid.Row="1"
-                                        Grid.Column="1"
-                                        Margin="4,0"
-                                        Tag="Center"
-                                        IsEnabled="{Binding CanUseMotorControls}"
-                                        PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
-                                        PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
-                                        MouseLeave="MotorButton_OnMouseLeave"
-                                        Style="{StaticResource ArrowButton}">
-                                    <TextBlock FontSize="10" FontWeight="Bold" Text="&#xC911;&#xC559;" />
-                                </Button>
-                                <Button Grid.Row="1"
-                                        Grid.Column="2"
-                                        Tag="Right"
-                                        IsEnabled="{Binding CanUseMotorControls}"
-                                        PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
-                                        PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
-                                        MouseLeave="MotorButton_OnMouseLeave"
-                                        Style="{StaticResource ArrowButton}">
-                                    <materialDesign:PackIcon Kind="ArrowRightBold" Width="16" Height="16" />
-                                </Button>
-                                <Button Grid.Row="2"
-                                        Grid.Column="1"
-                                        Tag="Down"
-                                        IsEnabled="{Binding CanUseMotorControls}"
-                                        PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
-                                        PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
-                                        MouseLeave="MotorButton_OnMouseLeave"
-                                        Style="{StaticResource ArrowButton}">
-                                    <materialDesign:PackIcon Kind="ArrowDownBold" Width="16" Height="16" />
-                                </Button>
-                            </Grid>
+                            <Border Grid.Row="0"
+                                    Grid.RowSpan="2"
+                                    Grid.Column="3"
+                                    Margin="6,0"
+                                    Padding="8,6"
+                                    Background="{DynamicResource OverlayPanelBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="2"
+                                    Opacity="{Binding MotorControlsOpacity}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               Text="&#xBAA8;&#xD130; &#xCEE8;&#xD2B8;&#xB864;" />
+                                    <Grid Grid.Row="1"
+                                          Width="118"
+                                          Height="88"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="28" />
+                                            <RowDefinition Height="32" />
+                                            <RowDefinition Height="28" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="38" />
+                                            <ColumnDefinition Width="40" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Row="0"
+                                                Grid.Column="1"
+                                                Tag="Up"
+                                                IsEnabled="{Binding CanUseMotorControls}"
+                                                PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                                PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                                MouseLeave="MotorButton_OnMouseLeave"
+                                                Style="{StaticResource MotorPadButton}">
+                                            <materialDesign:PackIcon Kind="ArrowUpBold" Width="15" Height="15" />
+                                        </Button>
+                                        <Button Grid.Row="1"
+                                                Grid.Column="0"
+                                                Tag="Left"
+                                                IsEnabled="{Binding CanUseMotorControls}"
+                                                PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                                PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                                MouseLeave="MotorButton_OnMouseLeave"
+                                                Style="{StaticResource MotorPadButton}">
+                                            <materialDesign:PackIcon Kind="ArrowLeftBold" Width="15" Height="15" />
+                                        </Button>
+                                        <Button Grid.Row="1"
+                                                Grid.Column="1"
+                                                Tag="Center"
+                                                IsEnabled="{Binding CanUseMotorControls}"
+                                                PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                                PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                                MouseLeave="MotorButton_OnMouseLeave"
+                                                Style="{StaticResource MotorPadButton}">
+                                            <TextBlock FontSize="10" FontWeight="Bold" Text="&#xC911;" />
+                                        </Button>
+                                        <Button Grid.Row="1"
+                                                Grid.Column="2"
+                                                Tag="Right"
+                                                IsEnabled="{Binding CanUseMotorControls}"
+                                                PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                                PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                                MouseLeave="MotorButton_OnMouseLeave"
+                                                Style="{StaticResource MotorPadButton}">
+                                            <materialDesign:PackIcon Kind="ArrowRightBold" Width="15" Height="15" />
+                                        </Button>
+                                        <Button Grid.Row="2"
+                                                Grid.Column="1"
+                                                Tag="Down"
+                                                IsEnabled="{Binding CanUseMotorControls}"
+                                                PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                                PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                                MouseLeave="MotorButton_OnMouseLeave"
+                                                Style="{StaticResource MotorPadButton}">
+                                            <materialDesign:PackIcon Kind="ArrowDownBold" Width="15" Height="15" />
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </Border>
 
                             <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="4" Margin="6,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
                                 <StackPanel VerticalAlignment="Center">
@@ -1187,6 +1233,142 @@
                 </Grid>
             </Grid>
         </Grid>
+
+        <Border x:Name="RecordedVideosPanel"
+                Margin="64"
+                Padding="18"
+                Background="{DynamicResource DrawerBrush}"
+                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="2"
+                Visibility="Collapsed"
+                Panel.ZIndex="18">
+            <Grid>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid Grid.Row="0" Margin="0,0,0,14">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="8" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock Foreground="{DynamicResource DrawerTextBrush}"
+                                   FontSize="24"
+                                   FontWeight="Bold"
+                                   Text="&#xB179;&#xD654; &#xC601;&#xC0C1; &#xBCF4;&#xAE30;" />
+                        <TextBlock x:Name="RecordedVideosStatusText"
+                                   Margin="16,5,0,0"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   FontSize="13"
+                                   Text="" />
+                    </StackPanel>
+                    <Button Grid.Column="1"
+                            Width="82"
+                            Click="RefreshRecordedVideosButton_OnClick"
+                            Style="{StaticResource TopBarButton}"
+                            Content="&#xC0C8;&#xB85C;&#xACE0;&#xCE68;" />
+                    <Button Grid.Column="3"
+                            Width="70"
+                            Click="CloseRecordedVideosButton_OnClick"
+                            Style="{StaticResource TopBarButton}"
+                            Content="&#xB2EB;&#xAE30;" />
+                </Grid>
+
+                <Grid Grid.Row="1">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="300" />
+                        <ColumnDefinition Width="14" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Border Grid.Column="0"
+                            Padding="12"
+                            Background="{DynamicResource OverlayPanelBrush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="2">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                       FontSize="17"
+                                       FontWeight="Bold"
+                                       Text="&#xC800;&#xC7A5;&#xB41C; &#xC601;&#xC0C1;" />
+                            <ListBox x:Name="RecordedVideoList"
+                                     Grid.Row="1"
+                                     Margin="0,10,0,0"
+                                     DisplayMemberPath="Name"
+                                     SelectionChanged="RecordedVideoList_OnSelectionChanged"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{DynamicResource PrimaryTextBrush}" />
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Column="2"
+                            Padding="12"
+                            Background="{DynamicResource OverlayPanelBrush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="2">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*" />
+                                <RowDefinition Height="52" />
+                            </Grid.RowDefinitions>
+                            <MediaElement x:Name="RecordedVideoPlayer"
+                                          Grid.Row="0"
+                                          LoadedBehavior="Manual"
+                                          UnloadedBehavior="Manual"
+                                          Stretch="Uniform"
+                                          ScrubbingEnabled="True"
+                                          Volume="0.9" />
+                            <Grid Grid.Row="1" Margin="0,12,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="86" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="86" />
+                                    <ColumnDefinition Width="8" />
+                                    <ColumnDefinition Width="86" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="120" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0"
+                                        Click="RecordedVideoPlayButton_OnClick"
+                                        Style="{StaticResource TopBarButton}"
+                                        Content="&#xC7AC;&#xC0DD;" />
+                                <Button Grid.Column="2"
+                                        Click="RecordedVideoPauseButton_OnClick"
+                                        Style="{StaticResource TopBarButton}"
+                                        Content="&#xC77C;&#xC2DC;&#xC815;&#xC9C0;" />
+                                <Button Grid.Column="4"
+                                        Click="RecordedVideoStopButton_OnClick"
+                                        Style="{StaticResource TopBarButton}"
+                                        Content="&#xC815;&#xC9C0;" />
+                                <ComboBox x:Name="PlaybackSpeedCombo"
+                                          Grid.Column="6"
+                                          SelectedIndex="3"
+                                          SelectionChanged="PlaybackSpeedCombo_OnSelectionChanged"
+                                          VerticalAlignment="Center"
+                                          Height="36">
+                                    <ComboBoxItem Tag="0.25" Content="0.25x" />
+                                    <ComboBoxItem Tag="0.5" Content="0.5x" />
+                                    <ComboBoxItem Tag="0.75" Content="0.75x" />
+                                    <ComboBoxItem Tag="1" Content="1.0x" />
+                                    <ComboBoxItem Tag="1.5" Content="1.5x" />
+                                    <ComboBoxItem Tag="2" Content="2.0x" />
+                                </ComboBox>
+                            </Grid>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Grid>
+        </Border>
 
         <!-- SettingsBackdrop? ?ㅼ젙李???諛곌꼍???대몼寃?源붽퀬 諛붽묑 ?대┃ ???ル뒗 ?ㅻ쾭?덉씠?? -->
         <Rectangle x:Name="SettingsBackdrop"

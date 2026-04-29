@@ -241,11 +241,39 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
         return
 
     def do_GET(self) -> None:
+        if self.path == "/api/videos":
+            self._send_video_list()
+            return
+
         if self.path in {"/", "/index.html"}:
             self._send_player_page()
             return
 
         super().do_GET()
+
+    def _send_video_list(self) -> None:
+        directory = Path(self.directory)
+        files = sorted(
+            [item for item in directory.glob("*.mp4") if item.is_file()],
+            key=lambda item: item.stat().st_mtime,
+            reverse=True,
+        )
+        payload = [
+            {
+                "name": item.name,
+                "url": quote(item.name),
+                "sizeBytes": item.stat().st_size,
+                "modifiedUnixMs": int(item.stat().st_mtime * 1000),
+            }
+            for item in files
+        ]
+        encoded = json.dumps(payload, separators=(",", ":")).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(encoded)
 
     def _send_player_page(self) -> None:
         directory = Path(self.directory)

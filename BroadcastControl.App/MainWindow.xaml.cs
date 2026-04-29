@@ -1,5 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Globalization;
+using System.Net.Http;
+using System.Text.Json;
 using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
@@ -34,6 +36,7 @@ public partial class MainWindow : Window
     private const int MobileAlertPort = 8088;
     private const string DefaultRecordedVideoUrl = "http://192.168.1.56:8090/";
     private static readonly TimeSpan MobileAlertCooldown = TimeSpan.FromSeconds(10);
+    private static readonly HttpClient RecordedVideoHttpClient = new();
     private readonly MainViewModel _viewModel;
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
     private readonly UdpEncodedVideoReceiverService _irUdpCaptureService;
@@ -68,6 +71,13 @@ public partial class MainWindow : Window
     private const int OverlayCacheLimit = 48;
     private const uint OverlayFrameTolerance = 12;
     private const float DisplayScoreThreshold = 0.60f;
+    private sealed class RecordedVideoItem
+    {
+        public string Name { get; set; } = string.Empty;
+
+        public string Url { get; set; } = string.Empty;
+    }
+
     private static readonly HashSet<string> NonMilitaryTargetClasses = new(StringComparer.OrdinalIgnoreCase)
     {
         "chair",
@@ -952,7 +962,105 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void OpenRecordedVideosButton_OnClick(object sender, RoutedEventArgs e)
+    private async void OpenRecordedVideosButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        RecordedVideosPanel.Visibility = Visibility.Visible;
+        await LoadRecordedVideosAsync();
+        e.Handled = true;
+    }
+
+    private async void RefreshRecordedVideosButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        await LoadRecordedVideosAsync();
+        e.Handled = true;
+    }
+
+    private void CloseRecordedVideosButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        RecordedVideoPlayer.Stop();
+        RecordedVideoPlayer.Source = null;
+        RecordedVideosPanel.Visibility = Visibility.Collapsed;
+        e.Handled = true;
+    }
+
+    private void RecordedVideoList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (RecordedVideoList.SelectedItem is not RecordedVideoItem item ||
+            string.IsNullOrWhiteSpace(item.Url))
+        {
+            return;
+        }
+
+        RecordedVideoPlayer.Source = new Uri(item.Url, UriKind.Absolute);
+        ApplyRecordedVideoPlaybackSpeed();
+        RecordedVideoPlayer.Play();
+        RecordedVideosStatusText.Text = item.Name;
+    }
+
+    private void RecordedVideoPlayButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        ApplyRecordedVideoPlaybackSpeed();
+        RecordedVideoPlayer.Play();
+    }
+
+    private void RecordedVideoPauseButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        RecordedVideoPlayer.Pause();
+    }
+
+    private void RecordedVideoStopButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        RecordedVideoPlayer.Stop();
+    }
+
+    private void PlaybackSpeedCombo_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        ApplyRecordedVideoPlaybackSpeed();
+    }
+
+    private async Task LoadRecordedVideosAsync()
+    {
+        var baseUri = GetRecordedVideoBaseUri();
+        var apiUri = new Uri(baseUri, "api/videos");
+        RecordedVideosStatusText.Text = "목록을 불러오는 중...";
+
+        try
+        {
+            using var stream = await RecordedVideoHttpClient.GetStreamAsync(apiUri);
+            var videos = await JsonSerializer.DeserializeAsync<List<RecordedVideoItem>>(
+                stream,
+                new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            videos ??= new List<RecordedVideoItem>();
+
+            foreach (var video in videos)
+            {
+                if (Uri.TryCreate(video.Url, UriKind.Absolute, out _))
+                {
+                    continue;
+                }
+
+                video.Url = new Uri(baseUri, video.Url).ToString();
+            }
+
+            RecordedVideoList.ItemsSource = videos;
+            RecordedVideosStatusText.Text = videos.Count == 0
+                ? "저장된 영상이 아직 없습니다."
+                : $"{videos.Count}개 영상";
+
+            if (videos.Count > 0 && RecordedVideoList.SelectedIndex < 0)
+            {
+                RecordedVideoList.SelectedIndex = 0;
+            }
+        }
+        catch (Exception ex)
+        {
+            RecordedVideoList.ItemsSource = null;
+            RecordedVideosStatusText.Text = "목록을 불러오지 못했습니다.";
+            _viewModel.AppendImportantLog($"녹화 영상 목록을 불러오지 못했습니다: {ex.Message}");
+        }
+    }
+
+    private static Uri GetRecordedVideoBaseUri()
     {
         var videoUrl = Environment.GetEnvironmentVariable("JETSON_VIDEO_URL");
         if (string.IsNullOrWhiteSpace(videoUrl))
@@ -960,18 +1068,24 @@ public partial class MainWindow : Window
             videoUrl = DefaultRecordedVideoUrl;
         }
 
-        try
+        if (!videoUrl.EndsWith("/", StringComparison.Ordinal))
         {
-            Process.Start(new ProcessStartInfo(videoUrl)
-            {
-                UseShellExecute = true
-            });
-            _viewModel.AppendImportantLog($"녹화 영상 보기 창을 열었습니다: {videoUrl}");
+            videoUrl += "/";
         }
-        catch (Exception ex)
+
+        return new Uri(videoUrl, UriKind.Absolute);
+    }
+
+    private void ApplyRecordedVideoPlaybackSpeed()
+    {
+        if (PlaybackSpeedCombo?.SelectedItem is not ComboBoxItem item ||
+            item.Tag is not string value ||
+            !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var speed))
         {
-            _viewModel.AppendImportantLog($"녹화 영상 보기 창을 열지 못했습니다: {ex.Message}");
+            speed = 1.0;
         }
+
+        RecordedVideoPlayer.SpeedRatio = speed;
     }
 
     private void SettingsBackdrop_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
