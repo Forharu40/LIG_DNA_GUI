@@ -2,7 +2,6 @@
 using System.Globalization;
 using System.Net.Http;
 using System.Text.Json;
-using System.Diagnostics;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;

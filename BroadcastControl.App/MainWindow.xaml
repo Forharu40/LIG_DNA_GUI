@@ -137,18 +137,18 @@
             <Setter Property="Width" Value="24" />
             <Setter Property="Height" Value="20" />
             <Setter Property="Padding" Value="0" />
-            <Setter Property="Background" Value="#1AFFFFFF" />
-            <Setter Property="BorderBrush" Value="#66FFFFFF" />
+            <Setter Property="Background" Value="#00FFFFFF" />
+            <Setter Property="BorderBrush" Value="#55FFFFFF" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
             <Style.Triggers>
                 <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#33475663" />
+                    <Setter Property="Background" Value="#1F475663" />
                     <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
                 </Trigger>
                 <Trigger Property="IsPressed" Value="True">
-                    <Setter Property="Background" Value="#55475663" />
+                    <Setter Property="Background" Value="#33475663" />
                 </Trigger>
             </Style.Triggers>
         </Style>
@@ -945,10 +945,10 @@
                                     Grid.RowSpan="2"
                                     Grid.Column="3"
                                     Margin="6,0"
-                                    Padding="8,6"
-                                    Background="{DynamicResource OverlayPanelBrush}"
-                                    BorderBrush="{DynamicResource PanelBorderBrush}"
-                                    BorderThickness="1"
+                                    Padding="0"
+                                    Background="Transparent"
+                                    BorderBrush="Transparent"
+                                    BorderThickness="0"
                                     CornerRadius="2"
                                     Opacity="{Binding MotorControlsOpacity}">
                                 <Grid>
@@ -1054,9 +1054,9 @@
                     <Grid Grid.Row="0"
                           Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="162" />
+                            <ColumnDefinition Width="142" />
                             <ColumnDefinition Width="6" />
-                            <ColumnDefinition Width="186" />
+                            <ColumnDefinition Width="152" />
                             <ColumnDefinition Width="6" />
                             <ColumnDefinition Width="54" />
                         </Grid.ColumnDefinitions>
@@ -1079,7 +1079,7 @@
                         <Button Grid.Column="2"
                                 Click="OpenRecordedVideosButton_OnClick"
                                 Style="{StaticResource TopBarButton}"
-                                Content="&#xB179;&#xD654; &#xC601;&#xC0C1; &#xBCF4;&#xAE30;" />
+                                Content="&#xC800;&#xC7A5; &#xC601;&#xC0C1; &#xD655;&#xC778;" />
                         <Button Grid.Column="4"
                                 Command="{Binding ToggleSettingsCommand}"
                                 Style="{StaticResource TopBarButton}"
