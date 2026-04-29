@@ -326,19 +326,30 @@
                             Style="{StaticResource GlassCardBorder}"
                             Background="#FF05070A">
                         <Grid Margin="12">
-                            <Border Width="72"
+                            <Border Width="108"
                                     Height="25"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top"
                                     Style="{StaticResource OverlayCardBorder}"
                                     BorderThickness="0"
                                     Padding="7,3">
-                                <TextBlock Text="CAM 1"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource PrimaryTextBrush}"
-                                           FontSize="13"
-                                           FontWeight="Bold" />
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock DockPanel.Dock="Left"
+                                               Text="CAM 1"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="12"
+                                               FontWeight="Bold" />
+                                    <Button DockPanel.Dock="Right"
+                                            Width="20"
+                                            Height="20"
+                                            Padding="0"
+                                            Tag="CAM 1"
+                                            Click="RotateAuxCameraButton_OnClick"
+                                            Style="{StaticResource TopBarSmallButton}">
+                                        <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
+                                    </Button>
+                                </DockPanel>
                             </Border>
                         </Grid>
                     </Border>
@@ -348,19 +359,30 @@
                             Style="{StaticResource GlassCardBorder}"
                             Background="#FF05070A">
                         <Grid Margin="12">
-                            <Border Width="72"
+                            <Border Width="108"
                                     Height="25"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top"
                                     Style="{StaticResource OverlayCardBorder}"
                                     BorderThickness="0"
                                     Padding="7,3">
-                                <TextBlock Text="CAM 2"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource PrimaryTextBrush}"
-                                           FontSize="13"
-                                           FontWeight="Bold" />
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock DockPanel.Dock="Left"
+                                               Text="CAM 2"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="12"
+                                               FontWeight="Bold" />
+                                    <Button DockPanel.Dock="Right"
+                                            Width="20"
+                                            Height="20"
+                                            Padding="0"
+                                            Tag="CAM 2"
+                                            Click="RotateAuxCameraButton_OnClick"
+                                            Style="{StaticResource TopBarSmallButton}">
+                                        <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
+                                    </Button>
+                                </DockPanel>
                             </Border>
                         </Grid>
                     </Border>
@@ -370,19 +392,30 @@
                             Style="{StaticResource GlassCardBorder}"
                             Background="#FF05070A">
                         <Grid Margin="12">
-                            <Border Width="72"
+                            <Border Width="108"
                                     Height="25"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top"
                                     Style="{StaticResource OverlayCardBorder}"
                                     BorderThickness="0"
                                     Padding="7,3">
-                                <TextBlock Text="CAM 3"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource PrimaryTextBrush}"
-                                           FontSize="13"
-                                           FontWeight="Bold" />
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock DockPanel.Dock="Left"
+                                               Text="CAM 3"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="12"
+                                               FontWeight="Bold" />
+                                    <Button DockPanel.Dock="Right"
+                                            Width="20"
+                                            Height="20"
+                                            Padding="0"
+                                            Tag="CAM 3"
+                                            Click="RotateAuxCameraButton_OnClick"
+                                            Style="{StaticResource TopBarSmallButton}">
+                                        <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
+                                    </Button>
+                                </DockPanel>
                             </Border>
                         </Grid>
                     </Border>
@@ -391,19 +424,30 @@
                             Style="{StaticResource GlassCardBorder}"
                             Background="#FF05070A">
                         <Grid Margin="12">
-                            <Border Width="72"
+                            <Border Width="108"
                                     Height="25"
                                     HorizontalAlignment="Left"
                                     VerticalAlignment="Top"
                                     Style="{StaticResource OverlayCardBorder}"
                                     BorderThickness="0"
                                     Padding="7,3">
-                                <TextBlock Text="CAM 4"
-                                           HorizontalAlignment="Center"
-                                           VerticalAlignment="Center"
-                                           Foreground="{DynamicResource PrimaryTextBrush}"
-                                           FontSize="13"
-                                           FontWeight="Bold" />
+                                <DockPanel LastChildFill="False">
+                                    <TextBlock DockPanel.Dock="Left"
+                                               Text="CAM 4"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="12"
+                                               FontWeight="Bold" />
+                                    <Button DockPanel.Dock="Right"
+                                            Width="20"
+                                            Height="20"
+                                            Padding="0"
+                                            Tag="CAM 4"
+                                            Click="RotateAuxCameraButton_OnClick"
+                                            Style="{StaticResource TopBarSmallButton}">
+                                        <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
+                                    </Button>
+                                </DockPanel>
                             </Border>
                         </Grid>
                     </Border>
@@ -460,10 +504,22 @@
                                 BorderThickness="0"
                                 CornerRadius="2"
                                 Padding="8,4">
-                            <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
-                                       FontSize="17"
-                                       FontWeight="Bold"
-                                       Text="{Binding LargeFeedTitle}" />
+                            <DockPanel LastChildFill="False">
+                                <TextBlock DockPanel.Dock="Left"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           FontSize="17"
+                                           FontWeight="Bold"
+                                           Text="{Binding LargeFeedTitle}" />
+                                <Button DockPanel.Dock="Right"
+                                        Width="24"
+                                        Height="24"
+                                        Margin="10,0,0,0"
+                                        Padding="0"
+                                        Click="RotateLargeFeedButton_OnClick"
+                                        Style="{StaticResource TopBarSmallButton}">
+                                    <materialDesign:PackIcon Kind="RotateRight" Width="14" Height="14" />
+                                </Button>
+                            </DockPanel>
                         </Border>
 
                         <!-- ?꾩옄 以?誘몃땲留?
@@ -551,10 +607,22 @@
                                              BorderThickness="0"
                                              CornerRadius="2"
                                              Padding="7,3">
-                                        <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
-                                                   FontSize="13"
-                                                   FontWeight="Bold"
-                                                   Text="{Binding InsetFeedTitle}" />
+                                        <DockPanel LastChildFill="False">
+                                            <TextBlock DockPanel.Dock="Left"
+                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                       FontSize="13"
+                                                       FontWeight="Bold"
+                                                       Text="{Binding InsetFeedTitle}" />
+                                            <Button DockPanel.Dock="Right"
+                                                    Width="20"
+                                                    Height="20"
+                                                    Margin="8,0,0,0"
+                                                    Padding="0"
+                                                    Click="RotateInsetFeedButton_OnClick"
+                                                    Style="{StaticResource TopBarSmallButton}">
+                                                <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
+                                            </Button>
+                                        </DockPanel>
                                     </Border>
                                 </Grid>
                             </Border>
@@ -565,7 +633,7 @@
                         <Grid Margin="0,0,24,26"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom"
-                              Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                              Visibility="Collapsed">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -847,11 +915,74 @@
                                 <TextBlock Grid.Column="4" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" FontWeight="SemiBold" TextAlignment="Right" Text="{Binding ZoomLevelText}" />
                             </Grid>
 
-                            <Button Grid.Row="0" Grid.Column="3" Margin="6,0" Command="{Binding ToggleManualRecordingCommand}" Opacity="{Binding ManualRecordingButtonOpacity}" IsEnabled="{Binding IsSystemPoweredOn}" Style="{StaticResource TopBarButton}" Content="{Binding ManualRecordingButtonText}" />
-                            <StackPanel Grid.Row="1" Grid.Column="3" Margin="6,0" HorizontalAlignment="Center" VerticalAlignment="Center" Orientation="Horizontal" Opacity="{Binding RecordingIndicatorOpacity}">
-                                <Ellipse Width="12" Height="12" Margin="0,0,7,0" VerticalAlignment="Center" Fill="{Binding RecordingIndicatorBrush}" />
-                                <TextBlock VerticalAlignment="Center" Foreground="{Binding RecordingTextBrush}" FontSize="15" FontWeight="Bold" Text="&#xC601;&#xC0C1; &#xB179;&#xD654; &#xC911;" />
-                            </StackPanel>
+                            <Grid Grid.Row="0"
+                                  Grid.RowSpan="2"
+                                  Grid.Column="3"
+                                  Margin="6,0"
+                                  Opacity="{Binding MotorControlsOpacity}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="22" />
+                                    <RowDefinition Height="36" />
+                                    <RowDefinition Height="22" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="36" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Button Grid.Row="0"
+                                        Grid.Column="1"
+                                        Tag="Up"
+                                        IsEnabled="{Binding CanUseMotorControls}"
+                                        PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                        PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                        MouseLeave="MotorButton_OnMouseLeave"
+                                        Style="{StaticResource ArrowButton}">
+                                    <materialDesign:PackIcon Kind="ArrowUpBold" Width="16" Height="16" />
+                                </Button>
+                                <Button Grid.Row="1"
+                                        Grid.Column="0"
+                                        Tag="Left"
+                                        IsEnabled="{Binding CanUseMotorControls}"
+                                        PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                        PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                        MouseLeave="MotorButton_OnMouseLeave"
+                                        Style="{StaticResource ArrowButton}">
+                                    <materialDesign:PackIcon Kind="ArrowLeftBold" Width="16" Height="16" />
+                                </Button>
+                                <Button Grid.Row="1"
+                                        Grid.Column="1"
+                                        Margin="4,0"
+                                        Tag="Center"
+                                        IsEnabled="{Binding CanUseMotorControls}"
+                                        PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                        PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                        MouseLeave="MotorButton_OnMouseLeave"
+                                        Style="{StaticResource ArrowButton}">
+                                    <TextBlock FontSize="10" FontWeight="Bold" Text="&#xC911;&#xC559;" />
+                                </Button>
+                                <Button Grid.Row="1"
+                                        Grid.Column="2"
+                                        Tag="Right"
+                                        IsEnabled="{Binding CanUseMotorControls}"
+                                        PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                        PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                        MouseLeave="MotorButton_OnMouseLeave"
+                                        Style="{StaticResource ArrowButton}">
+                                    <materialDesign:PackIcon Kind="ArrowRightBold" Width="16" Height="16" />
+                                </Button>
+                                <Button Grid.Row="2"
+                                        Grid.Column="1"
+                                        Tag="Down"
+                                        IsEnabled="{Binding CanUseMotorControls}"
+                                        PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                        PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                        MouseLeave="MotorButton_OnMouseLeave"
+                                        Style="{StaticResource ArrowButton}">
+                                    <materialDesign:PackIcon Kind="ArrowDownBold" Width="16" Height="16" />
+                                </Button>
+                            </Grid>
 
                             <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="4" Margin="6,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
                                 <StackPanel VerticalAlignment="Center">
@@ -877,20 +1008,32 @@
                     <Grid Grid.Row="0"
                           Margin="0,0,0,12">
                         <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="147" />
+                            <ColumnDefinition Width="162" />
                             <ColumnDefinition Width="6" />
-                            <ColumnDefinition Width="147" />
+                            <ColumnDefinition Width="186" />
                             <ColumnDefinition Width="6" />
                             <ColumnDefinition Width="54" />
                         </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0"
-                                Click="RotateLargeFeedButton_OnClick"
-                                Style="{StaticResource TopBarButton}"
-                                Content="&#xC8FC; &#xD654;&#xBA74; &#xD68C;&#xC804;" />
+                        <StackPanel Grid.Column="0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Opacity="{Binding RecordingIndicatorOpacity}">
+                            <Ellipse Width="12"
+                                     Height="12"
+                                     Margin="0,0,7,0"
+                                     VerticalAlignment="Center"
+                                     Fill="{Binding RecordingIndicatorBrush}" />
+                            <TextBlock VerticalAlignment="Center"
+                                       Foreground="{Binding RecordingTextBrush}"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Text="&#xC601;&#xC0C1; &#xB179;&#xD654; &#xC911;" />
+                        </StackPanel>
                         <Button Grid.Column="2"
-                                Click="RotateInsetFeedButton_OnClick"
+                                Click="OpenRecordedVideosButton_OnClick"
                                 Style="{StaticResource TopBarButton}"
-                                Content="&#xBCF4;&#xC870; &#xD654;&#xBA74; &#xD68C;&#xC804;" />
+                                Content="&#xB179;&#xD654; &#xC601;&#xC0C1; &#xBCF4;&#xAE30;" />
                         <Button Grid.Column="4"
                                 Command="{Binding ToggleSettingsCommand}"
                                 Style="{StaticResource TopBarButton}"

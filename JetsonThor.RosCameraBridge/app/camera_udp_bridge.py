@@ -5,12 +5,18 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass
+from datetime import datetime
+from functools import partial
+import html
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 import json
 import os
+from pathlib import Path
 import socket
 import struct
 import threading
 import time
+from urllib.parse import quote
 
 import cv2
 import numpy as np
@@ -59,6 +65,12 @@ STREAM_HEIGHT = getenv_int("STREAM_HEIGHT", 360)
 JPEG_QUALITY = getenv_int("JPEG_QUALITY", 35)
 UDP_SEND_BUFFER_BYTES = getenv_int("UDP_SEND_BUFFER_BYTES", 4 * 1024 * 1024)
 SEND_STATUS_WITH_IMAGE = getenv_bool("SEND_STATUS_WITH_IMAGE", True)
+RECORDING_ENABLED = getenv_bool("RECORDING_ENABLED", True)
+RECORDING_DIR = os.getenv("RECORDING_DIR", "/recordings")
+RECORDING_SEGMENT_SECONDS = getenv_int("RECORDING_SEGMENT_SECONDS", 300)
+RECORDING_FPS = getenv_int("RECORDING_FPS", 15)
+RECORDING_HTTP_ENABLED = getenv_bool("RECORDING_HTTP_ENABLED", True)
+RECORDING_HTTP_PORT = getenv_int("RECORDING_HTTP_PORT", 8090)
 
 IMAGE_TOPIC_QOS = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
@@ -169,6 +181,135 @@ class FrameStampInfo:
     height: int
 
 
+class VideoSegmentRecorder:
+    def __init__(self, name: str, directory: str, segment_seconds: int, fps: int) -> None:
+        self.name = name
+        self.directory = Path(directory)
+        self.segment_seconds = max(10, segment_seconds)
+        self.fps = max(1, fps)
+        self._lock = threading.Lock()
+        self._writer: cv2.VideoWriter | None = None
+        self._segment_started_at = 0.0
+        self._frame_size: tuple[int, int] | None = None
+        self._current_path: Path | None = None
+        self.directory.mkdir(parents=True, exist_ok=True)
+
+    def write(self, frame: np.ndarray) -> None:
+        if frame.size == 0:
+            return
+
+        height, width = frame.shape[:2]
+        now = time.monotonic()
+
+        with self._lock:
+            needs_new_segment = (
+                self._writer is None
+                or self._frame_size != (width, height)
+                or now - self._segment_started_at >= self.segment_seconds
+            )
+            if needs_new_segment:
+                self._start_segment(width, height, now)
+
+            if self._writer is not None:
+                self._writer.write(frame)
+
+    def close(self) -> None:
+        with self._lock:
+            if self._writer is not None:
+                self._writer.release()
+                self._writer = None
+
+    def _start_segment(self, width: int, height: int, now: float) -> None:
+        if self._writer is not None:
+            self._writer.release()
+
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        self._current_path = self.directory / f"{self.name}_{timestamp}.mp4"
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(str(self._current_path), fourcc, self.fps, (width, height))
+        if not writer.isOpened():
+            self._writer = None
+            raise RuntimeError(f"Failed to open recording file: {self._current_path}")
+
+        self._writer = writer
+        self._segment_started_at = now
+        self._frame_size = (width, height)
+
+
+class RecordingVideoHandler(SimpleHTTPRequestHandler):
+    def log_message(self, format: str, *args) -> None:
+        return
+
+    def do_GET(self) -> None:
+        if self.path in {"/", "/index.html"}:
+            self._send_player_page()
+            return
+
+        super().do_GET()
+
+    def _send_player_page(self) -> None:
+        directory = Path(self.directory)
+        files = sorted(
+            [item.name for item in directory.glob("*.mp4") if item.is_file()],
+            reverse=True,
+        )
+        options = "\n".join(
+            f'<option value="{quote(name)}">{html.escape(name)}</option>' for name in files
+        )
+        initial_source = quote(files[0]) if files else ""
+        body = f"""<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Recorded Videos</title>
+  <style>
+    body {{ margin: 0; padding: 24px; background: #111827; color: #e5e7eb; font-family: sans-serif; }}
+    h1 {{ margin: 0 0 16px; font-size: 24px; }}
+    .bar {{ display: flex; gap: 12px; margin-bottom: 16px; flex-wrap: wrap; }}
+    select {{ min-height: 38px; padding: 6px 10px; background: #1f2937; color: #f9fafb; border: 1px solid #4b5563; }}
+    video {{ width: 100%; max-height: 72vh; background: #000; }}
+    .empty {{ padding: 32px; border: 1px solid #374151; background: #1f2937; }}
+  </style>
+</head>
+<body>
+  <h1>녹화 영상 보기</h1>
+  <div class="bar">
+    <select id="fileList">{options}</select>
+    <select id="speed">
+      <option value="0.25">0.25x</option>
+      <option value="0.5">0.5x</option>
+      <option value="0.75">0.75x</option>
+      <option value="1" selected>1.0x</option>
+      <option value="1.5">1.5x</option>
+      <option value="2">2.0x</option>
+    </select>
+  </div>
+  {('<video id="player" controls src="' + initial_source + '"></video>') if files else '<div class="empty">저장된 영상이 아직 없습니다.</div>'}
+  <script>
+    const fileList = document.getElementById('fileList');
+    const speed = document.getElementById('speed');
+    const player = document.getElementById('player');
+    if (fileList && player) {{
+      fileList.addEventListener('change', () => {{
+        player.src = fileList.value;
+        player.load();
+      }});
+      speed.addEventListener('change', () => {{
+        player.playbackRate = Number(speed.value);
+      }});
+    }}
+  </script>
+</body>
+</html>"""
+        encoded = body.encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.end_headers()
+        self.wfile.write(encoded)
+
+
 class StreamBridge:
     def __init__(self, name: str, image_topic: str, detection_topic: str, host: str, port: int) -> None:
         self.name = name
@@ -186,6 +327,11 @@ class StreamBridge:
         self._lock = threading.Lock()
         self._stamp_history: deque[FrameStampInfo] = deque(maxlen=STAMP_HISTORY_LIMIT)
         self._last_frame_info = FrameStampInfo(0, 0, 0, 0)
+        self._recorder = (
+            VideoSegmentRecorder(name, RECORDING_DIR, RECORDING_SEGMENT_SECONDS, RECORDING_FPS)
+            if RECORDING_ENABLED
+            else None
+        )
 
     def send_image(self, message: Image) -> None:
         frame = ros_image_to_bgr(message)
@@ -195,6 +341,9 @@ class StreamBridge:
         frame_index = self.frame_index
 
         stream_frame = fit_frame_to_stream(frame)
+        if self._recorder is not None:
+            self._recorder.write(stream_frame)
+
         ok, encoded = cv2.imencode(
             ".jpg",
             stream_frame,
@@ -267,12 +416,18 @@ class StreamBridge:
 
         return FrameStampInfo(stamp_ns, 0, 0, 0)
 
+    def close(self) -> None:
+        if self._recorder is not None:
+            self._recorder.close()
+
 
 class CameraUdpBridge(Node):
     def __init__(self) -> None:
         super().__init__("camera_udp_bridge")
         self._eo = StreamBridge("eo", EO_IMAGE_TOPIC, EO_DETECTION_TOPIC, GUI_HOST, EO_GUI_PORT)
         self._ir = StreamBridge("ir", IR_IMAGE_TOPIC, IR_DETECTION_TOPIC, GUI_HOST, IR_GUI_PORT)
+        self._recording_http_server: ThreadingHTTPServer | None = None
+        self._recording_http_thread: threading.Thread | None = None
 
         self.create_subscription(Image, EO_IMAGE_TOPIC, self._on_eo_image, IMAGE_TOPIC_QOS)
         self.create_subscription(Image, IR_IMAGE_TOPIC, self._on_ir_image, IMAGE_TOPIC_QOS)
@@ -285,6 +440,11 @@ class CameraUdpBridge(Node):
         self.get_logger().info(f"IR detection topic: {IR_DETECTION_TOPIC}")
         self.get_logger().info(f"Streaming EO UDP packets to {GUI_HOST}:{EO_GUI_PORT}")
         self.get_logger().info(f"Streaming IR UDP packets to {GUI_HOST}:{IR_GUI_PORT}")
+        if RECORDING_ENABLED:
+            self.get_logger().info(
+                f"Recording EO/IR videos to {RECORDING_DIR} every {RECORDING_SEGMENT_SECONDS} seconds"
+            )
+        self._start_recording_http_server()
 
     def _on_eo_image(self, message: Image) -> None:
         try:
@@ -322,6 +482,28 @@ class CameraUdpBridge(Node):
         except Exception as exc:
             self.get_logger().error(f"Failed to forward IR detections: {exc}")
 
+    def close(self) -> None:
+        self._eo.close()
+        self._ir.close()
+        if self._recording_http_server is not None:
+            self._recording_http_server.shutdown()
+            self._recording_http_server.server_close()
+
+    def _start_recording_http_server(self) -> None:
+        if not RECORDING_ENABLED or not RECORDING_HTTP_ENABLED:
+            return
+
+        Path(RECORDING_DIR).mkdir(parents=True, exist_ok=True)
+        handler = partial(RecordingVideoHandler, directory=RECORDING_DIR)
+        self._recording_http_server = ThreadingHTTPServer(("0.0.0.0", RECORDING_HTTP_PORT), handler)
+        self._recording_http_thread = threading.Thread(
+            target=self._recording_http_server.serve_forever,
+            name="recording-video-http",
+            daemon=True,
+        )
+        self._recording_http_thread.start()
+        self.get_logger().info(f"Recorded video player: http://0.0.0.0:{RECORDING_HTTP_PORT}/")
+
 
 def main() -> None:
     rclpy.init()
@@ -329,6 +511,7 @@ def main() -> None:
     try:
         rclpy.spin(node)
     finally:
+        node.close()
         node.destroy_node()
         rclpy.shutdown()
 

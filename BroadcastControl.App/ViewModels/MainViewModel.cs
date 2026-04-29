@@ -165,6 +165,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanSelectAutoMode));
                 OnPropertyChanged(nameof(CanSelectManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
+                OnPropertyChanged(nameof(MotorControlsOpacity));
                 OnPropertyChanged(nameof(CanUseZoomControls));
                 OnPropertyChanged(nameof(IsAutoMode));
                 OnPropertyChanged(nameof(IsRecordingActive));
@@ -197,6 +198,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanSelectAutoMode));
                 OnPropertyChanged(nameof(CanSelectManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
+                OnPropertyChanged(nameof(MotorControlsOpacity));
                 OnPropertyChanged(nameof(CanUseZoomControls));
                 OnPropertyChanged(nameof(ShowZoomMiniMap));
                 OnPropertyChanged(nameof(IsAutoMode));
@@ -225,11 +227,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         !_isRecordingSuppressed &&
         (IsManualRecordingEnabled || _isAutoRecordingLatched);
 
-    public Brush RecordingIndicatorBrush => IsRecordingActive ? RecordingOnBrush : RecordingOffBrush;
+    public Brush RecordingIndicatorBrush => IsSystemPoweredOn ? RecordingOnBrush : RecordingOffBrush;
 
-    public Brush RecordingTextBrush => IsRecordingActive ? RecordingOnBrush : RecordingTextOffBrush;
+    public Brush RecordingTextBrush => IsSystemPoweredOn ? RecordingOnBrush : RecordingTextOffBrush;
 
-    public double RecordingIndicatorOpacity => IsRecordingActive ? 1.0 : 0.42;
+    public double RecordingIndicatorOpacity => IsSystemPoweredOn ? 1.0 : 0.42;
 
     public bool IsManualMode => IsSystemPoweredOn && CurrentMode == "\uC218\uB3D9";
 
@@ -240,6 +242,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public bool CanSelectManualMode => IsSystemPoweredOn && CurrentMode != "\uC218\uB3D9";
 
     public bool CanUseMotorControls => IsManualMode;
+
+    public double MotorControlsOpacity => CanUseMotorControls ? 1.0 : 0.38;
 
     public bool CanUseZoomControls => IsSystemPoweredOn;
 
