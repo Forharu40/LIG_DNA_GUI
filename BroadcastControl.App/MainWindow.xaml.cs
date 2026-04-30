@@ -43,6 +43,7 @@ public partial class MainWindow : Window
     private readonly UdpMotorControlService _motorControlService;
     private readonly MobileAlertHubService _mobileAlertHubService;
     private readonly DispatcherTimer _motorHoldTimer;
+    private readonly DispatcherTimer _recordedVideoPositionTimer;
 
     private bool _isDraggingZoom;
     private Point _lastZoomDragPoint;
@@ -61,6 +62,7 @@ public partial class MainWindow : Window
     private bool _hasRenderedDetectionOverlay;
     private bool _isRenderingOverlay;
     private bool _isViewportRecordingActive;
+    private bool _isDraggingRecordedVideoPosition;
     private string? _lastDetectionAlertSignature;
     private DateTimeOffset _lastMobileAlertAt = DateTimeOffset.MinValue;
     private string? _lastFilteredOutTargetSignature;
@@ -127,6 +129,11 @@ public partial class MainWindow : Window
             Interval = TimeSpan.FromMilliseconds(50)
         };
         _motorHoldTimer.Tick += MotorHoldTimer_OnTick;
+        _recordedVideoPositionTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMilliseconds(250)
+        };
+        _recordedVideoPositionTimer.Tick += RecordedVideoPositionTimer_OnTick;
         DataContext = _viewModel;
 
         Loaded += OnLoaded;
@@ -976,6 +983,7 @@ public partial class MainWindow : Window
 
     private void CloseRecordedVideosButton_OnClick(object sender, RoutedEventArgs e)
     {
+        _recordedVideoPositionTimer.Stop();
         RecordedVideoPlayer.Stop();
         RecordedVideoPlayer.Source = null;
         RecordedVideosPanel.Visibility = Visibility.Collapsed;
@@ -991,8 +999,10 @@ public partial class MainWindow : Window
         }
 
         RecordedVideoPlayer.Source = new Uri(item.Url, UriKind.Absolute);
+        ResetRecordedVideoPositionUi();
         ApplyRecordedVideoPlaybackSpeed();
         RecordedVideoPlayer.Play();
+        _recordedVideoPositionTimer.Start();
         RecordedVideosStatusText.Text = item.Name;
     }
 
@@ -1000,6 +1010,7 @@ public partial class MainWindow : Window
     {
         ApplyRecordedVideoPlaybackSpeed();
         RecordedVideoPlayer.Play();
+        _recordedVideoPositionTimer.Start();
     }
 
     private void RecordedVideoPauseButton_OnClick(object sender, RoutedEventArgs e)
@@ -1010,6 +1021,8 @@ public partial class MainWindow : Window
     private void RecordedVideoStopButton_OnClick(object sender, RoutedEventArgs e)
     {
         RecordedVideoPlayer.Stop();
+        _recordedVideoPositionTimer.Stop();
+        ResetRecordedVideoPositionUi();
     }
 
     private void PlaybackSpeedCombo_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1085,6 +1098,91 @@ public partial class MainWindow : Window
         }
 
         RecordedVideoPlayer.SpeedRatio = speed;
+    }
+
+    private void RecordedVideoPlayer_OnMediaOpened(object sender, RoutedEventArgs e)
+    {
+        if (RecordedVideoPlayer.NaturalDuration.HasTimeSpan)
+        {
+            var duration = RecordedVideoPlayer.NaturalDuration.TimeSpan;
+            RecordedVideoPositionSlider.Maximum = Math.Max(duration.TotalSeconds, 1);
+            RecordedVideoDurationText.Text = FormatVideoTime(duration);
+        }
+
+        UpdateRecordedVideoPositionUi();
+    }
+
+    private void RecordedVideoPlayer_OnMediaEnded(object sender, RoutedEventArgs e)
+    {
+        _recordedVideoPositionTimer.Stop();
+        UpdateRecordedVideoPositionUi();
+    }
+
+    private void RecordedVideoPositionTimer_OnTick(object? sender, EventArgs e)
+    {
+        UpdateRecordedVideoPositionUi();
+    }
+
+    private void RecordedVideoPositionSlider_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        _isDraggingRecordedVideoPosition = true;
+    }
+
+    private void RecordedVideoPositionSlider_OnPreviewMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        SeekRecordedVideoToSlider();
+        _isDraggingRecordedVideoPosition = false;
+    }
+
+    private void RecordedVideoPositionSlider_OnValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (_isDraggingRecordedVideoPosition)
+        {
+            RecordedVideoCurrentTimeText.Text = FormatVideoTime(TimeSpan.FromSeconds(e.NewValue));
+        }
+    }
+
+    private void SeekRecordedVideoToSlider()
+    {
+        RecordedVideoPlayer.Position = TimeSpan.FromSeconds(RecordedVideoPositionSlider.Value);
+        UpdateRecordedVideoPositionUi();
+    }
+
+    private void UpdateRecordedVideoPositionUi()
+    {
+        if (_isDraggingRecordedVideoPosition)
+        {
+            return;
+        }
+
+        var position = RecordedVideoPlayer.Position;
+        RecordedVideoCurrentTimeText.Text = FormatVideoTime(position);
+
+        if (RecordedVideoPlayer.NaturalDuration.HasTimeSpan)
+        {
+            var duration = RecordedVideoPlayer.NaturalDuration.TimeSpan;
+            RecordedVideoPositionSlider.Maximum = Math.Max(duration.TotalSeconds, 1);
+            RecordedVideoDurationText.Text = FormatVideoTime(duration);
+        }
+
+        RecordedVideoPositionSlider.Value = Math.Min(position.TotalSeconds, RecordedVideoPositionSlider.Maximum);
+    }
+
+    private void ResetRecordedVideoPositionUi()
+    {
+        _isDraggingRecordedVideoPosition = false;
+        RecordedVideoPositionSlider.Minimum = 0;
+        RecordedVideoPositionSlider.Maximum = 1;
+        RecordedVideoPositionSlider.Value = 0;
+        RecordedVideoCurrentTimeText.Text = "00:00";
+        RecordedVideoDurationText.Text = "00:00";
+    }
+
+    private static string FormatVideoTime(TimeSpan value)
+    {
+        return value.TotalHours >= 1
+            ? value.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
+            : value.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
     }
 
     private void SettingsBackdrop_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1399,6 +1497,7 @@ public partial class MainWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         StopManualMotorInput();
+        _recordedVideoPositionTimer.Stop();
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
