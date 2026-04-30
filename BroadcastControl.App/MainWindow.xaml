@@ -1448,7 +1448,7 @@
                                     <ColumnDefinition Width="8" />
                                     <ColumnDefinition Width="42" />
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="120" />
+                                    <ColumnDefinition Width="138" />
                                 </Grid.ColumnDefinitions>
                                 <Button Grid.Column="0"
                                         Click="RecordedVideoPlayButton_OnClick"
@@ -1470,6 +1470,12 @@
                                             HorizontalAlignment="Right"
                                             VerticalAlignment="Center"
                                             Orientation="Horizontal">
+                                    <TextBlock Margin="0,0,8,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               Text="&#xD655;&#xB300;" />
                                     <Button x:Name="RecordedVideoZoomResetButton"
                                             Width="58"
                                             Height="28"
@@ -1487,21 +1493,41 @@
                                             Style="{x:Null}"
                                             ValueChanged="RecordedVideoZoomSlider_OnValueChanged" />
                                 </StackPanel>
-                                <ComboBox x:Name="PlaybackSpeedCombo"
-                                          Grid.Column="6"
-                                          SelectedIndex="3"
-                                          SelectionChanged="PlaybackSpeedCombo_OnSelectionChanged"
-                                          VerticalAlignment="Center"
-                                          Height="36"
-                                          Foreground="{DynamicResource PrimaryTextBrush}"
-                                          Background="{DynamicResource TopBarButtonBrush}">
-                                    <ComboBoxItem Tag="0.25" Foreground="White" Content="0.25x" />
-                                    <ComboBoxItem Tag="0.5" Foreground="White" Content="0.5x" />
-                                    <ComboBoxItem Tag="0.75" Foreground="White" Content="0.75x" />
-                                    <ComboBoxItem Tag="1" Foreground="White" Content="1.0x" />
-                                    <ComboBoxItem Tag="1.5" Foreground="White" Content="1.5x" />
-                                    <ComboBoxItem Tag="2" Foreground="White" Content="2.0x" />
-                                </ComboBox>
+                                <StackPanel Grid.Column="6"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Orientation="Horizontal">
+                                    <TextBlock Margin="0,0,8,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               Text="&#xC18D;&#xB3C4;" />
+                                    <ComboBox x:Name="PlaybackSpeedCombo"
+                                              Width="82"
+                                              SelectedIndex="3"
+                                              SelectionChanged="PlaybackSpeedCombo_OnSelectionChanged"
+                                              VerticalAlignment="Center"
+                                              Height="34"
+                                              Padding="8,3"
+                                              Foreground="White"
+                                              Background="#22313A46"
+                                              BorderBrush="{DynamicResource PanelBorderBrush}">
+                                        <ComboBox.Resources>
+                                            <Style TargetType="{x:Type ComboBoxItem}">
+                                                <Setter Property="Foreground" Value="White" />
+                                                <Setter Property="Background" Value="#FF1F2937" />
+                                                <Setter Property="Padding" Value="8,4" />
+                                            </Style>
+                                        </ComboBox.Resources>
+                                        <ComboBoxItem Tag="0.25" Content="0.25x" />
+                                        <ComboBoxItem Tag="0.5" Content="0.5x" />
+                                        <ComboBoxItem Tag="0.75" Content="0.75x" />
+                                        <ComboBoxItem Tag="1" Content="1.0x" />
+                                        <ComboBoxItem Tag="1.5" Content="1.5x" />
+                                        <ComboBoxItem Tag="2" Content="2.0x" />
+                                    </ComboBox>
+                                </StackPanel>
                             </Grid>
                         </Grid>
                     </Border>
