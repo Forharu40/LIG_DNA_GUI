@@ -33,7 +33,7 @@ public partial class MainWindow : Window
     private const int EoUdpPort = 5000;
     private const int IrUdpPort = 5001;
     private const int MobileAlertPort = 8088;
-    private const string DefaultRecordedVideoUrl = "http://192.168.1.56:8090/";
+    private const string DefaultRecordedVideoUrl = "http://192.168.3.143:8090/";
     private static readonly TimeSpan MobileAlertCooldown = TimeSpan.FromSeconds(10);
     private static readonly HttpClient RecordedVideoHttpClient = new();
     private readonly MainViewModel _viewModel;

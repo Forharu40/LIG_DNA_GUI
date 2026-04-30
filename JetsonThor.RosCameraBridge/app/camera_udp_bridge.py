@@ -37,6 +37,7 @@ LEGACY_IMAGE_HEADER_SIZE = 20
 DETECTION_PACKET_MAGIC = b"DETS"
 STATUS_PACKET_MAGIC = b"STAT"
 STAMP_HISTORY_LIMIT = 120
+VIDEO_FILE_EXTENSIONS = {".mp4", ".avi", ".mov", ".mkv", ".m4v"}
 
 
 def getenv_int(name: str, default: int) -> int:
@@ -254,7 +255,11 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
     def _send_video_list(self) -> None:
         directory = Path(self.directory)
         files = sorted(
-            [item for item in directory.glob("*.mp4") if item.is_file()],
+            [
+                item
+                for item in directory.iterdir()
+                if item.is_file() and item.suffix.lower() in VIDEO_FILE_EXTENSIONS
+            ],
             key=lambda item: item.stat().st_mtime,
             reverse=True,
         )
@@ -278,7 +283,11 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
     def _send_player_page(self) -> None:
         directory = Path(self.directory)
         files = sorted(
-            [item.name for item in directory.glob("*.mp4") if item.is_file()],
+            [
+                item.name
+                for item in directory.iterdir()
+                if item.is_file() and item.suffix.lower() in VIDEO_FILE_EXTENSIONS
+            ],
             reverse=True,
         )
         options = "\n".join(
