@@ -34,6 +34,7 @@ public partial class MainWindow : Window
     private const int IrUdpPort = 5001;
     private const int MobileAlertPort = 8088;
     private const string DefaultRecordedVideoUrl = "http://192.168.3.143:8090/";
+    private const string RecordedVideoCacheFolderName = "LIG_DNA_GUI_recorded_videos";
     private static readonly TimeSpan MobileAlertCooldown = TimeSpan.FromSeconds(10);
     private static readonly HttpClient RecordedVideoHttpClient = new();
     private readonly MainViewModel _viewModel;
@@ -77,6 +78,8 @@ public partial class MainWindow : Window
         public string Name { get; set; } = string.Empty;
 
         public string Url { get; set; } = string.Empty;
+
+        public long SizeBytes { get; set; }
     }
 
     private static readonly HashSet<string> NonMilitaryTargetClasses = new(StringComparer.OrdinalIgnoreCase)
@@ -990,7 +993,7 @@ public partial class MainWindow : Window
         e.Handled = true;
     }
 
-    private void RecordedVideoList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
+    private async void RecordedVideoList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
         if (RecordedVideoList.SelectedItem is not RecordedVideoItem item ||
             string.IsNullOrWhiteSpace(item.Url))
@@ -998,12 +1001,26 @@ public partial class MainWindow : Window
             return;
         }
 
-        RecordedVideoPlayer.Source = new Uri(item.Url, UriKind.Absolute);
-        ResetRecordedVideoPositionUi();
-        ApplyRecordedVideoPlaybackSpeed();
-        RecordedVideoPlayer.Play();
-        _recordedVideoPositionTimer.Start();
-        RecordedVideosStatusText.Text = item.Name;
+        try
+        {
+            _recordedVideoPositionTimer.Stop();
+            RecordedVideoPlayer.Stop();
+            RecordedVideoPlayer.Source = null;
+            ResetRecordedVideoPositionUi();
+            RecordedVideosStatusText.Text = $"{item.Name} 내려받는 중...";
+
+            var localPath = await EnsureRecordedVideoCachedAsync(item);
+            RecordedVideoPlayer.Source = new Uri(localPath, UriKind.Absolute);
+            ApplyRecordedVideoPlaybackSpeed();
+            RecordedVideoPlayer.Play();
+            _recordedVideoPositionTimer.Start();
+            RecordedVideosStatusText.Text = item.Name;
+        }
+        catch (Exception ex)
+        {
+            RecordedVideosStatusText.Text = "영상을 재생할 수 없습니다.";
+            _viewModel.AppendImportantLog($"녹화 영상 재생 준비에 실패했습니다: {ex.Message}");
+        }
     }
 
     private void RecordedVideoPlayButton_OnClick(object sender, RoutedEventArgs e)
@@ -1118,6 +1135,13 @@ public partial class MainWindow : Window
         UpdateRecordedVideoPositionUi();
     }
 
+    private void RecordedVideoPlayer_OnMediaFailed(object sender, ExceptionRoutedEventArgs e)
+    {
+        _recordedVideoPositionTimer.Stop();
+        RecordedVideosStatusText.Text = "영상을 재생할 수 없습니다.";
+        _viewModel.AppendImportantLog($"녹화 영상 재생에 실패했습니다: {e.ErrorException.Message}");
+    }
+
     private void RecordedVideoPositionTimer_OnTick(object? sender, EventArgs e)
     {
         UpdateRecordedVideoPositionUi();
@@ -1183,6 +1207,34 @@ public partial class MainWindow : Window
         return value.TotalHours >= 1
             ? value.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture)
             : value.ToString(@"mm\:ss", CultureInfo.InvariantCulture);
+    }
+
+    private static async Task<string> EnsureRecordedVideoCachedAsync(RecordedVideoItem item)
+    {
+        var cacheDirectory = System.IO.Path.Combine(System.IO.Path.GetTempPath(), RecordedVideoCacheFolderName);
+        Directory.CreateDirectory(cacheDirectory);
+
+        var localPath = System.IO.Path.Combine(cacheDirectory, SanitizeFileName(item.Name));
+        if (File.Exists(localPath))
+        {
+            var localSize = new FileInfo(localPath).Length;
+            if (item.SizeBytes <= 0 || localSize == item.SizeBytes)
+            {
+                return localPath;
+            }
+        }
+
+        var bytes = await RecordedVideoHttpClient.GetByteArrayAsync(item.Url);
+        await File.WriteAllBytesAsync(localPath, bytes);
+        return localPath;
+    }
+
+    private static string SanitizeFileName(string fileName)
+    {
+        var invalidChars = System.IO.Path.GetInvalidFileNameChars();
+        var chars = fileName.Select(ch => invalidChars.Contains(ch) ? '_' : ch).ToArray();
+        var sanitized = new string(chars);
+        return string.IsNullOrWhiteSpace(sanitized) ? "recorded_video" : sanitized;
     }
 
     private void SettingsBackdrop_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
