@@ -153,6 +153,26 @@
             </Style.Triggers>
         </Style>
 
+        <Style x:Key="PlaybackIconButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+            <Setter Property="Width" Value="42" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="#22313A46" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#33475663" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#55475663" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="PanelTitle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Setter Property="FontSize" Value="18" />
@@ -1354,8 +1374,10 @@
                                 <Slider x:Name="RecordedVideoPositionSlider"
                                         Grid.Column="1"
                                         Margin="10,0"
+                                        Height="22"
                                         Minimum="0"
                                         Maximum="1"
+                                        Style="{x:Null}"
                                         ValueChanged="RecordedVideoPositionSlider_OnValueChanged"
                                         PreviewMouseLeftButtonDown="RecordedVideoPositionSlider_OnPreviewMouseLeftButtonDown"
                                         PreviewMouseLeftButtonUp="RecordedVideoPositionSlider_OnPreviewMouseLeftButtonUp" />
@@ -1369,26 +1391,29 @@
                             </Grid>
                             <Grid Grid.Row="2" Margin="0,12,0,0">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="86" />
+                                    <ColumnDefinition Width="42" />
                                     <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="86" />
+                                    <ColumnDefinition Width="42" />
                                     <ColumnDefinition Width="8" />
-                                    <ColumnDefinition Width="86" />
+                                    <ColumnDefinition Width="42" />
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="120" />
                                 </Grid.ColumnDefinitions>
                                 <Button Grid.Column="0"
                                         Click="RecordedVideoPlayButton_OnClick"
-                                        Style="{StaticResource TopBarButton}"
-                                        Content="&#xC7AC;&#xC0DD;" />
+                                        Style="{StaticResource PlaybackIconButton}">
+                                    <materialDesign:PackIcon Kind="Play" Width="22" Height="22" />
+                                </Button>
                                 <Button Grid.Column="2"
                                         Click="RecordedVideoPauseButton_OnClick"
-                                        Style="{StaticResource TopBarButton}"
-                                        Content="&#xC77C;&#xC2DC;&#xC815;&#xC9C0;" />
+                                        Style="{StaticResource PlaybackIconButton}">
+                                    <materialDesign:PackIcon Kind="Pause" Width="22" Height="22" />
+                                </Button>
                                 <Button Grid.Column="4"
                                         Click="RecordedVideoStopButton_OnClick"
-                                        Style="{StaticResource TopBarButton}"
-                                        Content="&#xC815;&#xC9C0;" />
+                                        Style="{StaticResource PlaybackIconButton}">
+                                    <materialDesign:PackIcon Kind="Stop" Width="22" Height="22" />
+                                </Button>
                                 <ComboBox x:Name="PlaybackSpeedCombo"
                                           Grid.Column="6"
                                           SelectedIndex="3"
