@@ -35,6 +35,8 @@ public partial class MainWindow : Window
     private const int MobileAlertPort = 8088;
     private const string DefaultRecordedVideoUrl = "http://192.168.3.143:8090/";
     private const string RecordedVideoCacheFolderName = "LIG_DNA_GUI_recorded_videos";
+    private const double RecordedVideoMiniMapWidth = 120;
+    private const double RecordedVideoMiniMapHeight = 62;
     private static readonly TimeSpan MobileAlertCooldown = TimeSpan.FromSeconds(10);
     private static readonly HttpClient RecordedVideoHttpClient = new();
     private readonly MainViewModel _viewModel;
@@ -64,6 +66,11 @@ public partial class MainWindow : Window
     private bool _isRenderingOverlay;
     private bool _isViewportRecordingActive;
     private bool _isDraggingRecordedVideoPosition;
+    private bool _isDraggingRecordedVideoPan;
+    private double _recordedVideoZoomLevel = 1.0;
+    private double _recordedVideoPanX;
+    private double _recordedVideoPanY;
+    private Point _lastRecordedVideoPanPoint;
     private string? _lastDetectionAlertSignature;
     private DateTimeOffset _lastMobileAlertAt = DateTimeOffset.MinValue;
     private string? _lastFilteredOutTargetSignature;
@@ -1011,6 +1018,7 @@ public partial class MainWindow : Window
 
             var localPath = await EnsureRecordedVideoCachedAsync(item);
             RecordedVideoPlayer.Source = new Uri(localPath, UriKind.Absolute);
+            ResetRecordedVideoZoom();
             ApplyRecordedVideoPlaybackSpeed();
             RecordedVideoPlayer.Play();
             _recordedVideoPositionTimer.Start();
@@ -1200,6 +1208,177 @@ public partial class MainWindow : Window
         RecordedVideoPositionSlider.Value = 0;
         RecordedVideoCurrentTimeText.Text = "00:00";
         RecordedVideoDurationText.Text = "00:00";
+    }
+
+    private void RecordedVideoViewport_OnMouseWheel(object sender, MouseWheelEventArgs e)
+    {
+        AdjustRecordedVideoZoom(e.Delta > 0 ? 0.1 : -0.1);
+        e.Handled = true;
+    }
+
+    private void RecordedVideoViewport_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_recordedVideoZoomLevel <= 1.0)
+        {
+            return;
+        }
+
+        _isDraggingRecordedVideoPan = true;
+        _lastRecordedVideoPanPoint = e.GetPosition(RecordedVideoViewport);
+        RecordedVideoViewport.CaptureMouse();
+        RecordedVideoViewport.Cursor = Cursors.ScrollAll;
+        e.Handled = true;
+    }
+
+    private void RecordedVideoViewport_OnMouseMove(object sender, MouseEventArgs e)
+    {
+        if (!_isDraggingRecordedVideoPan)
+        {
+            return;
+        }
+
+        var point = e.GetPosition(RecordedVideoViewport);
+        _recordedVideoPanX += point.X - _lastRecordedVideoPanPoint.X;
+        _recordedVideoPanY += point.Y - _lastRecordedVideoPanPoint.Y;
+        _lastRecordedVideoPanPoint = point;
+        ClampRecordedVideoPan();
+        UpdateRecordedVideoZoomUi();
+    }
+
+    private void RecordedVideoViewport_OnMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+    {
+        StopRecordedVideoPanDrag();
+    }
+
+    private void RecordedVideoZoomSlider_OnValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
+    {
+        if (RecordedVideoScaleTransform is null)
+        {
+            return;
+        }
+
+        SetRecordedVideoZoom(e.NewValue);
+    }
+
+    private void RecordedVideoZoomResetButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        ResetRecordedVideoZoom();
+    }
+
+    private void AdjustRecordedVideoZoom(double delta)
+    {
+        SetRecordedVideoZoom(_recordedVideoZoomLevel + delta);
+    }
+
+    private void SetRecordedVideoZoom(double value)
+    {
+        _recordedVideoZoomLevel = Math.Clamp(value, 1.0, 4.0);
+        if (_recordedVideoZoomLevel <= 1.0)
+        {
+            _recordedVideoPanX = 0;
+            _recordedVideoPanY = 0;
+            StopRecordedVideoPanDrag();
+        }
+
+        ClampRecordedVideoPan();
+        UpdateRecordedVideoZoomUi();
+    }
+
+    private void ResetRecordedVideoZoom()
+    {
+        _recordedVideoZoomLevel = 1.0;
+        _recordedVideoPanX = 0;
+        _recordedVideoPanY = 0;
+        StopRecordedVideoPanDrag();
+        UpdateRecordedVideoZoomUi();
+    }
+
+    private void StopRecordedVideoPanDrag()
+    {
+        if (!_isDraggingRecordedVideoPan)
+        {
+            return;
+        }
+
+        _isDraggingRecordedVideoPan = false;
+        RecordedVideoViewport.ReleaseMouseCapture();
+        RecordedVideoViewport.Cursor = Cursors.Arrow;
+    }
+
+    private void ClampRecordedVideoPan()
+    {
+        var maxPanX = GetRecordedVideoMaxPanX();
+        var maxPanY = GetRecordedVideoMaxPanY();
+        _recordedVideoPanX = Math.Clamp(_recordedVideoPanX, -maxPanX, maxPanX);
+        _recordedVideoPanY = Math.Clamp(_recordedVideoPanY, -maxPanY, maxPanY);
+    }
+
+    private double GetRecordedVideoMaxPanX()
+    {
+        return Math.Max(0, RecordedVideoViewport.ActualWidth * (_recordedVideoZoomLevel - 1.0) / 2.0);
+    }
+
+    private double GetRecordedVideoMaxPanY()
+    {
+        return Math.Max(0, RecordedVideoViewport.ActualHeight * (_recordedVideoZoomLevel - 1.0) / 2.0);
+    }
+
+    private void UpdateRecordedVideoZoomUi()
+    {
+        if (RecordedVideoScaleTransform is null)
+        {
+            return;
+        }
+
+        RecordedVideoScaleTransform.ScaleX = _recordedVideoZoomLevel;
+        RecordedVideoScaleTransform.ScaleY = _recordedVideoZoomLevel;
+        RecordedVideoTranslateTransform.X = _recordedVideoPanX;
+        RecordedVideoTranslateTransform.Y = _recordedVideoPanY;
+
+        if (RecordedVideoZoomSlider is not null &&
+            Math.Abs(RecordedVideoZoomSlider.Value - _recordedVideoZoomLevel) > 0.001)
+        {
+            RecordedVideoZoomSlider.Value = _recordedVideoZoomLevel;
+        }
+
+        if (RecordedVideoZoomResetButton is not null)
+        {
+            RecordedVideoZoomResetButton.Content = $"x{_recordedVideoZoomLevel:0.00}";
+        }
+
+        UpdateRecordedVideoMiniMap();
+    }
+
+    private void UpdateRecordedVideoMiniMap()
+    {
+        if (RecordedVideoZoomMiniMap is null || RecordedVideoMiniMapViewport is null)
+        {
+            return;
+        }
+
+        if (_recordedVideoZoomLevel <= 1.0)
+        {
+            RecordedVideoZoomMiniMap.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        RecordedVideoZoomMiniMap.Visibility = Visibility.Visible;
+        var viewportWidth = RecordedVideoMiniMapWidth / _recordedVideoZoomLevel;
+        var viewportHeight = RecordedVideoMiniMapHeight / _recordedVideoZoomLevel;
+        RecordedVideoMiniMapViewport.Width = viewportWidth;
+        RecordedVideoMiniMapViewport.Height = viewportHeight;
+
+        var maxPanX = GetRecordedVideoMaxPanX();
+        var maxPanY = GetRecordedVideoMaxPanY();
+        var left = maxPanX <= 0
+            ? (RecordedVideoMiniMapWidth - viewportWidth) / 2
+            : (1.0 - ((_recordedVideoPanX + maxPanX) / (maxPanX * 2.0))) * (RecordedVideoMiniMapWidth - viewportWidth);
+        var top = maxPanY <= 0
+            ? (RecordedVideoMiniMapHeight - viewportHeight) / 2
+            : (1.0 - ((_recordedVideoPanY + maxPanY) / (maxPanY * 2.0))) * (RecordedVideoMiniMapHeight - viewportHeight);
+
+        Canvas.SetLeft(RecordedVideoMiniMapViewport, left);
+        Canvas.SetTop(RecordedVideoMiniMapViewport, top);
     }
 
     private static string FormatVideoTime(TimeSpan value)

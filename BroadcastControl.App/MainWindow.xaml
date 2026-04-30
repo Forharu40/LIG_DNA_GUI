@@ -1350,16 +1350,67 @@
                                 <RowDefinition Height="34" />
                                 <RowDefinition Height="52" />
                             </Grid.RowDefinitions>
-                            <MediaElement x:Name="RecordedVideoPlayer"
-                                          Grid.Row="0"
-                                          LoadedBehavior="Manual"
-                                          UnloadedBehavior="Manual"
-                                          Stretch="Uniform"
-                                          ScrubbingEnabled="True"
-                                          MediaOpened="RecordedVideoPlayer_OnMediaOpened"
-                                          MediaEnded="RecordedVideoPlayer_OnMediaEnded"
-                                          MediaFailed="RecordedVideoPlayer_OnMediaFailed"
-                                          Volume="0.9" />
+                            <Grid x:Name="RecordedVideoViewport"
+                                  Grid.Row="0"
+                                  Background="#FF000000"
+                                  ClipToBounds="True"
+                                  MouseWheel="RecordedVideoViewport_OnMouseWheel"
+                                  MouseLeftButtonDown="RecordedVideoViewport_OnMouseLeftButtonDown"
+                                  MouseMove="RecordedVideoViewport_OnMouseMove"
+                                  MouseLeftButtonUp="RecordedVideoViewport_OnMouseLeftButtonUp">
+                                <MediaElement x:Name="RecordedVideoPlayer"
+                                              LoadedBehavior="Manual"
+                                              UnloadedBehavior="Manual"
+                                              Stretch="Uniform"
+                                              ScrubbingEnabled="True"
+                                              RenderTransformOrigin="0.5,0.5"
+                                              MediaOpened="RecordedVideoPlayer_OnMediaOpened"
+                                              MediaEnded="RecordedVideoPlayer_OnMediaEnded"
+                                              MediaFailed="RecordedVideoPlayer_OnMediaFailed"
+                                              Volume="0.9">
+                                    <MediaElement.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform x:Name="RecordedVideoScaleTransform" ScaleX="1" ScaleY="1" />
+                                            <TranslateTransform x:Name="RecordedVideoTranslateTransform" X="0" Y="0" />
+                                        </TransformGroup>
+                                    </MediaElement.RenderTransform>
+                                </MediaElement>
+
+                                <Border x:Name="RecordedVideoZoomMiniMap"
+                                        Width="142"
+                                        Height="92"
+                                        Margin="12"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Bottom"
+                                        Background="#CC111827"
+                                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="2"
+                                        Visibility="Collapsed">
+                                    <Grid Margin="10">
+                                        <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
+                                                   FontSize="11"
+                                                   Text="Zoom" />
+                                        <Canvas Width="120"
+                                                Height="62"
+                                                Margin="0,18,0,0"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Top">
+                                            <Rectangle Width="120"
+                                                       Height="62"
+                                                       Fill="#55333F4D"
+                                                       Stroke="#FF64748B"
+                                                       StrokeThickness="1" />
+                                            <Rectangle x:Name="RecordedVideoMiniMapViewport"
+                                                       Width="120"
+                                                       Height="62"
+                                                       Fill="#2200FFAA"
+                                                       Stroke="{DynamicResource AccentBrush}"
+                                                       StrokeThickness="1.5" />
+                                        </Canvas>
+                                    </Grid>
+                                </Border>
+                            </Grid>
                             <Grid Grid.Row="1" Margin="0,10,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="58" />
@@ -1414,18 +1465,42 @@
                                         Style="{StaticResource PlaybackIconButton}">
                                     <materialDesign:PackIcon Kind="Stop" Width="22" Height="22" />
                                 </Button>
+                                <StackPanel Grid.Column="5"
+                                            Margin="12,0"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Orientation="Horizontal">
+                                    <Button x:Name="RecordedVideoZoomResetButton"
+                                            Width="58"
+                                            Height="28"
+                                            Padding="4,0"
+                                            Click="RecordedVideoZoomResetButton_OnClick"
+                                            Style="{StaticResource TopBarSmallButton}"
+                                            Content="x1.00" />
+                                    <Slider x:Name="RecordedVideoZoomSlider"
+                                            Width="120"
+                                            Margin="8,0,0,0"
+                                            Minimum="1"
+                                            Maximum="4"
+                                            Value="1"
+                                            TickFrequency="0.1"
+                                            Style="{x:Null}"
+                                            ValueChanged="RecordedVideoZoomSlider_OnValueChanged" />
+                                </StackPanel>
                                 <ComboBox x:Name="PlaybackSpeedCombo"
                                           Grid.Column="6"
                                           SelectedIndex="3"
                                           SelectionChanged="PlaybackSpeedCombo_OnSelectionChanged"
                                           VerticalAlignment="Center"
-                                          Height="36">
-                                    <ComboBoxItem Tag="0.25" Content="0.25x" />
-                                    <ComboBoxItem Tag="0.5" Content="0.5x" />
-                                    <ComboBoxItem Tag="0.75" Content="0.75x" />
-                                    <ComboBoxItem Tag="1" Content="1.0x" />
-                                    <ComboBoxItem Tag="1.5" Content="1.5x" />
-                                    <ComboBoxItem Tag="2" Content="2.0x" />
+                                          Height="36"
+                                          Foreground="{DynamicResource PrimaryTextBrush}"
+                                          Background="{DynamicResource TopBarButtonBrush}">
+                                    <ComboBoxItem Tag="0.25" Foreground="White" Content="0.25x" />
+                                    <ComboBoxItem Tag="0.5" Foreground="White" Content="0.5x" />
+                                    <ComboBoxItem Tag="0.75" Foreground="White" Content="0.75x" />
+                                    <ComboBoxItem Tag="1" Foreground="White" Content="1.0x" />
+                                    <ComboBoxItem Tag="1.5" Foreground="White" Content="1.5x" />
+                                    <ComboBoxItem Tag="2" Foreground="White" Content="2.0x" />
                                 </ComboBox>
                             </Grid>
                         </Grid>
