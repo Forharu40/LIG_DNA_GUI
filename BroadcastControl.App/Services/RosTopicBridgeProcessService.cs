@@ -35,7 +35,7 @@ public sealed class RosTopicBridgeProcessService : IDisposable
         startInfo.Environment["EO_GUI_PORT"] = eoPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
         startInfo.Environment["IR_GUI_PORT"] = irPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
         SetDefaultEnvironment(startInfo, "EO_IMAGE_TOPIC", "/video/eo/preprocessed");
-        SetDefaultEnvironment(startInfo, "IR_IMAGE_TOPIC", "/video/ir/preprocessed");
+        SetDefaultEnvironment(startInfo, "IR_IMAGE_TOPIC", "/camera/ir");
         SetDefaultEnvironment(startInfo, "EO_DETECTION_TOPIC", "/detections/eo");
         SetDefaultEnvironment(startInfo, "IR_DETECTION_TOPIC", "/detections/ir");
 

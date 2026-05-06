@@ -507,9 +507,14 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             Cv2.Normalize(gray, gray8, 0, 255, NormTypes.MinMax, MatType.CV_8U);
         }
 
+        // IR false-color view:
         var colorized = new Mat();
         Cv2.ApplyColorMap(gray8, colorized, ColormapTypes.Jet);
         return colorized;
+
+        //var grayscale = new Mat();
+        //Cv2.CvtColor(gray8, grayscale, ColorConversionCodes.GRAY2BGR);
+        //return grayscale;
     }
 
     private Mat CreateRecordedFrame(Mat source)

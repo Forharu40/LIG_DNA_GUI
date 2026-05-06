@@ -1,6 +1,7 @@
 ﻿using System.ComponentModel;
 using System.Globalization;
 using System.Net.Http;
+using System.Text;
 using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
@@ -47,6 +48,7 @@ public partial class MainWindow : Window
     private readonly MobileAlertHubService _mobileAlertHubService;
     private readonly DispatcherTimer _motorHoldTimer;
     private readonly DispatcherTimer _recordedVideoPositionTimer;
+    private readonly DispatcherTimer _recordingMetadataTimer;
 
     private bool _isDraggingZoom;
     private Point _lastZoomDragPoint;
@@ -67,12 +69,15 @@ public partial class MainWindow : Window
     private bool _isViewportRecordingActive;
     private bool _isDraggingRecordedVideoPosition;
     private bool _isDraggingRecordedVideoPan;
+    private readonly List<RecordedVideoItem> _recordedVideoFiles = new();
+    private string? _recordedVideoSelectedFolder;
     private double _recordedVideoZoomLevel = 1.0;
     private double _recordedVideoPanX;
     private double _recordedVideoPanY;
     private Point _lastRecordedVideoPanPoint;
     private string? _lastDetectionAlertSignature;
     private DateTimeOffset _lastMobileAlertAt = DateTimeOffset.MinValue;
+    private DateTime _recordingMetadataWindowStart;
     private string? _lastFilteredOutTargetSignature;
     private string? _lastOverlaySignature;
     private readonly Dictionary<string, int> _activeMotorDirections = new(StringComparer.Ordinal);
@@ -87,6 +92,14 @@ public partial class MainWindow : Window
         public string Url { get; set; } = string.Empty;
 
         public long SizeBytes { get; set; }
+
+        public string Folder { get; set; } = string.Empty;
+
+        public string DisplayName { get; set; } = string.Empty;
+
+        public bool IsFolder { get; set; }
+
+        public bool IsBack { get; set; }
     }
 
     private static readonly HashSet<string> NonMilitaryTargetClasses = new(StringComparer.OrdinalIgnoreCase)
@@ -144,6 +157,11 @@ public partial class MainWindow : Window
             Interval = TimeSpan.FromMilliseconds(250)
         };
         _recordedVideoPositionTimer.Tick += RecordedVideoPositionTimer_OnTick;
+        _recordingMetadataTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromMinutes(1)
+        };
+        _recordingMetadataTimer.Tick += RecordingMetadataTimer_OnTick;
         DataContext = _viewModel;
 
         Loaded += OnLoaded;
@@ -158,6 +176,8 @@ public partial class MainWindow : Window
         UpdateWindowModeButtonText();
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
+        _viewModel.ManualAnalysisSaveRequested += ViewModel_OnManualAnalysisSaveRequested;
+        _viewModel.ManualSystemLogSaveRequested += ViewModel_OnManualSystemLogSaveRequested;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived += OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived += OnYoloStatusReceived;
@@ -175,6 +195,8 @@ public partial class MainWindow : Window
         UpdateRecordingViewportState();
         RenderDetectionOverlay();
         UpdateMotorAutomationState();
+        _recordingMetadataWindowStart = DateTime.Now;
+        _recordingMetadataTimer.Start();
 
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
 
@@ -480,18 +502,21 @@ public partial class MainWindow : Window
 
             var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
             var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
-            var baseScale = Math.Max(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
-            var scaledWidth = rotatedSourceWidth * baseScale;
-            var scaledHeight = rotatedSourceHeight * baseScale;
+            var usesFillScale = !_viewModel.IsEoPrimary;
+            var baseScale = Math.Min(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
+            var scaleX = usesFillScale ? viewportWidth / rotatedSourceWidth : baseScale;
+            var scaleY = usesFillScale ? viewportHeight / rotatedSourceHeight : baseScale;
+            var scaledWidth = rotatedSourceWidth * scaleX;
+            var scaledHeight = rotatedSourceHeight * scaleY;
             var baseLeft = (viewportWidth - scaledWidth) / 2.0;
             var baseTop = (viewportHeight - scaledHeight) / 2.0;
 
             foreach (var detection in rotatedDetections)
             {
-                var rectLeft = baseLeft + (detection.X1 * baseScale);
-                var rectTop = baseTop + (detection.Y1 * baseScale);
-                var rectWidth = Math.Max(2, (detection.X2 - detection.X1) * baseScale);
-                var rectHeight = Math.Max(2, (detection.Y2 - detection.Y1) * baseScale);
+                var rectLeft = baseLeft + (detection.X1 * scaleX);
+                var rectTop = baseTop + (detection.Y1 * scaleY);
+                var rectWidth = Math.Max(2, (detection.X2 - detection.X1) * scaleX);
+                var rectHeight = Math.Max(2, (detection.Y2 - detection.Y1) * scaleY);
 
                 if (rectWidth < 2 || rectHeight < 2)
                 {
@@ -1002,8 +1027,26 @@ public partial class MainWindow : Window
 
     private async void RecordedVideoList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (RecordedVideoList.SelectedItem is not RecordedVideoItem item ||
-            string.IsNullOrWhiteSpace(item.Url))
+        if (RecordedVideoList.SelectedItem is not RecordedVideoItem item)
+        {
+            return;
+        }
+
+        if (item.IsBack)
+        {
+            _recordedVideoSelectedFolder = null;
+            ShowRecordedVideoFolderList();
+            return;
+        }
+
+        if (item.IsFolder)
+        {
+            _recordedVideoSelectedFolder = item.Folder;
+            ShowRecordedVideoFolderContents(item.Folder);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(item.Url))
         {
             return;
         }
@@ -1014,7 +1057,7 @@ public partial class MainWindow : Window
             RecordedVideoPlayer.Stop();
             RecordedVideoPlayer.Source = null;
             ResetRecordedVideoPositionUi();
-            RecordedVideosStatusText.Text = $"{item.Name} 내려받는 중...";
+            RecordedVideosStatusText.Text = $"{item.DisplayName} 내려받는 중...";
 
             var localPath = await EnsureRecordedVideoCachedAsync(item);
             RecordedVideoPlayer.Source = new Uri(localPath, UriKind.Absolute);
@@ -1022,7 +1065,7 @@ public partial class MainWindow : Window
             ApplyRecordedVideoPlaybackSpeed();
             RecordedVideoPlayer.Play();
             _recordedVideoPositionTimer.Start();
-            RecordedVideosStatusText.Text = item.Name;
+            RecordedVideosStatusText.Text = item.DisplayName;
         }
         catch (Exception ex)
         {
@@ -1071,6 +1114,8 @@ public partial class MainWindow : Window
 
             foreach (var video in videos)
             {
+                video.Folder = GetRecordedVideoFolder(video.Name);
+                video.DisplayName = GetRecordedVideoFileName(video.Name);
                 if (Uri.TryCreate(video.Url, UriKind.Absolute, out _))
                 {
                     continue;
@@ -1079,14 +1124,18 @@ public partial class MainWindow : Window
                 video.Url = new Uri(baseUri, video.Url).ToString();
             }
 
-            RecordedVideoList.ItemsSource = videos;
-            RecordedVideosStatusText.Text = videos.Count == 0
-                ? "저장된 영상이 아직 없습니다."
-                : $"{videos.Count}개 영상";
+            _recordedVideoFiles.Clear();
+            _recordedVideoFiles.AddRange(videos);
 
-            if (videos.Count > 0 && RecordedVideoList.SelectedIndex < 0)
+            if (!string.IsNullOrWhiteSpace(_recordedVideoSelectedFolder) &&
+                _recordedVideoFiles.Any(video => string.Equals(video.Folder, _recordedVideoSelectedFolder, StringComparison.Ordinal)))
             {
-                RecordedVideoList.SelectedIndex = 0;
+                ShowRecordedVideoFolderContents(_recordedVideoSelectedFolder);
+            }
+            else
+            {
+                _recordedVideoSelectedFolder = null;
+                ShowRecordedVideoFolderList();
             }
         }
         catch (Exception ex)
@@ -1111,6 +1160,145 @@ public partial class MainWindow : Window
         }
 
         return new Uri(videoUrl, UriKind.Absolute);
+    }
+
+    private void ShowRecordedVideoFolderList()
+    {
+        var folders = _recordedVideoFiles
+            .GroupBy(video => video.Folder)
+            .OrderByDescending(group => group.Key, StringComparer.Ordinal)
+            .Select(group => new RecordedVideoItem
+            {
+                Folder = group.Key,
+                DisplayName = $"[폴더] {group.Key} ({group.Count()}개)",
+                IsFolder = true
+            })
+            .ToList();
+
+        RecordedVideoList.ItemsSource = folders;
+        RecordedVideosStatusText.Text = folders.Count == 0
+            ? "저장된 영상 폴더가 아직 없습니다."
+            : $"{folders.Count}개 폴더";
+    }
+
+    private void ShowRecordedVideoFolderContents(string folder)
+    {
+        var videos = _recordedVideoFiles
+            .Where(video => string.Equals(video.Folder, folder, StringComparison.Ordinal))
+            .OrderBy(video => video.DisplayName, StringComparer.OrdinalIgnoreCase)
+            .ToList();
+
+        var items = new List<RecordedVideoItem>
+        {
+            new()
+            {
+                DisplayName = "[상위 폴더로]",
+                IsBack = true
+            }
+        };
+        items.AddRange(videos);
+
+        RecordedVideoList.ItemsSource = items;
+        RecordedVideosStatusText.Text = $"{folder} / {videos.Count}개 영상";
+    }
+
+    private static string GetRecordedVideoFolder(string name)
+    {
+        var normalized = name.Replace('\\', '/');
+        var separatorIndex = normalized.LastIndexOf('/');
+        return separatorIndex > 0
+            ? normalized[..separatorIndex]
+            : "기존 영상";
+    }
+
+    private static string GetRecordedVideoFileName(string name)
+    {
+        var normalized = name.Replace('\\', '/');
+        var separatorIndex = normalized.LastIndexOf('/');
+        return separatorIndex >= 0 && separatorIndex < normalized.Length - 1
+            ? normalized[(separatorIndex + 1)..]
+            : normalized;
+    }
+
+    private async void RecordingMetadataTimer_OnTick(object? sender, EventArgs e)
+    {
+        var windowEnd = DateTime.Now;
+        var windowStart = _recordingMetadataWindowStart == default
+            ? windowEnd.AddMinutes(-1)
+            : _recordingMetadataWindowStart;
+        _recordingMetadataWindowStart = windowEnd;
+
+        await SaveRecordingMetadataAsync(
+            windowStart,
+            windowEnd,
+            manual: false,
+            includeAnalysis: true,
+            includeSystemLog: true);
+    }
+
+    private async void ViewModel_OnManualAnalysisSaveRequested(object? sender, EventArgs e)
+    {
+        var now = DateTime.Now;
+        await SaveRecordingMetadataAsync(
+            now,
+            now,
+            manual: true,
+            includeAnalysis: true,
+            includeSystemLog: false);
+    }
+
+    private async void ViewModel_OnManualSystemLogSaveRequested(object? sender, EventArgs e)
+    {
+        var now = DateTime.Now;
+        await SaveRecordingMetadataAsync(
+            now,
+            now,
+            manual: true,
+            includeAnalysis: false,
+            includeSystemLog: true);
+    }
+
+    private async Task SaveRecordingMetadataAsync(
+        DateTime windowStart,
+        DateTime windowEnd,
+        bool manual,
+        bool includeAnalysis,
+        bool includeSystemLog)
+    {
+        try
+        {
+            var payload = new Dictionary<string, object?>
+            {
+                ["manual"] = manual
+            };
+
+            if (includeAnalysis)
+            {
+                payload["analysisText"] = _viewModel.BuildAnalysisLogSnapshot(windowStart, windowEnd, includeAll: manual);
+            }
+
+            if (includeSystemLog)
+            {
+                payload["systemLogText"] = _viewModel.BuildSystemLogSnapshot(windowStart, windowEnd, includeAll: manual);
+            }
+
+            var apiUri = new Uri(GetRecordedVideoBaseUri(), "api/logs");
+            var json = JsonSerializer.Serialize(payload);
+            using var content = new StringContent(json, Encoding.UTF8, "application/json");
+            using var response = await RecordedVideoHttpClient.PostAsync(apiUri, content);
+            response.EnsureSuccessStatusCode();
+
+            if (manual)
+            {
+                var targetName = includeAnalysis ? "VLM 분석 결과" : "시스템 로그";
+                _viewModel.AppendImportantLog($"{targetName}를 젝슨 영상 폴더에 C_ 파일로 저장했습니다.");
+            }
+        }
+        catch (Exception ex)
+        {
+            var modeText = manual ? "수동" : "자동";
+            _viewModel.AppendImportantLog($"{modeText} 로그/VLM 저장에 실패했습니다: {ex.Message}");
+        }
     }
 
     private void ApplyRecordedVideoPlaybackSpeed()
@@ -1729,7 +1917,10 @@ public partial class MainWindow : Window
     {
         StopManualMotorInput();
         _recordedVideoPositionTimer.Stop();
+        _recordingMetadataTimer.Stop();
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
+        _viewModel.ManualAnalysisSaveRequested -= ViewModel_OnManualAnalysisSaveRequested;
+        _viewModel.ManualSystemLogSaveRequested -= ViewModel_OnManualSystemLogSaveRequested;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived -= OnYoloStatusReceived;

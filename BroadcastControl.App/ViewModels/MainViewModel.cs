@@ -106,13 +106,17 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         ResetZoomCommand = new RelayCommand(_ => ZoomLevel = 1.0, _ => CanUseZoomControls);
         ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsSystemPoweredOn);
         SetThemeCommand = new RelayCommand(SetTheme);
-        SaveAnalysisLogsCommand = new RelayCommand(_ => SaveAnalysisLogsToDesktop());
-        SaveSystemLogsCommand = new RelayCommand(_ => SaveSystemLogsToDesktop());
+        SaveAnalysisLogsCommand = new RelayCommand(_ => ManualAnalysisSaveRequested?.Invoke(this, EventArgs.Empty));
+        SaveSystemLogsCommand = new RelayCommand(_ => ManualSystemLogSaveRequested?.Invoke(this, EventArgs.Empty));
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         MoveMotorCommand = new RelayCommand(MoveMotor, _ => CanUseMotorControls);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
+
+    public event EventHandler? ManualAnalysisSaveRequested;
+
+    public event EventHandler? ManualSystemLogSaveRequested;
 
     public ObservableCollection<AnalysisItem> AnalysisItems { get; }
 
@@ -349,6 +353,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public double LargeFeedRotationAngle => _isEoPrimary ? _eoDisplayRotationAngle : _irDisplayRotationAngle;
 
     public double InsetFeedRotationAngle => _isEoPrimary ? _irDisplayRotationAngle : _eoDisplayRotationAngle;
+
+    public Stretch LargeFeedStretch => _isEoPrimary ? Stretch.Uniform : Stretch.Fill;
+
+    public Stretch InsetFeedStretch => _isEoPrimary ? Stretch.Fill : Stretch.Uniform;
 
     public string LargeFeedSubtitle => _isEoPrimary ? EoSubtitle : IrSubtitle;
 
@@ -653,6 +661,74 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         AddAnalysisItem(new AnalysisItem(DateTime.Now.ToString("HH:mm:ss"), message));
     }
 
+    public string BuildAnalysisLogSnapshot(DateTime startInclusive, DateTime endExclusive, bool includeAll)
+    {
+        var items = includeAll
+            ? _analysisHistory.OrderBy(item => item.CreatedAt).ToArray()
+            : _analysisHistory
+                .Where(item => item.CreatedAt >= startInclusive && item.CreatedAt < endExclusive)
+                .OrderBy(item => item.CreatedAt)
+                .ToArray();
+
+        var builder = new StringBuilder();
+        builder.AppendLine("LIG DNA GUI VLM Analysis Result");
+        builder.AppendLine($"Saved At: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        if (!includeAll)
+        {
+            builder.AppendLine($"Window: {startInclusive:yyyy-MM-dd HH:mm:ss} - {endExclusive:yyyy-MM-dd HH:mm:ss}");
+        }
+
+        builder.AppendLine();
+
+        if (items.Length == 0)
+        {
+            builder.AppendLine("No VLM analysis result in this period.");
+        }
+        else
+        {
+            foreach (var item in items)
+            {
+                builder.AppendLine($"[{item.CreatedAt:yyyy-MM-dd HH:mm:ss}] {item.Message}");
+            }
+        }
+
+        return builder.ToString();
+    }
+
+    public string BuildSystemLogSnapshot(DateTime startInclusive, DateTime endExclusive, bool includeAll)
+    {
+        var items = includeAll
+            ? _systemLogHistory.OrderBy(item => item.CreatedAt).ToArray()
+            : _systemLogHistory
+                .Where(item => item.CreatedAt >= startInclusive && item.CreatedAt < endExclusive)
+                .OrderBy(item => item.CreatedAt)
+                .ToArray();
+
+        var builder = new StringBuilder();
+        builder.AppendLine("LIG DNA GUI System Log");
+        builder.AppendLine($"Saved At: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
+        if (!includeAll)
+        {
+            builder.AppendLine($"Window: {startInclusive:yyyy-MM-dd HH:mm:ss} - {endExclusive:yyyy-MM-dd HH:mm:ss}");
+        }
+
+        builder.AppendLine();
+
+        if (items.Length == 0)
+        {
+            builder.AppendLine("No system log in this period.");
+        }
+        else
+        {
+            foreach (var item in items)
+            {
+                builder.AppendLine($"[{item.CreatedAt:yyyy-MM-dd HH:mm:ss}] {item.Message}");
+            }
+        }
+
+        return builder.ToString();
+    }
+
     private void SaveAnalysisLogsToDesktop()
     {
         try
@@ -855,6 +931,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(InsetFeedSubtitle));
         OnPropertyChanged(nameof(LargeFeedRotationAngle));
         OnPropertyChanged(nameof(InsetFeedRotationAngle));
+        OnPropertyChanged(nameof(LargeFeedStretch));
+        OnPropertyChanged(nameof(InsetFeedStretch));
 
         AppendImportantLog($"{LargeFeedTitle}\uAC00 \uBA54\uC778 \uD654\uBA74\uC73C\uB85C \uC804\uD658\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
     }
@@ -1181,10 +1259,16 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 /// <summary>
 /// 상황 분석 영역에 표시할 분석 문장 한 줄을 나타낸다.
 /// </summary>
-public sealed record AnalysisItem(string Time, string Message);
+public sealed record AnalysisItem(string Time, string Message)
+{
+    public DateTime CreatedAt { get; init; } = DateTime.Now;
+}
 
 /// <summary>
 /// 시스템 로그 영역에 표시할 주요 상태 변경 항목 한 줄을 나타낸다.
 /// </summary>
-public sealed record SystemLogItem(string Time, string Message);
+public sealed record SystemLogItem(string Time, string Message)
+{
+    public DateTime CreatedAt { get; init; } = DateTime.Now;
+}
 

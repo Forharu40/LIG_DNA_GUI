@@ -16,7 +16,7 @@ import socket
 import struct
 import threading
 import time
-from urllib.parse import quote
+from urllib.parse import quote, urlparse
 
 import cv2
 import numpy as np
@@ -58,7 +58,7 @@ GUI_HOST = os.getenv("GUI_HOST", "192.168.1.94")
 EO_GUI_PORT = getenv_int("EO_GUI_PORT", 5000)
 IR_GUI_PORT = getenv_int("IR_GUI_PORT", 5001)
 EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/video/eo/preprocessed")
-IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/video/ir/preprocessed")
+IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
 EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/detections/eo")
 IR_DETECTION_TOPIC = os.getenv("IR_DETECTION_TOPIC", "/detections/ir")
 STREAM_WIDTH = getenv_int("STREAM_WIDTH", 640)
@@ -68,10 +68,11 @@ UDP_SEND_BUFFER_BYTES = getenv_int("UDP_SEND_BUFFER_BYTES", 4 * 1024 * 1024)
 SEND_STATUS_WITH_IMAGE = getenv_bool("SEND_STATUS_WITH_IMAGE", True)
 RECORDING_ENABLED = getenv_bool("RECORDING_ENABLED", True)
 RECORDING_DIR = os.getenv("RECORDING_DIR", "/recordings")
-RECORDING_SEGMENT_SECONDS = getenv_int("RECORDING_SEGMENT_SECONDS", 30)
+RECORDING_SEGMENT_SECONDS = getenv_int("RECORDING_SEGMENT_SECONDS", 60)
 RECORDING_FPS = getenv_int("RECORDING_FPS", 15)
 RECORDING_HTTP_ENABLED = getenv_bool("RECORDING_HTTP_ENABLED", True)
 RECORDING_HTTP_PORT = getenv_int("RECORDING_HTTP_PORT", 8090)
+LATEST_RECORDING_SEGMENT_NAME = ""
 
 IMAGE_TOPIC_QOS = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
@@ -79,6 +80,90 @@ IMAGE_TOPIC_QOS = QoSProfile(
     reliability=ReliabilityPolicy.RELIABLE,
     durability=DurabilityPolicy.VOLATILE,
 )
+
+
+def current_recording_segment_name() -> str:
+    now = datetime.now().replace(second=0, microsecond=0)
+    return now.strftime("%Y%m%d_%H%M%S")
+
+
+def safe_segment_name(value: object | None) -> str:
+    if not isinstance(value, str) or not value.strip():
+        return current_recording_segment_name()
+
+    cleaned = "".join(ch for ch in value.strip() if ch.isalnum() or ch in {"_", "-"})
+    return cleaned or current_recording_segment_name()
+
+
+def latest_recording_segment_name(directory: Path) -> str:
+    if LATEST_RECORDING_SEGMENT_NAME:
+        return LATEST_RECORDING_SEGMENT_NAME
+
+    existing_folders = sorted(
+        [item for item in directory.iterdir() if item.is_dir()],
+        key=lambda item: item.stat().st_mtime,
+        reverse=True,
+    )
+    if existing_folders:
+        return safe_segment_name(existing_folders[0].name)
+
+    return current_recording_segment_name()
+
+
+def write_text_file(directory: Path, name: str, content: object | None) -> Path | None:
+    if not isinstance(content, str):
+        return None
+
+    directory.mkdir(parents=True, exist_ok=True)
+    path = directory / name
+    path.write_text(content, encoding="utf-8")
+    return path
+
+
+def default_system_log_text(timestamp: str) -> str:
+    return (
+        "LIG DNA GUI System Log\n"
+        f"Saved At: {datetime.now():%Y-%m-%d %H:%M:%S}\n"
+        f"Recording Folder: {timestamp}\n\n"
+        "No GUI system log was received for this recording segment yet.\n"
+    )
+
+
+def default_vlm_analysis_text(timestamp: str) -> str:
+    return (
+        "LIG DNA GUI VLM Analysis Result\n"
+        f"Saved At: {datetime.now():%Y-%m-%d %H:%M:%S}\n"
+        f"Recording Folder: {timestamp}\n\n"
+        "No VLM analysis result was received for this recording segment yet.\n"
+    )
+
+
+def ensure_default_metadata_files(segment_directory: Path, timestamp: str) -> None:
+    segment_directory.mkdir(parents=True, exist_ok=True)
+    system_path = segment_directory / f"system_log_{timestamp}.txt"
+    analysis_path = segment_directory / f"vlm_analysis_{timestamp}.txt"
+
+    if not system_path.exists():
+        system_path.write_text(default_system_log_text(timestamp), encoding="utf-8")
+
+    if not analysis_path.exists():
+        analysis_path.write_text(default_vlm_analysis_text(timestamp), encoding="utf-8")
+
+
+def create_ir_false_color_frame(frame: np.ndarray) -> np.ndarray:
+    if frame.ndim == 3 and frame.shape[2] == 3:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    elif frame.ndim == 3 and frame.shape[2] == 4:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGRA2GRAY)
+    else:
+        gray = frame
+
+    if gray.dtype != np.uint8:
+        gray8 = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    else:
+        gray8 = gray
+
+    return cv2.applyColorMap(gray8, cv2.COLORMAP_JET)
 
 DETECTION_TOPIC_QOS = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
@@ -221,11 +306,17 @@ class VideoSegmentRecorder:
                 self._writer = None
 
     def _start_segment(self, width: int, height: int, now: float) -> None:
+        global LATEST_RECORDING_SEGMENT_NAME
+
         if self._writer is not None:
             self._writer.release()
 
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        self._current_path = self.directory / f"{self.name}_{timestamp}.mp4"
+        timestamp = current_recording_segment_name()
+        LATEST_RECORDING_SEGMENT_NAME = timestamp
+        segment_directory = self.directory / timestamp
+        ensure_default_metadata_files(segment_directory, timestamp)
+        stream_name = self.name.upper()
+        self._current_path = segment_directory / f"{stream_name}_{timestamp}.mp4"
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(self._current_path), fourcc, self.fps, (width, height))
         if not writer.isOpened():
@@ -235,6 +326,7 @@ class VideoSegmentRecorder:
         self._writer = writer
         self._segment_started_at = now
         self._frame_size = (width, height)
+        print(f"Recording segment started: {self._current_path}", flush=True)
 
 
 class RecordingVideoHandler(SimpleHTTPRequestHandler):
@@ -242,22 +334,31 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
         return
 
     def do_GET(self) -> None:
-        if self.path == "/api/videos":
+        parsed_path = urlparse(self.path).path
+        if parsed_path == "/api/videos":
             self._send_video_list()
             return
 
-        if self.path in {"/", "/index.html"}:
+        if parsed_path in {"/", "/index.html"}:
             self._send_player_page()
             return
 
         super().do_GET()
+
+    def do_POST(self) -> None:
+        parsed_path = urlparse(self.path).path
+        if parsed_path == "/api/logs":
+            self._save_metadata_logs()
+            return
+
+        self.send_error(404, "Not Found")
 
     def _send_video_list(self) -> None:
         directory = Path(self.directory)
         files = sorted(
             [
                 item
-                for item in directory.iterdir()
+                for item in directory.rglob("*")
                 if item.is_file() and item.suffix.lower() in VIDEO_FILE_EXTENSIONS
             ],
             key=lambda item: item.stat().st_mtime,
@@ -265,8 +366,8 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
         )
         payload = [
             {
-                "name": item.name,
-                "url": quote(item.name),
+                "name": item.relative_to(directory).as_posix(),
+                "url": quote(item.relative_to(directory).as_posix(), safe="/"),
                 "sizeBytes": item.stat().st_size,
                 "modifiedUnixMs": int(item.stat().st_mtime * 1000),
             }
@@ -284,16 +385,16 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
         directory = Path(self.directory)
         files = sorted(
             [
-                item.name
-                for item in directory.iterdir()
+                item.relative_to(directory).as_posix()
+                for item in directory.rglob("*")
                 if item.is_file() and item.suffix.lower() in VIDEO_FILE_EXTENSIONS
             ],
             reverse=True,
         )
         options = "\n".join(
-            f'<option value="{quote(name)}">{html.escape(name)}</option>' for name in files
+            f'<option value="{quote(name, safe="/")}">{html.escape(name)}</option>' for name in files
         )
-        initial_source = quote(files[0]) if files else ""
+        initial_source = quote(files[0], safe="/") if files else ""
         body = f"""<!doctype html>
 <html lang="ko">
 <head>
@@ -346,6 +447,62 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(encoded)
 
+    def _save_metadata_logs(self) -> None:
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            length = 0
+
+        try:
+            raw_body = self.rfile.read(length) if length > 0 else b"{}"
+            payload = json.loads(raw_body.decode("utf-8"))
+        except Exception as exc:
+            self.send_error(400, f"Invalid JSON: {exc}")
+            return
+
+        directory = Path(self.directory)
+        requested_folder = payload.get("folderName")
+        timestamp = safe_segment_name(requested_folder) if requested_folder else latest_recording_segment_name(directory)
+        segment_directory = directory / timestamp
+        manual = bool(payload.get("manual"))
+        prefix = "C_" if manual else ""
+        saved_files = []
+
+        system_text = payload.get("systemLogText")
+        if not isinstance(system_text, str) or not system_text.strip():
+            system_text = default_system_log_text(timestamp)
+
+        analysis_text = payload.get("analysisText")
+        if not isinstance(analysis_text, str) or not analysis_text.strip():
+            analysis_text = default_vlm_analysis_text(timestamp)
+
+        system_path = write_text_file(
+            segment_directory,
+            f"{prefix}system_log_{timestamp}.txt",
+            system_text,
+        )
+        if system_path is not None:
+            saved_files.append(system_path.relative_to(directory).as_posix())
+
+        analysis_path = write_text_file(
+            segment_directory,
+            f"{prefix}vlm_analysis_{timestamp}.txt",
+            analysis_text,
+        )
+        if analysis_path is not None:
+            saved_files.append(analysis_path.relative_to(directory).as_posix())
+
+        encoded = json.dumps(
+            {"folder": timestamp, "savedFiles": saved_files},
+            separators=(",", ":"),
+        ).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json; charset=utf-8")
+        self.send_header("Content-Length", str(len(encoded)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(encoded)
+
 
 class StreamBridge:
     def __init__(self, name: str, image_topic: str, detection_topic: str, host: str, port: int) -> None:
@@ -379,7 +536,12 @@ class StreamBridge:
 
         stream_frame = fit_frame_to_stream(frame)
         if self._recorder is not None:
-            self._recorder.write(stream_frame)
+            recording_frame = (
+                create_ir_false_color_frame(stream_frame)
+                if self.name.lower() == "ir"
+                else stream_frame
+            )
+            self._recorder.write(recording_frame)
 
         ok, encoded = cv2.imencode(
             ".jpg",

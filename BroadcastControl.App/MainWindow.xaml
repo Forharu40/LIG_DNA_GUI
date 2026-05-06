@@ -533,7 +533,7 @@
                              EO/IR ?ㅼ솑 ?곹깭???곕씪 ?쒖떆 ?곸긽???щ씪吏? -->
                         <Image Source="{Binding LargeFeedImage}"
                                Margin="0"
-                               Stretch="UniformToFill"
+                               Stretch="{Binding LargeFeedStretch}"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                RenderTransformOrigin="0.5,0.5">
@@ -643,7 +643,7 @@
                                     CornerRadius="1">
                                 <Grid ClipToBounds="True">
                                     <Image Source="{Binding InsetFeedImage}"
-                                           Stretch="UniformToFill"
+                                           Stretch="{Binding InsetFeedStretch}"
                                            RenderTransformOrigin="0.5,0.5">
                                         <Image.RenderTransform>
                                             <RotateTransform Angle="{Binding InsetFeedRotationAngle}" />
@@ -1327,10 +1327,10 @@
                                        FontSize="17"
                                        FontWeight="Bold"
                                        Text="&#xC800;&#xC7A5;&#xB41C; &#xC601;&#xC0C1;" />
-                            <ListBox x:Name="RecordedVideoList"
-                                     Grid.Row="1"
-                                     Margin="0,10,0,0"
-                                     DisplayMemberPath="Name"
+                             <ListBox x:Name="RecordedVideoList"
+                                      Grid.Row="1"
+                                      Margin="0,10,0,0"
+                                      DisplayMemberPath="DisplayName"
                                      SelectionChanged="RecordedVideoList_OnSelectionChanged"
                                      Background="Transparent"
                                      BorderThickness="0"
