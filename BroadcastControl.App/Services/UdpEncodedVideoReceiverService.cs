@@ -411,8 +411,11 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 WriteRecordingFrame(recordingFrame);
             }
 
+            using var upscaledDisplay = _applyIrFalseColor ? CreateIrUpscaledDisplayFrame(adjusted) : new Mat();
+            var displayFrame = upscaledDisplay.Empty() ? adjusted : upscaledDisplay;
+
             using var converted = new Mat();
-            Cv2.CvtColor(adjusted, converted, ColorConversionCodes.BGR2BGRA);
+            Cv2.CvtColor(displayFrame, converted, ColorConversionCodes.BGR2BGRA);
 
             var bufferSize = checked((int)(converted.Step() * converted.Rows));
             var stride = checked((int)converted.Step());
@@ -515,6 +518,43 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         //var grayscale = new Mat();
         //Cv2.CvtColor(gray8, grayscale, ColorConversionCodes.GRAY2BGR);
         //return grayscale;
+    }
+
+    private Mat CreateIrUpscaledDisplayFrame(Mat source)
+    {
+        if (source.Empty())
+        {
+            return new Mat();
+        }
+
+        var targetWidth = Math.Max(source.Width, (int)Math.Round(_viewportWidth));
+        var targetHeight = Math.Max(source.Height, (int)Math.Round(_viewportHeight));
+        var scale = Math.Max(
+            targetWidth / (double)source.Width,
+            targetHeight / (double)source.Height);
+
+        if (scale <= 1.05)
+        {
+            return new Mat();
+        }
+
+        var outputWidth = Math.Clamp((int)Math.Round(source.Width * scale), source.Width, 1920);
+        var outputHeight = Math.Clamp((int)Math.Round(source.Height * scale), source.Height, 1080);
+
+        if (outputWidth == source.Width && outputHeight == source.Height)
+        {
+            return new Mat();
+        }
+
+        var upscaled = new Mat();
+        Cv2.Resize(
+            source,
+            upscaled,
+            new OpenCvSharp.Size(outputWidth, outputHeight),
+            0,
+            0,
+            InterpolationFlags.Lanczos4);
+        return upscaled;
     }
 
     private Mat CreateRecordedFrame(Mat source)

@@ -1,5 +1,6 @@
 ﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
+using System.Globalization;
 using System.IO;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -49,13 +50,15 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double _zoomPanY;
     private double _viewportWidth = 1;
     private double _viewportHeight = 1;
-    private int _motorPan;
-    private int _motorTilt;
+    private double _motorPan;
+    private double _motorTilt;
+    private string _motorTargetPanText = "0.0";
+    private string _motorTargetTiltText = "0.0";
     private bool _hasTrackedTarget;
     private readonly UdpMotorControlService _motorControlService;
     private const int MotorStepDegrees = 20;
-    private const int MotorPanLimitDegrees = 180;
-    private const int MotorTiltLimitDegrees = 180;
+    private const double MotorPanLimitDegrees = 360;
+    private const double MotorTiltLimitDegrees = 360;
     private const int VisibleLogItemLimit = 30;
     private const int StoredLogItemLimit = 100;
     private readonly List<AnalysisItem> _analysisHistory = new();
@@ -81,6 +84,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         AnalysisItems = new ObservableCollection<AnalysisItem>();
         SystemLogs = new ObservableCollection<SystemLogItem>();
+        MotorStatusItems = new ObservableCollection<MotorStatusItem>(CreateDefaultMotorStatusItems());
 
         AddSystemLogItem(new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), "\uC2DC\uC2A4\uD15C \uAC00\uB3D9\uC744 \uC2DC\uC791\uD569\uB2C8\uB2E4."));
 
@@ -110,6 +114,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         SaveSystemLogsCommand = new RelayCommand(_ => ManualSystemLogSaveRequested?.Invoke(this, EventArgs.Empty));
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         MoveMotorCommand = new RelayCommand(MoveMotor, _ => CanUseMotorControls);
+        SendMotorTargetCommand = new RelayCommand(_ => SendMotorTargetAngles(), _ => CanUseMotorTargetControls);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -121,6 +126,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<AnalysisItem> AnalysisItems { get; }
 
     public ObservableCollection<SystemLogItem> SystemLogs { get; }
+
+    public ObservableCollection<MotorStatusItem> MotorStatusItems { get; }
 
     public ReadOnlyCollection<string> PrimaryTargets { get; }
 
@@ -150,6 +157,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public ICommand MoveMotorCommand { get; }
 
+    public ICommand SendMotorTargetCommand { get; }
+
     public bool IsSettingsOpen
     {
         get => _isSettingsOpen;
@@ -169,6 +178,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanSelectAutoMode));
                 OnPropertyChanged(nameof(CanSelectManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
+                OnPropertyChanged(nameof(CanUseMotorTargetControls));
                 OnPropertyChanged(nameof(MotorControlsOpacity));
                 OnPropertyChanged(nameof(CanUseZoomControls));
                 OnPropertyChanged(nameof(IsAutoMode));
@@ -202,6 +212,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 OnPropertyChanged(nameof(CanSelectAutoMode));
                 OnPropertyChanged(nameof(CanSelectManualMode));
                 OnPropertyChanged(nameof(CanUseMotorControls));
+                OnPropertyChanged(nameof(CanUseMotorTargetControls));
                 OnPropertyChanged(nameof(MotorControlsOpacity));
                 OnPropertyChanged(nameof(CanUseZoomControls));
                 OnPropertyChanged(nameof(ShowZoomMiniMap));
@@ -246,6 +257,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public bool CanSelectManualMode => IsSystemPoweredOn && CurrentMode != "\uC218\uB3D9";
 
     public bool CanUseMotorControls => IsManualMode;
+
+    public bool CanUseMotorTargetControls => IsSystemPoweredOn;
 
     public double MotorControlsOpacity => CanUseMotorControls ? 1.0 : 0.38;
 
@@ -354,9 +367,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double InsetFeedRotationAngle => _isEoPrimary ? _irDisplayRotationAngle : _eoDisplayRotationAngle;
 
-    public Stretch LargeFeedStretch => _isEoPrimary ? Stretch.Uniform : Stretch.Fill;
+    public Stretch LargeFeedStretch => Stretch.Fill;
 
-    public Stretch InsetFeedStretch => _isEoPrimary ? Stretch.Fill : Stretch.Uniform;
+    public Stretch InsetFeedStretch => Stretch.Fill;
 
     public string LargeFeedSubtitle => _isEoPrimary ? EoSubtitle : IrSubtitle;
 
@@ -464,9 +477,21 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string MotorPanText => $"모터 좌우: {_motorPan}도";
+    public string MotorPanText => $"모터 좌우: {_motorPan:0.0}도";
 
-    public string MotorTiltText => $"모터 상하: {_motorTilt}도";
+    public string MotorTiltText => $"모터 상하: {_motorTilt:0.0}도";
+
+    public string MotorTargetPanText
+    {
+        get => _motorTargetPanText;
+        set => SetProperty(ref _motorTargetPanText, value);
+    }
+
+    public string MotorTargetTiltText
+    {
+        get => _motorTargetTiltText;
+        set => SetProperty(ref _motorTargetTiltText, value);
+    }
 
     /// <summary>
     /// EO 카메라 프레임을 ViewModel에 반영한다.
@@ -575,13 +600,30 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         UpdateManualButtonState(buttons);
     }
 
-    public void SetMotorPosition(int panDegrees, int tiltDegrees)
+    public void SetMotorPosition(double panDegrees, double tiltDegrees)
     {
-        _motorPan = Math.Clamp(panDegrees, -MotorPanLimitDegrees, MotorPanLimitDegrees);
-        _motorTilt = Math.Clamp(tiltDegrees, -MotorTiltLimitDegrees, MotorTiltLimitDegrees);
+        _motorPan = NormalizeMotorDegrees(panDegrees, MotorPanLimitDegrees);
+        _motorTilt = NormalizeMotorDegrees(tiltDegrees, MotorTiltLimitDegrees);
 
         OnPropertyChanged(nameof(MotorPanText));
         OnPropertyChanged(nameof(MotorTiltText));
+    }
+
+    public void UpdateMotorStatus(MotorStatusPacket packet)
+    {
+        SetMotorStatusValue("Motor Value", packet.PresentPosition.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue("Actual Value", $"{DynamixelPositionToDegrees(packet.PresentPosition):0.0} deg");
+        SetMotorStatusValue("Motor Change Value", packet.GoalPosition.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue("Actual Change Value", $"{DynamixelPositionToDegrees(packet.GoalPosition):0.0} deg");
+        SetMotorStatusValue("Velocity", packet.PresentVelocity.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue("Load", packet.PresentLoad.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue("PWM", packet.PresentPwm.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue("Temperature", $"{packet.PresentTemperature} C");
+        SetMotorStatusValue("Voltage", $"{packet.PresentInputVoltage:0.0} V");
+        SetMotorStatusValue("Moving", packet.Moving == 0 ? "Stop" : "Moving");
+        SetMotorStatusValue("Error Status", $"0x{packet.HardwareErrorStatus:X2}");
+        SetMotorStatusValue("Moving Status", $"0x{packet.MovingStatus:X2}");
+        SetMotorStatusValue("Last Update", packet.ReceivedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
     }
 
     public void UpdateManualButtonState(MotorButtonMask buttons)
@@ -1010,6 +1052,35 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         UpdateManualButtonState(buttons);
     }
 
+    private void SendMotorTargetAngles()
+    {
+        if (!CanUseMotorTargetControls)
+        {
+            return;
+        }
+
+        if (!double.TryParse(MotorTargetPanText, NumberStyles.Float, CultureInfo.InvariantCulture, out var panDegrees) ||
+            !double.TryParse(MotorTargetTiltText, NumberStyles.Float, CultureInfo.InvariantCulture, out var tiltDegrees))
+        {
+            AppendImportantLog("모터 목표 각도 입력값을 확인하세요. 예: 0, 45.5, 360");
+            return;
+        }
+
+        panDegrees = NormalizeMotorDegrees(panDegrees, MotorPanLimitDegrees);
+        tiltDegrees = NormalizeMotorDegrees(tiltDegrees, MotorTiltLimitDegrees);
+        MotorTargetPanText = panDegrees.ToString("0.0", CultureInfo.InvariantCulture);
+        MotorTargetTiltText = tiltDegrees.ToString("0.0", CultureInfo.InvariantCulture);
+
+        if (!_motorControlService.TrySendTargetAnglePacket(panDegrees, tiltDegrees, out var error))
+        {
+            AppendImportantLog($"모터 목표 각도 전송에 실패했습니다: {error}");
+            return;
+        }
+
+        SetMotorPosition(panDegrees, tiltDegrees);
+        AppendImportantLog($"모터 목표 각도 전송: pan {panDegrees:0.0}°, tilt {tiltDegrees:0.0}°");
+    }
+
     /// <summary>
     /// 현재 확대 이동 값이 허용 범위를 넘지 않도록 보정한다.
     /// 화면 크기나 배율이 바뀐 뒤에도 이동 좌표가 튀지 않도록 정리하는 단계다.
@@ -1051,6 +1122,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         RaiseCommand(ResetZoomCommand);
         RaiseCommand(ToggleManualRecordingCommand);
         RaiseCommand(MoveMotorCommand);
+        RaiseCommand(SendMotorTargetCommand);
     }
 
     private static void RaiseCommand(ICommand command)
@@ -1093,6 +1165,48 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         SystemLogs.Insert(0, item);
         TrimCollection(SystemLogs, VisibleLogItemLimit);
+    }
+
+    private void SetMotorStatusValue(string name, string value)
+    {
+        var item = MotorStatusItems.FirstOrDefault(status => status.Name == name);
+        if (item is not null)
+        {
+            item.Value = value;
+        }
+    }
+
+    private static IEnumerable<MotorStatusItem> CreateDefaultMotorStatusItems()
+    {
+        var names = new[]
+        {
+            "Motor Value",
+            "Actual Value",
+            "Motor Change Value",
+            "Actual Change Value",
+            "Velocity",
+            "Load",
+            "PWM",
+            "Temperature",
+            "Voltage",
+            "Moving",
+            "Error Status",
+            "Moving Status",
+            "Last Update"
+        };
+
+        return names.Select(name => new MotorStatusItem(name, "-")).ToArray();
+    }
+
+    private static double NormalizeMotorDegrees(double degrees, double limit)
+    {
+        var rounded = Math.Round(degrees, 1, MidpointRounding.AwayFromZero);
+        return Math.Clamp(rounded, 0, limit);
+    }
+
+    private static double DynamixelPositionToDegrees(ushort position)
+    {
+        return position * 360.0 / 4095.0;
     }
 
     /// <summary>
@@ -1196,22 +1310,22 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         {
             if ((buttons & MotorButtonMask.Left) == MotorButtonMask.Left)
             {
-                _motorPan = Math.Clamp(_motorPan - MotorStepDegrees, -MotorPanLimitDegrees, MotorPanLimitDegrees);
+                _motorPan = Math.Clamp(_motorPan - MotorStepDegrees, 0, MotorPanLimitDegrees);
             }
 
             if ((buttons & MotorButtonMask.Right) == MotorButtonMask.Right)
             {
-                _motorPan = Math.Clamp(_motorPan + MotorStepDegrees, -MotorPanLimitDegrees, MotorPanLimitDegrees);
+                _motorPan = Math.Clamp(_motorPan + MotorStepDegrees, 0, MotorPanLimitDegrees);
             }
 
             if ((buttons & MotorButtonMask.Up) == MotorButtonMask.Up)
             {
-                _motorTilt = Math.Clamp(_motorTilt + MotorStepDegrees, -MotorTiltLimitDegrees, MotorTiltLimitDegrees);
+                _motorTilt = Math.Clamp(_motorTilt + MotorStepDegrees, 0, MotorTiltLimitDegrees);
             }
 
             if ((buttons & MotorButtonMask.Down) == MotorButtonMask.Down)
             {
-                _motorTilt = Math.Clamp(_motorTilt - MotorStepDegrees, -MotorTiltLimitDegrees, MotorTiltLimitDegrees);
+                _motorTilt = Math.Clamp(_motorTilt - MotorStepDegrees, 0, MotorTiltLimitDegrees);
             }
         }
 
@@ -1270,5 +1384,35 @@ public sealed record AnalysisItem(string Time, string Message)
 public sealed record SystemLogItem(string Time, string Message)
 {
     public DateTime CreatedAt { get; init; } = DateTime.Now;
+}
+
+public sealed class MotorStatusItem : INotifyPropertyChanged
+{
+    private string _value;
+
+    public MotorStatusItem(string name, string value)
+    {
+        Name = name;
+        _value = value;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public string Name { get; }
+
+    public string Value
+    {
+        get => _value;
+        set
+        {
+            if (string.Equals(_value, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _value = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(Value)));
+        }
+    }
 }
 

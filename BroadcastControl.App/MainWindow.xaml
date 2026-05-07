@@ -350,7 +350,7 @@
             <Grid Grid.Row="1"
                   Margin="0">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="220" />
+                    <ColumnDefinition Width="250" />
                     <ColumnDefinition Width="*" />
                     <ColumnDefinition Width="360" />
                 </Grid.ColumnDefinitions>
@@ -359,9 +359,7 @@
                       Margin="0,0,12,0">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="74" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="*" />
-                        <RowDefinition Height="*" />
+                        <RowDefinition Height="150" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -413,94 +411,52 @@
                     </Border>
 
                     <Border Grid.Row="2"
-                            Margin="0,0,0,12"
                             Style="{StaticResource GlassCardBorder}"
                             Background="#FF05070A">
                         <Grid Margin="12">
-                            <Border Width="108"
-                                    Height="25"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Top"
-                                    Style="{StaticResource OverlayCardBorder}"
-                                    BorderThickness="0"
-                                    Padding="7,3">
-                                <DockPanel LastChildFill="False">
-                                    <TextBlock DockPanel.Dock="Left"
-                                               Text="CAM 2"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource PrimaryTextBrush}"
-                                               FontSize="12"
-                                               FontWeight="Bold" />
-                                    <Button DockPanel.Dock="Right"
-                                            Margin="8,0,0,0"
-                                            Tag="CAM 2"
-                                            Click="RotateAuxCameraButton_OnClick"
-                                            Style="{StaticResource InlineRotateButton}">
-                                        <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
-                                    </Button>
-                                </DockPanel>
-                            </Border>
-                        </Grid>
-                    </Border>
-
-                    <Border Grid.Row="3"
-                            Margin="0,0,0,12"
-                            Style="{StaticResource GlassCardBorder}"
-                            Background="#FF05070A">
-                        <Grid Margin="12">
-                            <Border Width="108"
-                                    Height="25"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Top"
-                                    Style="{StaticResource OverlayCardBorder}"
-                                    BorderThickness="0"
-                                    Padding="7,3">
-                                <DockPanel LastChildFill="False">
-                                    <TextBlock DockPanel.Dock="Left"
-                                               Text="CAM 3"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource PrimaryTextBrush}"
-                                               FontSize="12"
-                                               FontWeight="Bold" />
-                                    <Button DockPanel.Dock="Right"
-                                            Margin="8,0,0,0"
-                                            Tag="CAM 3"
-                                            Click="RotateAuxCameraButton_OnClick"
-                                            Style="{StaticResource InlineRotateButton}">
-                                        <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
-                                    </Button>
-                                </DockPanel>
-                            </Border>
-                        </Grid>
-                    </Border>
-
-                    <Border Grid.Row="4"
-                            Style="{StaticResource GlassCardBorder}"
-                            Background="#FF05070A">
-                        <Grid Margin="12">
-                            <Border Width="108"
-                                    Height="25"
-                                    HorizontalAlignment="Left"
-                                    VerticalAlignment="Top"
-                                    Style="{StaticResource OverlayCardBorder}"
-                                    BorderThickness="0"
-                                    Padding="7,3">
-                                <DockPanel LastChildFill="False">
-                                    <TextBlock DockPanel.Dock="Left"
-                                               Text="CAM 4"
-                                               VerticalAlignment="Center"
-                                               Foreground="{DynamicResource PrimaryTextBrush}"
-                                               FontSize="12"
-                                               FontWeight="Bold" />
-                                    <Button DockPanel.Dock="Right"
-                                            Margin="8,0,0,0"
-                                            Tag="CAM 4"
-                                            Click="RotateAuxCameraButton_OnClick"
-                                            Style="{StaticResource InlineRotateButton}">
-                                        <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
-                                    </Button>
-                                </DockPanel>
-                            </Border>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                       FontSize="20"
+                                       FontWeight="Bold"
+                                       Text="Motor Info" />
+                            <ItemsControl Grid.Row="1"
+                                          Margin="0,10,0,0"
+                                          ItemsSource="{Binding MotorStatusItems}">
+                                <ItemsControl.ItemsPanel>
+                                    <ItemsPanelTemplate>
+                                        <UniformGrid Columns="2" />
+                                    </ItemsPanelTemplate>
+                                </ItemsControl.ItemsPanel>
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Border Margin="0,0,6,7"
+                                                Padding="7,5"
+                                                Background="#22313A46"
+                                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                                BorderThickness="1"
+                                                CornerRadius="2">
+                                            <StackPanel>
+                                                <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
+                                                           FontSize="11"
+                                                           FontWeight="Bold"
+                                                           LineHeight="12"
+                                                           Text="{Binding Name}"
+                                                           TextWrapping="Wrap" />
+                                                <TextBlock Margin="0,2,0,0"
+                                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                                           FontSize="16"
+                                                           FontWeight="Bold"
+                                                           LineHeight="18"
+                                                           Text="{Binding Value}"
+                                                           TextWrapping="Wrap" />
+                                            </StackPanel>
+                                        </Border>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
                         </Grid>
                     </Border>
                 </Grid>
@@ -534,6 +490,7 @@
                         <Image Source="{Binding LargeFeedImage}"
                                Margin="0"
                                Stretch="{Binding LargeFeedStretch}"
+                               RenderOptions.BitmapScalingMode="HighQuality"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                RenderTransformOrigin="0.5,0.5">
@@ -628,7 +585,7 @@
                         <!-- IR/EO ?몄뀑 ?붾㈃:
                              ?묒? ?붾㈃ ?대┃ ?????붾㈃怨??ㅼ솑?섎뒗 ?낅젰 ?곸뿭?? -->
                         <Button Width="168"
-                                Height="126"
+                                Height="124"
                                 Margin="0,8,26,0"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Top"
@@ -644,6 +601,7 @@
                                 <Grid ClipToBounds="True">
                                     <Image Source="{Binding InsetFeedImage}"
                                            Stretch="{Binding InsetFeedStretch}"
+                                           RenderOptions.BitmapScalingMode="HighQuality"
                                            RenderTransformOrigin="0.5,0.5">
                                         <Image.RenderTransform>
                                             <RotateTransform Angle="{Binding InsetFeedRotationAngle}" />
@@ -679,8 +637,9 @@
                         <Grid Margin="0,0,24,26"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom"
-                              Visibility="Collapsed">
+                              Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVisibilityConverter}}">
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -690,8 +649,23 @@
                                 <ColumnDefinition Width="Auto" />
                                 <ColumnDefinition Width="Auto" />
                             </Grid.ColumnDefinitions>
+                            <Border Grid.Row="0"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="3"
+                                    Margin="0,0,0,8"
+                                    Padding="12,5"
+                                    Background="#DD05070A"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="2">
+                                <TextBlock HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           FontSize="16"
+                                           FontWeight="Bold"
+                                           Text="&#xBAA8;&#xD130; &#xCEE8;&#xD2B8;&#xB864;" />
+                            </Border>
 
-                            <Button Grid.Row="0"
+                            <Button Grid.Row="1"
                                     Grid.Column="1"
                                     Tag="Up"
                                     IsEnabled="{Binding CanUseMotorControls}"
@@ -701,7 +675,7 @@
                                     Style="{StaticResource ArrowButton}">
                                 <materialDesign:PackIcon Kind="ArrowUpBold" Width="20" Height="20" />
                             </Button>
-                            <Button Grid.Row="1"
+                            <Button Grid.Row="2"
                                     Grid.Column="0"
                                     Margin="0,6,6,6"
                                     Tag="Left"
@@ -712,7 +686,7 @@
                                     Style="{StaticResource ArrowButton}">
                                 <materialDesign:PackIcon Kind="ArrowLeftBold" Width="20" Height="20" />
                             </Button>
-                            <Button Grid.Row="1"
+                            <Button Grid.Row="2"
                                     Grid.Column="1"
                                     Margin="0,6,0,6"
                                     Tag="Center"
@@ -720,9 +694,14 @@
                                     PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
                                     PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
                                     MouseLeave="MotorButton_OnMouseLeave"
-                                    Style="{StaticResource ArrowButton}"
-                                    Content="&#xC911;&#xC559;" />
-                            <Button Grid.Row="1"
+                                    Style="{StaticResource ArrowButton}">
+                                <Ellipse Width="16"
+                                         Height="16"
+                                         Stroke="{DynamicResource PrimaryTextBrush}"
+                                         StrokeThickness="2"
+                                         Fill="Transparent" />
+                            </Button>
+                            <Button Grid.Row="2"
                                     Grid.Column="2"
                                     Margin="6,6,0,6"
                                     Tag="Right"
@@ -733,7 +712,7 @@
                                     Style="{StaticResource ArrowButton}">
                                 <materialDesign:PackIcon Kind="ArrowRightBold" Width="20" Height="20" />
                             </Button>
-                            <Button Grid.Row="2"
+                            <Button Grid.Row="3"
                                     Grid.Column="1"
                                     Tag="Down"
                                     IsEnabled="{Binding CanUseMotorControls}"
@@ -965,93 +944,69 @@
                                     Grid.RowSpan="2"
                                     Grid.Column="3"
                                     Margin="6,0"
-                                    Padding="0"
-                                    Background="Transparent"
-                                    BorderBrush="Transparent"
-                                    BorderThickness="0"
-                                    CornerRadius="2"
-                                    Opacity="{Binding MotorControlsOpacity}">
-                                <Grid>
+                                    Padding="8,6"
+                                    Background="{DynamicResource OverlayPanelBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="2">
+                                <Grid IsEnabled="{Binding CanUseMotorTargetControls}">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="*" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
                                     </Grid.RowDefinitions>
                                     <TextBlock HorizontalAlignment="Center"
                                                Foreground="{DynamicResource PrimaryTextBrush}"
-                                               FontSize="13"
+                                               FontSize="12"
                                                FontWeight="Bold"
-                                               Text="&#xBAA8;&#xD130; &#xCEE8;&#xD2B8;&#xB864;" />
-                                    <Grid Grid.Row="1"
-                                          Width="118"
-                                          Height="88"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="28" />
-                                            <RowDefinition Height="32" />
-                                            <RowDefinition Height="28" />
-                                        </Grid.RowDefinitions>
+                                               Text="Motor Target" />
+                                    <Grid Grid.Row="1" Margin="0,6,0,0">
                                         <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="40" />
-                                            <ColumnDefinition Width="38" />
-                                            <ColumnDefinition Width="40" />
+                                            <ColumnDefinition Width="42" />
+                                            <ColumnDefinition Width="*" />
                                         </Grid.ColumnDefinitions>
-                                        <Button Grid.Row="0"
-                                                Grid.Column="1"
-                                                Tag="Up"
-                                                IsEnabled="{Binding CanUseMotorControls}"
-                                                PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
-                                                PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
-                                                MouseLeave="MotorButton_OnMouseLeave"
-                                                Style="{StaticResource MotorPadButton}">
-                                            <materialDesign:PackIcon Kind="ArrowUpBold" Width="15" Height="15" />
-                                        </Button>
-                                        <Button Grid.Row="1"
-                                                Grid.Column="0"
-                                                Tag="Left"
-                                                IsEnabled="{Binding CanUseMotorControls}"
-                                                PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
-                                                PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
-                                                MouseLeave="MotorButton_OnMouseLeave"
-                                                Style="{StaticResource MotorPadButton}">
-                                            <materialDesign:PackIcon Kind="ArrowLeftBold" Width="15" Height="15" />
-                                        </Button>
-                                        <Button Grid.Row="1"
-                                                Grid.Column="1"
-                                                Tag="Center"
-                                                IsEnabled="{Binding CanUseMotorControls}"
-                                                PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
-                                                PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
-                                                MouseLeave="MotorButton_OnMouseLeave"
-                                                Style="{StaticResource MotorPadButton}">
-                                            <Ellipse Width="12"
-                                                     Height="12"
-                                                     Stroke="{DynamicResource PrimaryTextBrush}"
-                                                     StrokeThickness="2"
-                                                     Fill="Transparent" />
-                                        </Button>
-                                        <Button Grid.Row="1"
-                                                Grid.Column="2"
-                                                Tag="Right"
-                                                IsEnabled="{Binding CanUseMotorControls}"
-                                                PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
-                                                PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
-                                                MouseLeave="MotorButton_OnMouseLeave"
-                                                Style="{StaticResource MotorPadButton}">
-                                            <materialDesign:PackIcon Kind="ArrowRightBold" Width="15" Height="15" />
-                                        </Button>
-                                        <Button Grid.Row="2"
-                                                Grid.Column="1"
-                                                Tag="Down"
-                                                IsEnabled="{Binding CanUseMotorControls}"
-                                                PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
-                                                PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
-                                                MouseLeave="MotorButton_OnMouseLeave"
-                                                Style="{StaticResource MotorPadButton}">
-                                            <materialDesign:PackIcon Kind="ArrowDownBold" Width="15" Height="15" />
-                                        </Button>
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                   FontSize="14"
+                                                   FontWeight="Bold"
+                                                   Text="Pan" />
+                                        <TextBox Grid.Column="1"
+                                                 Height="23"
+                                                 Padding="6,1"
+                                                 FontSize="11"
+                                                 Foreground="{DynamicResource PrimaryTextBrush}"
+                                                 Background="#22313A46"
+                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
+                                                 Text="{Binding MotorTargetPanText, UpdateSourceTrigger=PropertyChanged}" />
                                     </Grid>
-                                </Grid>
+                                    <Grid Grid.Row="2" Margin="0,5,0,0">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="42" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                                   FontSize="14"
+                                                   FontWeight="Bold"
+                                                   Text="Tilt" />
+                                        <TextBox Grid.Column="1"
+                                                 Height="23"
+                                                 Padding="6,1"
+                                                 FontSize="11"
+                                                 Foreground="{DynamicResource PrimaryTextBrush}"
+                                                 Background="#22313A46"
+                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
+                                                 Text="{Binding MotorTargetTiltText, UpdateSourceTrigger=PropertyChanged}" />
+                                    </Grid>
+                                    <Button Grid.Row="3"
+                                            Margin="0,5,0,0"
+                                            Height="22"
+                                            Padding="7,0"
+                                            Command="{Binding SendMotorTargetCommand}"
+                                            Style="{StaticResource TopBarSmallButton}"
+                                            Content="OK" />
+                                    </Grid>
                             </Border>
 
                             <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="4" Margin="6,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">

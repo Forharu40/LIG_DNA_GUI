@@ -33,6 +33,15 @@ public sealed class UdpMotorControlService : IDisposable
         return TrySendPacket([0x02, (byte)buttons], out error);
     }
 
+    public bool TrySendTargetAnglePacket(double panDegrees, double tiltDegrees, out string? error)
+    {
+        var packet = new byte[17];
+        packet[0] = 0x03;
+        BitConverter.TryWriteBytes(packet.AsSpan(1, 8), panDegrees);
+        BitConverter.TryWriteBytes(packet.AsSpan(9, 8), tiltDegrees);
+        return TrySendPacket(packet, out error);
+    }
+
     public void Dispose()
     {
         _udpClient.Dispose();

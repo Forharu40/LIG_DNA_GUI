@@ -45,6 +45,7 @@ public partial class MainWindow : Window
     private readonly UdpEncodedVideoReceiverService _irUdpCaptureService;
     private readonly ViewportRecordingService _viewportRecordingService;
     private readonly UdpMotorControlService _motorControlService;
+    private readonly UdpMotorStatusReceiverService _motorStatusReceiverService;
     private readonly MobileAlertHubService _mobileAlertHubService;
     private readonly DispatcherTimer _motorHoldTimer;
     private readonly DispatcherTimer _recordedVideoPositionTimer;
@@ -146,6 +147,7 @@ public partial class MainWindow : Window
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
         _irUdpCaptureService = new UdpEncodedVideoReceiverService(applyIrFalseColor: true);
         _viewportRecordingService = new ViewportRecordingService();
+        _motorStatusReceiverService = new UdpMotorStatusReceiverService();
         _mobileAlertHubService = new MobileAlertHubService();
         _motorHoldTimer = new DispatcherTimer
         {
@@ -184,12 +186,16 @@ public partial class MainWindow : Window
         _irUdpCaptureService.FrameReady += OnIrFrameReady;
         _irUdpCaptureService.DetectionsReceived += OnIrDetectionsReceived;
         _irUdpCaptureService.StatusReceived += OnYoloStatusReceived;
+        _motorStatusReceiverService.StatusReceived += OnMotorStatusReceived;
+        _motorStatusReceiverService.ReceiverError += OnMotorStatusReceiverError;
 
         _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
         _eoUdpCaptureService.SetContrast(_viewModel.Contrast);
         _irUdpCaptureService.SetBrightness(_viewModel.Brightness);
         _irUdpCaptureService.SetContrast(_viewModel.Contrast);
         _viewModel.InitializeMotorControlState();
+        _motorStatusReceiverService.Start();
+        _viewModel.AppendImportantLog($"모터 상태 수신 대기 포트: {_motorStatusReceiverService.Port}");
 
         _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
         UpdateRecordingViewportState();
@@ -400,6 +406,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private void OnMotorStatusReceived(object? sender, MotorStatusPacket packet)
+    {
+        Dispatcher.Invoke(() => _viewModel.UpdateMotorStatus(packet));
+    }
+
+    private void OnMotorStatusReceiverError(object? sender, string message)
+    {
+        Dispatcher.Invoke(() => _viewModel.AppendImportantLog($"모터 상태 수신 오류: {message}"));
+    }
+
     private void OnIrFrameReady(ReceivedVideoFrame frame)
     {
         _latestIrFrame = frame;
@@ -502,10 +518,8 @@ public partial class MainWindow : Window
 
             var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
             var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
-            var usesFillScale = !_viewModel.IsEoPrimary;
-            var baseScale = Math.Min(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
-            var scaleX = usesFillScale ? viewportWidth / rotatedSourceWidth : baseScale;
-            var scaleY = usesFillScale ? viewportHeight / rotatedSourceHeight : baseScale;
+            var scaleX = viewportWidth / rotatedSourceWidth;
+            var scaleY = viewportHeight / rotatedSourceHeight;
             var scaledWidth = rotatedSourceWidth * scaleX;
             var scaledHeight = rotatedSourceHeight * scaleY;
             var baseLeft = (viewportWidth - scaledWidth) / 2.0;
@@ -1927,10 +1941,13 @@ public partial class MainWindow : Window
         _irUdpCaptureService.FrameReady -= OnIrFrameReady;
         _irUdpCaptureService.DetectionsReceived -= OnIrDetectionsReceived;
         _irUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
+        _motorStatusReceiverService.StatusReceived -= OnMotorStatusReceived;
+        _motorStatusReceiverService.ReceiverError -= OnMotorStatusReceiverError;
         _mobileAlertHubService.Dispose();
         _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
         _irUdpCaptureService.Dispose();
+        _motorStatusReceiverService.Dispose();
         _motorControlService.Dispose();
     }
 }
