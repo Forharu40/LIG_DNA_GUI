@@ -73,6 +73,7 @@ RECORDING_FPS = getenv_int("RECORDING_FPS", 15)
 RECORDING_HTTP_ENABLED = getenv_bool("RECORDING_HTTP_ENABLED", True)
 RECORDING_HTTP_PORT = getenv_int("RECORDING_HTTP_PORT", 8090)
 LATEST_RECORDING_SEGMENT_NAME = ""
+LATEST_RECORDING_SEGMENT_LOCK = threading.Lock()
 
 IMAGE_TOPIC_QOS = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
@@ -120,6 +121,10 @@ def write_text_file(directory: Path, name: str, content: object | None) -> Path 
     return path
 
 
+def recording_video_path(directory: Path, timestamp: str, stream_name: str) -> Path:
+    return directory / timestamp / f"{stream_name.upper()}_{timestamp}.mp4"
+
+
 def default_system_log_text(timestamp: str) -> str:
     return (
         "LIG DNA GUI System Log\n"
@@ -148,6 +153,61 @@ def ensure_default_metadata_files(segment_directory: Path, timestamp: str) -> No
 
     if not analysis_path.exists():
         analysis_path.write_text(default_vlm_analysis_text(timestamp), encoding="utf-8")
+
+
+def write_placeholder_video(path: Path, stream_name: str) -> None:
+    if path.exists():
+        return
+
+    path.parent.mkdir(parents=True, exist_ok=True)
+    width = max(320, STREAM_WIDTH)
+    height = max(180, STREAM_HEIGHT)
+    fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+    writer = cv2.VideoWriter(str(path), fourcc, max(1, RECORDING_FPS), (width, height))
+    if not writer.isOpened():
+        return
+
+    try:
+        frame = np.zeros((height, width, 3), dtype=np.uint8)
+        cv2.putText(
+            frame,
+            f"{stream_name.upper()} NO SIGNAL",
+            (32, height // 2),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            1.0,
+            (180, 180, 180),
+            2,
+            cv2.LINE_AA,
+        )
+        cv2.putText(
+            frame,
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            (32, min(height - 28, height // 2 + 44)),
+            cv2.FONT_HERSHEY_SIMPLEX,
+            0.65,
+            (120, 120, 120),
+            1,
+            cv2.LINE_AA,
+        )
+        for _ in range(max(1, RECORDING_FPS)):
+            writer.write(frame)
+    finally:
+        writer.release()
+
+
+def ensure_recording_segment(directory: Path, timestamp: str | None = None, create_placeholder_videos: bool = True) -> str:
+    global LATEST_RECORDING_SEGMENT_NAME
+
+    timestamp = safe_segment_name(timestamp) if timestamp else current_recording_segment_name()
+    with LATEST_RECORDING_SEGMENT_LOCK:
+        segment_directory = directory / timestamp
+        ensure_default_metadata_files(segment_directory, timestamp)
+        if create_placeholder_videos:
+            write_placeholder_video(recording_video_path(directory, timestamp, "eo"), "eo")
+            write_placeholder_video(recording_video_path(directory, timestamp, "ir"), "ir")
+
+        LATEST_RECORDING_SEGMENT_NAME = timestamp
+        return timestamp
 
 
 def create_ir_false_color_frame(frame: np.ndarray) -> np.ndarray:
@@ -276,6 +336,7 @@ class VideoSegmentRecorder:
         self._lock = threading.Lock()
         self._writer: cv2.VideoWriter | None = None
         self._segment_started_at = 0.0
+        self._current_segment_name = ""
         self._frame_size: tuple[int, int] | None = None
         self._current_path: Path | None = None
         self.directory.mkdir(parents=True, exist_ok=True)
@@ -286,15 +347,17 @@ class VideoSegmentRecorder:
 
         height, width = frame.shape[:2]
         now = time.monotonic()
+        segment_name = current_recording_segment_name()
 
         with self._lock:
             needs_new_segment = (
                 self._writer is None
                 or self._frame_size != (width, height)
+                or self._current_segment_name != segment_name
                 or now - self._segment_started_at >= self.segment_seconds
             )
             if needs_new_segment:
-                self._start_segment(width, height, now)
+                self._start_segment(width, height, now, segment_name)
 
             if self._writer is not None:
                 self._writer.write(frame)
@@ -304,19 +367,14 @@ class VideoSegmentRecorder:
             if self._writer is not None:
                 self._writer.release()
                 self._writer = None
+                self._current_segment_name = ""
 
-    def _start_segment(self, width: int, height: int, now: float) -> None:
-        global LATEST_RECORDING_SEGMENT_NAME
-
+    def _start_segment(self, width: int, height: int, now: float, timestamp: str) -> None:
         if self._writer is not None:
             self._writer.release()
 
-        timestamp = current_recording_segment_name()
-        LATEST_RECORDING_SEGMENT_NAME = timestamp
-        segment_directory = self.directory / timestamp
-        ensure_default_metadata_files(segment_directory, timestamp)
-        stream_name = self.name.upper()
-        self._current_path = segment_directory / f"{stream_name}_{timestamp}.mp4"
+        timestamp = ensure_recording_segment(self.directory, timestamp)
+        self._current_path = recording_video_path(self.directory, timestamp, self.name)
         fourcc = cv2.VideoWriter_fourcc(*"mp4v")
         writer = cv2.VideoWriter(str(self._current_path), fourcc, self.fps, (width, height))
         if not writer.isOpened():
@@ -325,8 +383,38 @@ class VideoSegmentRecorder:
 
         self._writer = writer
         self._segment_started_at = now
+        self._current_segment_name = timestamp
         self._frame_size = (width, height)
         print(f"Recording segment started: {self._current_path}", flush=True)
+
+
+class RecordingSegmentScheduler:
+    def __init__(self, directory: str, segment_seconds: int) -> None:
+        self.directory = Path(directory)
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="recording-segment-scheduler",
+            daemon=True,
+        )
+        self.directory.mkdir(parents=True, exist_ok=True)
+        timestamp = ensure_recording_segment(self.directory)
+        print(f"Recording segment folder ready: {self.directory / timestamp}", flush=True)
+        self._thread.start()
+
+    def close(self) -> None:
+        self._stop_event.set()
+        self._thread.join(timeout=2.0)
+
+    def _run(self) -> None:
+        last_timestamp = LATEST_RECORDING_SEGMENT_NAME
+        while not self._stop_event.wait(1.0):
+            timestamp = current_recording_segment_name()
+            if timestamp == last_timestamp:
+                continue
+
+            last_timestamp = ensure_recording_segment(self.directory, timestamp)
+            print(f"Recording segment folder ready: {self.directory / last_timestamp}", flush=True)
 
 
 class RecordingVideoHandler(SimpleHTTPRequestHandler):
@@ -462,7 +550,7 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
 
         directory = Path(self.directory)
         requested_folder = payload.get("folderName")
-        timestamp = safe_segment_name(requested_folder) if requested_folder else latest_recording_segment_name(directory)
+        timestamp = ensure_recording_segment(directory, requested_folder)
         segment_directory = directory / timestamp
         manual = bool(payload.get("manual"))
         prefix = "C_" if manual else ""
@@ -627,6 +715,11 @@ class CameraUdpBridge(Node):
         self._ir = StreamBridge("ir", IR_IMAGE_TOPIC, IR_DETECTION_TOPIC, GUI_HOST, IR_GUI_PORT)
         self._recording_http_server: ThreadingHTTPServer | None = None
         self._recording_http_thread: threading.Thread | None = None
+        self._recording_segment_scheduler = (
+            RecordingSegmentScheduler(RECORDING_DIR, RECORDING_SEGMENT_SECONDS)
+            if RECORDING_ENABLED
+            else None
+        )
 
         self.create_subscription(Image, EO_IMAGE_TOPIC, self._on_eo_image, IMAGE_TOPIC_QOS)
         self.create_subscription(Image, IR_IMAGE_TOPIC, self._on_ir_image, IMAGE_TOPIC_QOS)
@@ -684,6 +777,8 @@ class CameraUdpBridge(Node):
     def close(self) -> None:
         self._eo.close()
         self._ir.close()
+        if self._recording_segment_scheduler is not None:
+            self._recording_segment_scheduler.close()
         if self._recording_http_server is not None:
             self._recording_http_server.shutdown()
             self._recording_http_server.server_close()

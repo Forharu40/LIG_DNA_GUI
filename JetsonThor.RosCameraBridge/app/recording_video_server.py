@@ -6,6 +6,7 @@ from __future__ import annotations
 import html
 import json
 import os
+import threading
 from functools import partial
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -51,6 +52,19 @@ def write_text_file(directory: Path, name: str, content: object | None) -> Path 
     path = directory / name
     path.write_text(content, encoding="utf-8")
     return path
+
+
+def ensure_default_metadata_files(directory: Path, timestamp: str) -> None:
+    segment_directory = directory / timestamp
+    segment_directory.mkdir(parents=True, exist_ok=True)
+    system_path = segment_directory / f"system_log_{timestamp}.txt"
+    analysis_path = segment_directory / f"vlm_analysis_{timestamp}.txt"
+
+    if not system_path.exists():
+        system_path.write_text(default_system_log_text(timestamp), encoding="utf-8")
+
+    if not analysis_path.exists():
+        analysis_path.write_text(default_vlm_analysis_text(timestamp), encoding="utf-8")
 
 
 def default_system_log_text(timestamp: str) -> str:
@@ -219,13 +233,48 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
         self.wfile.write(encoded)
 
 
+class RecordingFolderScheduler:
+    def __init__(self, directory: Path) -> None:
+        self.directory = directory
+        self._stop_event = threading.Event()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="recording-folder-scheduler",
+            daemon=True,
+        )
+        self.directory.mkdir(parents=True, exist_ok=True)
+        timestamp = current_recording_segment_name()
+        ensure_default_metadata_files(self.directory, timestamp)
+        print(f"Recording segment folder ready: {self.directory / timestamp}", flush=True)
+        self._thread.start()
+
+    def close(self) -> None:
+        self._stop_event.set()
+        self._thread.join(timeout=2.0)
+
+    def _run(self) -> None:
+        last_timestamp = current_recording_segment_name()
+        while not self._stop_event.wait(1.0):
+            timestamp = current_recording_segment_name()
+            if timestamp == last_timestamp:
+                continue
+
+            last_timestamp = timestamp
+            ensure_default_metadata_files(self.directory, timestamp)
+            print(f"Recording segment folder ready: {self.directory / timestamp}", flush=True)
+
+
 def main() -> None:
     directory = Path(RECORDING_DIR)
     directory.mkdir(parents=True, exist_ok=True)
     handler = partial(RecordingVideoHandler, directory=str(directory))
     server = ThreadingHTTPServer(("0.0.0.0", RECORDING_HTTP_PORT), handler)
+    scheduler = RecordingFolderScheduler(directory)
     print(f"Serving {directory} at http://0.0.0.0:{RECORDING_HTTP_PORT}/", flush=True)
-    server.serve_forever()
+    try:
+        server.serve_forever()
+    finally:
+        scheduler.close()
 
 
 if __name__ == "__main__":
