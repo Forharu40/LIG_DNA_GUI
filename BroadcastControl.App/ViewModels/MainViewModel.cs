@@ -52,11 +52,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double _viewportHeight = 1;
     private double _motorPan;
     private double _motorTilt;
+    private int _motorStepSize = 9;
+    private double _panMotorPositionDegrees;
+    private double _tiltMotorPositionDegrees;
+    private bool _isMotorDetailsOpen;
     private string _motorTargetPanText = "0.0";
     private string _motorTargetTiltText = "0.0";
     private bool _hasTrackedTarget;
     private readonly UdpMotorControlService _motorControlService;
-    private const int MotorStepDegrees = 20;
     private const double MotorPanLimitDegrees = 360;
     private const double MotorTiltLimitDegrees = 360;
     private const int VisibleLogItemLimit = 30;
@@ -116,6 +119,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         MoveMotorCommand = new RelayCommand(MoveMotor, _ => CanUseMotorControls);
         SendMotorTargetCommand = new RelayCommand(_ => SendMotorTargetAngles(), _ => CanUseMotorTargetControls);
+        AdjustMotorStepCommand = new RelayCommand(AdjustMotorStep, _ => IsSystemPoweredOn);
+        ToggleMotorDetailsCommand = new RelayCommand(_ => IsMotorDetailsOpen = !IsMotorDetailsOpen);
+        CloseMotorDetailsCommand = new RelayCommand(_ => IsMotorDetailsOpen = false);
     }
 
     public event PropertyChangedEventHandler? PropertyChanged;
@@ -161,6 +167,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public ICommand MoveMotorCommand { get; }
 
     public ICommand SendMotorTargetCommand { get; }
+
+    public ICommand AdjustMotorStepCommand { get; }
+
+    public ICommand ToggleMotorDetailsCommand { get; }
+
+    public ICommand CloseMotorDetailsCommand { get; }
 
     public bool IsSettingsOpen
     {
@@ -264,6 +276,31 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public bool CanUseMotorTargetControls => IsSystemPoweredOn;
 
     public double MotorControlsOpacity => CanUseMotorControls ? 1.0 : 0.38;
+
+    public int MotorStepSize
+    {
+        get => _motorStepSize;
+        private set
+        {
+            var normalized = Math.Clamp(value, 1, 10);
+            if (SetProperty(ref _motorStepSize, normalized))
+            {
+                OnPropertyChanged(nameof(MotorStepSizeText));
+            }
+        }
+    }
+
+    public string MotorStepSizeText => MotorStepSize.ToString(CultureInfo.InvariantCulture);
+
+    public string PanMotorPositionText => $"{_panMotorPositionDegrees:0.0} deg";
+
+    public string TiltMotorPositionText => $"{_tiltMotorPositionDegrees:0.0} deg";
+
+    public bool IsMotorDetailsOpen
+    {
+        get => _isMotorDetailsOpen;
+        set => SetProperty(ref _isMotorDetailsOpen, value);
+    }
 
     public bool CanUseZoomControls => IsSystemPoweredOn;
 
@@ -591,6 +628,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         {
             AppendImportantLog($"초기 버튼 패킷 전송에 실패했습니다: {buttonError}");
         }
+
+        if (!TrySendStepSizePacket(out var stepError))
+        {
+            AppendImportantLog($"초기 모터 step size 전송에 실패했습니다: {stepError}");
+        }
     }
 
     public void MoveMotorStep(string direction)
@@ -607,17 +649,25 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     {
         _motorPan = NormalizeMotorDegrees(panDegrees, MotorPanLimitDegrees);
         _motorTilt = NormalizeMotorDegrees(tiltDegrees, MotorTiltLimitDegrees);
+        _panMotorPositionDegrees = _motorPan;
+        _tiltMotorPositionDegrees = _motorTilt;
 
         OnPropertyChanged(nameof(MotorPanText));
         OnPropertyChanged(nameof(MotorTiltText));
+        OnPropertyChanged(nameof(PanMotorPositionText));
+        OnPropertyChanged(nameof(TiltMotorPositionText));
     }
 
     public void UpdateMotorStatus(MotorStatusSnapshot snapshot)
     {
         UpdateMotorStatusItems(PanMotorStatusItems, snapshot.Pan);
+        _panMotorPositionDegrees = DynamixelPositionToDegrees(snapshot.Pan.PresentPosition);
+        OnPropertyChanged(nameof(PanMotorPositionText));
         if (snapshot.Tilt is { } tilt)
         {
             UpdateMotorStatusItems(TiltMotorStatusItems, tilt);
+            _tiltMotorPositionDegrees = DynamixelPositionToDegrees(tilt.PresentPosition);
+            OnPropertyChanged(nameof(TiltMotorPositionText));
         }
     }
 
@@ -1093,6 +1143,30 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         AppendImportantLog($"모터 목표 각도 전송: pan {panDegrees:0.0}°, tilt {tiltDegrees:0.0}°");
     }
 
+    private void AdjustMotorStep(object? parameter)
+    {
+        var delta = parameter switch
+        {
+            int intValue => intValue,
+            string text when int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) => parsed,
+            _ => 0
+        };
+
+        if (delta == 0)
+        {
+            return;
+        }
+
+        MotorStepSize += delta;
+        if (!_motorControlService.TrySendStepSizePacket(MotorStepSize, out var error))
+        {
+            AppendImportantLog($"모터 step size 전송에 실패했습니다: {error}");
+            return;
+        }
+
+        AppendImportantLog($"모터 step size가 {MotorStepSize}(으)로 변경되었습니다.");
+    }
+
     /// <summary>
     /// 현재 확대 이동 값이 허용 범위를 넘지 않도록 보정한다.
     /// 화면 크기나 배율이 바뀐 뒤에도 이동 좌표가 튀지 않도록 정리하는 단계다.
@@ -1135,6 +1209,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         RaiseCommand(ToggleManualRecordingCommand);
         RaiseCommand(MoveMotorCommand);
         RaiseCommand(SendMotorTargetCommand);
+        RaiseCommand(AdjustMotorStepCommand);
     }
 
     private static void RaiseCommand(ICommand command)
@@ -1311,6 +1386,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         return _motorControlService.TrySendButtonPacket(buttons, out error);
     }
 
+    private bool TrySendStepSizePacket(out string? error)
+    {
+        return _motorControlService.TrySendStepSizePacket(MotorStepSize, out error);
+    }
+
     private void ApplyMotorButtonStateToUi(MotorButtonMask buttons)
     {
         if ((buttons & MotorButtonMask.Center) == MotorButtonMask.Center)
@@ -1322,27 +1402,32 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         {
             if ((buttons & MotorButtonMask.Left) == MotorButtonMask.Left)
             {
-                _motorPan = Math.Clamp(_motorPan - MotorStepDegrees, 0, MotorPanLimitDegrees);
+                _motorPan = Math.Clamp(_motorPan - MotorStepSize, 0, MotorPanLimitDegrees);
             }
 
             if ((buttons & MotorButtonMask.Right) == MotorButtonMask.Right)
             {
-                _motorPan = Math.Clamp(_motorPan + MotorStepDegrees, 0, MotorPanLimitDegrees);
+                _motorPan = Math.Clamp(_motorPan + MotorStepSize, 0, MotorPanLimitDegrees);
             }
 
             if ((buttons & MotorButtonMask.Up) == MotorButtonMask.Up)
             {
-                _motorTilt = Math.Clamp(_motorTilt + MotorStepDegrees, 0, MotorTiltLimitDegrees);
+                _motorTilt = Math.Clamp(_motorTilt + MotorStepSize, 0, MotorTiltLimitDegrees);
             }
 
             if ((buttons & MotorButtonMask.Down) == MotorButtonMask.Down)
             {
-                _motorTilt = Math.Clamp(_motorTilt - MotorStepDegrees, 0, MotorTiltLimitDegrees);
+                _motorTilt = Math.Clamp(_motorTilt - MotorStepSize, 0, MotorTiltLimitDegrees);
             }
         }
 
+        _panMotorPositionDegrees = _motorPan;
+        _tiltMotorPositionDegrees = _motorTilt;
+
         OnPropertyChanged(nameof(MotorPanText));
         OnPropertyChanged(nameof(MotorTiltText));
+        OnPropertyChanged(nameof(PanMotorPositionText));
+        OnPropertyChanged(nameof(TiltMotorPositionText));
     }
 
     private static bool TryMapDirectionToButton(string direction, out MotorButtonMask buttons)

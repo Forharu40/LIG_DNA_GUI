@@ -360,6 +360,8 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="74" />
                         <RowDefinition Height="150" />
+                        <RowDefinition Height="210" />
+                        <RowDefinition Height="145" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -417,6 +419,7 @@
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
+                                <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                        FontSize="20"
@@ -430,102 +433,169 @@
 
                                 <Border Grid.Column="0"
                                         Margin="0,0,4,0"
-                                        Padding="6"
-                                        Background="#12000000"
+                                        Padding="9,8"
+                                        Background="#22313A46"
                                         BorderBrush="{DynamicResource PanelBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="2">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="*" />
-                                        </Grid.RowDefinitions>
+                                    <StackPanel>
                                         <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                                    FontSize="13"
                                                    FontWeight="Bold"
-                                                   Text="Pan Motor" />
-                                        <ItemsControl Grid.Row="1"
-                                                      Margin="0,6,0,0"
-                                                      ItemsSource="{Binding PanMotorStatusItems}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Margin="0,0,0,4"
-                                                            Padding="5,3"
-                                                            Background="#22313A46"
-                                                            BorderBrush="{DynamicResource PanelBorderBrush}"
-                                                            BorderThickness="1"
-                                                            CornerRadius="2">
-                                                        <StackPanel>
-                                                            <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
-                                                                       FontSize="9"
-                                                                       FontWeight="Bold"
-                                                                       LineHeight="10"
-                                                                       Text="{Binding Name}"
-                                                                       TextWrapping="Wrap" />
-                                                            <TextBlock Margin="0,1,0,0"
-                                                                       Foreground="{DynamicResource PrimaryTextBrush}"
-                                                                       FontSize="12"
-                                                                       FontWeight="Bold"
-                                                                       LineHeight="13"
-                                                                       Text="{Binding Value}"
-                                                                       TextWrapping="Wrap" />
-                                                        </StackPanel>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </Grid>
+                                                   Text="Pan Position" />
+                                        <TextBlock Margin="0,8,0,0"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   FontSize="22"
+                                                   FontWeight="Bold"
+                                                   Text="{Binding PanMotorPositionText}" />
+                                    </StackPanel>
                                 </Border>
 
                                 <Border Grid.Column="1"
                                         Margin="4,0,0,0"
-                                        Padding="6"
-                                        Background="#12000000"
+                                        Padding="9,8"
+                                        Background="#22313A46"
                                         BorderBrush="{DynamicResource PanelBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="2">
-                                    <Grid>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="*" />
-                                        </Grid.RowDefinitions>
+                                    <StackPanel>
                                         <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                                    FontSize="13"
                                                    FontWeight="Bold"
-                                                   Text="Tilt Motor" />
-                                        <ItemsControl Grid.Row="1"
-                                                      Margin="0,6,0,0"
-                                                      ItemsSource="{Binding TiltMotorStatusItems}">
-                                            <ItemsControl.ItemTemplate>
-                                                <DataTemplate>
-                                                    <Border Margin="0,0,0,4"
-                                                            Padding="5,3"
-                                                            Background="#22313A46"
-                                                            BorderBrush="{DynamicResource PanelBorderBrush}"
-                                                            BorderThickness="1"
-                                                            CornerRadius="2">
-                                                        <StackPanel>
-                                                            <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
-                                                                       FontSize="9"
-                                                                       FontWeight="Bold"
-                                                                       LineHeight="10"
-                                                                       Text="{Binding Name}"
-                                                                       TextWrapping="Wrap" />
-                                                            <TextBlock Margin="0,1,0,0"
-                                                                       Foreground="{DynamicResource PrimaryTextBrush}"
-                                                                       FontSize="12"
-                                                                       FontWeight="Bold"
-                                                                       LineHeight="13"
-                                                                       Text="{Binding Value}"
-                                                                       TextWrapping="Wrap" />
-                                                        </StackPanel>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </ItemsControl.ItemTemplate>
-                                        </ItemsControl>
-                                    </Grid>
+                                                   Text="Tilt Position" />
+                                        <TextBlock Margin="0,8,0,0"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   FontSize="22"
+                                                   FontWeight="Bold"
+                                                   Text="{Binding TiltMotorPositionText}" />
+                                    </StackPanel>
                                 </Border>
                             </Grid>
+                            <Button Grid.Row="2"
+                                    Height="30"
+                                    Margin="0,10,0,0"
+                                    Command="{Binding ToggleMotorDetailsCommand}"
+                                    Style="{StaticResource TopBarSmallButton}"
+                                    Content="Motor Details" />
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="3"
+                            Margin="0,12,0,0"
+                            Style="{StaticResource GlassCardBorder}"
+                            Background="#FF05070A">
+                        <Grid Margin="12"
+                              IsEnabled="{Binding CanUseMotorTargetControls}">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                       FontSize="17"
+                                       FontWeight="Bold"
+                                       Text="Motor Target" />
+                            <Grid Grid.Row="1" Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="42" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="42" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           FontSize="13"
+                                           FontWeight="Bold"
+                                           Text="Pan" />
+                                <TextBox Grid.Column="1"
+                                         Height="26"
+                                         Margin="0,0,8,0"
+                                         Padding="6,2"
+                                         FontSize="12"
+                                         Foreground="{DynamicResource PrimaryTextBrush}"
+                                         Background="#22313A46"
+                                         BorderBrush="{DynamicResource PanelBorderBrush}"
+                                         Text="{Binding MotorTargetPanText, UpdateSourceTrigger=PropertyChanged}" />
+                                <TextBlock Grid.Column="2"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           FontSize="13"
+                                           FontWeight="Bold"
+                                           Text="Tilt" />
+                                <TextBox Grid.Column="3"
+                                         Height="26"
+                                         Padding="6,2"
+                                         FontSize="12"
+                                         Foreground="{DynamicResource PrimaryTextBrush}"
+                                         Background="#22313A46"
+                                         BorderBrush="{DynamicResource PanelBorderBrush}"
+                                         Text="{Binding MotorTargetTiltText, UpdateSourceTrigger=PropertyChanged}" />
+                            </Grid>
+                            <Button Grid.Row="2"
+                                    Height="28"
+                                    Margin="0,10,0,0"
+                                    Command="{Binding SendMotorTargetCommand}"
+                                    Style="{StaticResource TopBarSmallButton}"
+                                    Content="OK" />
+                        </Grid>
+                    </Border>
+
+                    <Border Grid.Row="4"
+                            Margin="0,12,0,0"
+                            Style="{StaticResource GlassCardBorder}"
+                            Background="#FF05070A">
+                        <Grid Margin="12"
+                              VerticalAlignment="Top">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Foreground="#FF9DB9F4"
+                                       FontSize="17"
+                                       FontWeight="Bold"
+                                       Text="Step Size (+/-)" />
+                            <Grid Grid.Row="1" Margin="0,14,0,0" HorizontalAlignment="Center">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="56" />
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="72" />
+                                    <ColumnDefinition Width="24" />
+                                    <ColumnDefinition Width="56" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0"
+                                        Height="38"
+                                        Command="{Binding AdjustMotorStepCommand}"
+                                        CommandParameter="-1"
+                                        Style="{StaticResource TopBarButton}"
+                                        Content="-" />
+                                <Border Grid.Column="2"
+                                        Height="42"
+                                        Background="#33313A46"
+                                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="2">
+                                    <TextBlock HorizontalAlignment="Center"
+                                               VerticalAlignment="Center"
+                                               Foreground="#FFA8F0A2"
+                                               FontSize="26"
+                                               FontWeight="Bold"
+                                               Text="{Binding MotorStepSizeText}" />
+                                </Border>
+                                <Button Grid.Column="4"
+                                        Height="38"
+                                        Command="{Binding AdjustMotorStepCommand}"
+                                        CommandParameter="1"
+                                        Style="{StaticResource TopBarButton}"
+                                        Content="+" />
+                            </Grid>
+                            <TextBlock Grid.Row="2"
+                                       Margin="0,8,0,0"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource SecondaryTextBrush}"
+                                       FontSize="12"
+                                       FontWeight="SemiBold"
+                                       Text="keyboard: + / -" />
                         </Grid>
                     </Border>
                 </Grid>
@@ -1009,76 +1079,7 @@
                                 <TextBlock Grid.Column="4" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" FontWeight="SemiBold" TextAlignment="Right" Text="{Binding ZoomLevelText}" />
                             </Grid>
 
-                            <Border Grid.Row="0"
-                                    Grid.RowSpan="2"
-                                    Grid.Column="3"
-                                    Margin="6,0"
-                                    Padding="8,6"
-                                    Background="{DynamicResource OverlayPanelBrush}"
-                                    BorderBrush="{DynamicResource PanelBorderBrush}"
-                                    BorderThickness="1"
-                                    CornerRadius="2">
-                                <Grid IsEnabled="{Binding CanUseMotorTargetControls}">
-                                    <Grid.RowDefinitions>
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                        <RowDefinition Height="Auto" />
-                                    </Grid.RowDefinitions>
-                                    <TextBlock HorizontalAlignment="Center"
-                                               Foreground="{DynamicResource PrimaryTextBrush}"
-                                               FontSize="12"
-                                               FontWeight="Bold"
-                                               Text="Motor Target" />
-                                    <Grid Grid.Row="1" Margin="0,6,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="42" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                                   FontSize="14"
-                                                   FontWeight="Bold"
-                                                   Text="Pan" />
-                                        <TextBox Grid.Column="1"
-                                                 Height="23"
-                                                 Padding="6,1"
-                                                 FontSize="11"
-                                                 Foreground="{DynamicResource PrimaryTextBrush}"
-                                                 Background="#22313A46"
-                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
-                                                 Text="{Binding MotorTargetPanText, UpdateSourceTrigger=PropertyChanged}" />
-                                    </Grid>
-                                    <Grid Grid.Row="2" Margin="0,5,0,0">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="42" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <TextBlock VerticalAlignment="Center"
-                                                   Foreground="{DynamicResource SecondaryTextBrush}"
-                                                   FontSize="14"
-                                                   FontWeight="Bold"
-                                                   Text="Tilt" />
-                                        <TextBox Grid.Column="1"
-                                                 Height="23"
-                                                 Padding="6,1"
-                                                 FontSize="11"
-                                                 Foreground="{DynamicResource PrimaryTextBrush}"
-                                                 Background="#22313A46"
-                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
-                                                 Text="{Binding MotorTargetTiltText, UpdateSourceTrigger=PropertyChanged}" />
-                                    </Grid>
-                                    <Button Grid.Row="3"
-                                            Margin="0,5,0,0"
-                                            Height="22"
-                                            Padding="7,0"
-                                            Command="{Binding SendMotorTargetCommand}"
-                                            Style="{StaticResource TopBarSmallButton}"
-                                            Content="OK" />
-                                    </Grid>
-                            </Border>
-
-                            <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="4" Margin="6,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
+                            <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="3" Grid.ColumnSpan="2" Margin="6,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Foreground="{DynamicResource PrimaryTextBrush}" FontSize="16" FontWeight="Bold" Text="&#xC2DC;&#xC2A4;&#xD15C; &#xD604;&#xD669;" />
                                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
@@ -1558,6 +1559,138 @@
                 </Grid>
             </Grid>
         </Border>
+
+        <Grid Visibility="{Binding IsMotorDetailsOpen, Converter={StaticResource BoolToVisibilityConverter}}"
+              Panel.ZIndex="19">
+            <Rectangle Fill="#66000000" />
+            <Border Width="720"
+                    MaxHeight="680"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Padding="22"
+                    Background="{DynamicResource DrawerBrush}"
+                    BorderBrush="{DynamicResource DrawerBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="2"
+                    Effect="{StaticResource DrawerShadow}">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <TextBlock Foreground="{DynamicResource DrawerTextBrush}"
+                                   FontSize="24"
+                                   FontWeight="Bold"
+                                   Text="Motor Details" />
+                        <Button Grid.Column="1"
+                                Width="34"
+                                Height="30"
+                                Command="{Binding CloseMotorDetailsCommand}"
+                                Style="{StaticResource PlaybackIconButton}">
+                            <materialDesign:PackIcon Kind="Close" Width="18" Height="18" />
+                        </Button>
+                    </Grid>
+                    <Grid Grid.Row="1" Margin="0,18,0,0">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="18" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0"
+                                Padding="12"
+                                Background="{DynamicResource OverlayPanelBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="2">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Text="Pan Motor" />
+                                <ScrollViewer Grid.Row="1" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding PanMotorStatusItems}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
+                                                               FontSize="13"
+                                                               FontWeight="Bold"
+                                                               Text="{Binding Name}"
+                                                               TextWrapping="Wrap" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Margin="12,0,0,0"
+                                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                                               FontSize="14"
+                                                               FontWeight="Bold"
+                                                               Text="{Binding Value}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="2"
+                                Padding="12"
+                                Background="{DynamicResource OverlayPanelBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="2">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Text="Tilt Motor" />
+                                <ScrollViewer Grid.Row="1" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                                    <ItemsControl ItemsSource="{Binding TiltMotorStatusItems}">
+                                        <ItemsControl.ItemTemplate>
+                                            <DataTemplate>
+                                                <Grid Margin="0,0,0,8">
+                                                    <Grid.ColumnDefinitions>
+                                                        <ColumnDefinition Width="*" />
+                                                        <ColumnDefinition Width="Auto" />
+                                                    </Grid.ColumnDefinitions>
+                                                    <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
+                                                               FontSize="13"
+                                                               FontWeight="Bold"
+                                                               Text="{Binding Name}"
+                                                               TextWrapping="Wrap" />
+                                                    <TextBlock Grid.Column="1"
+                                                               Margin="12,0,0,0"
+                                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                                               FontSize="14"
+                                                               FontWeight="Bold"
+                                                               Text="{Binding Value}" />
+                                                </Grid>
+                                            </DataTemplate>
+                                        </ItemsControl.ItemTemplate>
+                                    </ItemsControl>
+                                </ScrollViewer>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+        </Grid>
 
         <!-- SettingsBackdrop? ?ㅼ젙李???諛곌꼍???대몼寃?源붽퀬 諛붽묑 ?대┃ ???ル뒗 ?ㅻ쾭?덉씠?? -->
         <Rectangle x:Name="SettingsBackdrop"

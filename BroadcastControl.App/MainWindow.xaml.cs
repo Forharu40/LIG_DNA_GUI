@@ -1705,6 +1705,11 @@ public partial class MainWindow : Window
 
     private void MainWindow_OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (TryHandleMotorStepKey(e))
+        {
+            return;
+        }
+
         if (!TryMapKeyToMotorDirection(e.Key, out var direction))
         {
             return;
@@ -1716,6 +1721,34 @@ public partial class MainWindow : Window
         }
 
         e.Handled = true;
+    }
+
+    private bool TryHandleMotorStepKey(KeyEventArgs e)
+    {
+        if (Keyboard.FocusedElement is TextBox)
+        {
+            return false;
+        }
+
+        var delta = e.Key switch
+        {
+            Key.Add or Key.OemPlus => 1,
+            Key.Subtract or Key.OemMinus => -1,
+            _ => 0
+        };
+
+        if (delta == 0)
+        {
+            return false;
+        }
+
+        if (_viewModel.AdjustMotorStepCommand.CanExecute(delta))
+        {
+            _viewModel.AdjustMotorStepCommand.Execute(delta);
+        }
+
+        e.Handled = true;
+        return true;
     }
 
     private void MainWindow_OnPreviewKeyUp(object sender, KeyEventArgs e)

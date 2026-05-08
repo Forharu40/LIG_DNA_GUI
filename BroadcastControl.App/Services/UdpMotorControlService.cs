@@ -33,6 +33,11 @@ public sealed class UdpMotorControlService : IDisposable
         return TrySendPacket([0x02, (byte)buttons], out error);
     }
 
+    public bool TrySendStepSizePacket(int stepSize, out string? error)
+    {
+        return TrySendPacket([0x04, (byte)Math.Clamp(stepSize, 1, 10)], out error);
+    }
+
     public bool TrySendTargetAnglePacket(double panDegrees, double tiltDegrees, out string? error)
     {
         var packet = new byte[17];
