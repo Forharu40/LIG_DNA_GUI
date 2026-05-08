@@ -52,7 +52,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double _viewportHeight = 1;
     private double _motorPan;
     private double _motorTilt;
-    private int _motorStepSize = 9;
+    private int _panMotorStepSize = 9;
+    private int _tiltMotorStepSize = 9;
     private double _panMotorPositionDegrees;
     private double _tiltMotorPositionDegrees;
     private bool _isMotorDetailsOpen;
@@ -277,20 +278,35 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double MotorControlsOpacity => CanUseMotorControls ? 1.0 : 0.38;
 
-    public int MotorStepSize
+    public int PanMotorStepSize
     {
-        get => _motorStepSize;
+        get => _panMotorStepSize;
         private set
         {
             var normalized = Math.Clamp(value, 1, 10);
-            if (SetProperty(ref _motorStepSize, normalized))
+            if (SetProperty(ref _panMotorStepSize, normalized))
             {
-                OnPropertyChanged(nameof(MotorStepSizeText));
+                OnPropertyChanged(nameof(PanMotorStepSizeText));
             }
         }
     }
 
-    public string MotorStepSizeText => MotorStepSize.ToString(CultureInfo.InvariantCulture);
+    public int TiltMotorStepSize
+    {
+        get => _tiltMotorStepSize;
+        private set
+        {
+            var normalized = Math.Clamp(value, 1, 10);
+            if (SetProperty(ref _tiltMotorStepSize, normalized))
+            {
+                OnPropertyChanged(nameof(TiltMotorStepSizeText));
+            }
+        }
+    }
+
+    public string PanMotorStepSizeText => PanMotorStepSize.ToString(CultureInfo.InvariantCulture);
+
+    public string TiltMotorStepSizeText => TiltMotorStepSize.ToString(CultureInfo.InvariantCulture);
 
     public string PanMotorPositionText => $"{_panMotorPositionDegrees:0.0} deg";
 
@@ -1145,26 +1161,57 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     private void AdjustMotorStep(object? parameter)
     {
-        var delta = parameter switch
-        {
-            int intValue => intValue,
-            string text when int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsed) => parsed,
-            _ => 0
-        };
-
-        if (delta == 0)
+        if (!TryParseMotorStepParameter(parameter, out var axis, out var delta))
         {
             return;
         }
 
-        MotorStepSize += delta;
-        if (!_motorControlService.TrySendStepSizePacket(MotorStepSize, out var error))
+        if (axis is MotorStepAxis.Pan or MotorStepAxis.Both)
+        {
+            PanMotorStepSize += delta;
+        }
+
+        if (axis is MotorStepAxis.Tilt or MotorStepAxis.Both)
+        {
+            TiltMotorStepSize += delta;
+        }
+
+        if (!_motorControlService.TrySendStepSizePacket(PanMotorStepSize, TiltMotorStepSize, out var error))
         {
             AppendImportantLog($"모터 step size 전송에 실패했습니다: {error}");
             return;
         }
 
-        AppendImportantLog($"모터 step size가 {MotorStepSize}(으)로 변경되었습니다.");
+        AppendImportantLog($"모터 step size 변경: pan {PanMotorStepSize}, tilt {TiltMotorStepSize}");
+    }
+
+    private static bool TryParseMotorStepParameter(object? parameter, out MotorStepAxis axis, out int delta)
+    {
+        axis = MotorStepAxis.Both;
+        delta = 0;
+
+        if (parameter is string text)
+        {
+            var parts = text.Split(':', StringSplitOptions.TrimEntries | StringSplitOptions.RemoveEmptyEntries);
+            if (parts.Length == 2)
+            {
+                axis = string.Equals(parts[0], "Tilt", StringComparison.OrdinalIgnoreCase)
+                    ? MotorStepAxis.Tilt
+                    : MotorStepAxis.Pan;
+                return int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out delta) && delta != 0;
+            }
+
+            axis = MotorStepAxis.Both;
+            return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out delta) && delta != 0;
+        }
+
+        delta = parameter switch
+        {
+            int intValue => intValue,
+            _ => 0
+        };
+
+        return delta != 0;
     }
 
     /// <summary>
@@ -1388,7 +1435,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     private bool TrySendStepSizePacket(out string? error)
     {
-        return _motorControlService.TrySendStepSizePacket(MotorStepSize, out error);
+        return _motorControlService.TrySendStepSizePacket(PanMotorStepSize, TiltMotorStepSize, out error);
     }
 
     private void ApplyMotorButtonStateToUi(MotorButtonMask buttons)
@@ -1402,22 +1449,22 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         {
             if ((buttons & MotorButtonMask.Left) == MotorButtonMask.Left)
             {
-                _motorPan = Math.Clamp(_motorPan - MotorStepSize, 0, MotorPanLimitDegrees);
+                _motorPan = Math.Clamp(_motorPan - PanMotorStepSize, 0, MotorPanLimitDegrees);
             }
 
             if ((buttons & MotorButtonMask.Right) == MotorButtonMask.Right)
             {
-                _motorPan = Math.Clamp(_motorPan + MotorStepSize, 0, MotorPanLimitDegrees);
+                _motorPan = Math.Clamp(_motorPan + PanMotorStepSize, 0, MotorPanLimitDegrees);
             }
 
             if ((buttons & MotorButtonMask.Up) == MotorButtonMask.Up)
             {
-                _motorTilt = Math.Clamp(_motorTilt + MotorStepSize, 0, MotorTiltLimitDegrees);
+                _motorTilt = Math.Clamp(_motorTilt + TiltMotorStepSize, 0, MotorTiltLimitDegrees);
             }
 
             if ((buttons & MotorButtonMask.Down) == MotorButtonMask.Down)
             {
-                _motorTilt = Math.Clamp(_motorTilt - MotorStepSize, 0, MotorTiltLimitDegrees);
+                _motorTilt = Math.Clamp(_motorTilt - TiltMotorStepSize, 0, MotorTiltLimitDegrees);
             }
         }
 
@@ -1481,6 +1528,13 @@ public sealed record AnalysisItem(string Time, string Message)
 public sealed record SystemLogItem(string Time, string Message)
 {
     public DateTime CreatedAt { get; init; } = DateTime.Now;
+}
+
+public enum MotorStepAxis
+{
+    Both,
+    Pan,
+    Tilt
 }
 
 public sealed class MotorStatusItem : INotifyPropertyChanged

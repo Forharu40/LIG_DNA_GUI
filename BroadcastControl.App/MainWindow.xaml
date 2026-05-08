@@ -360,8 +360,8 @@
                     <Grid.RowDefinitions>
                         <RowDefinition Height="74" />
                         <RowDefinition Height="150" />
-                        <RowDefinition Height="210" />
-                        <RowDefinition Height="145" />
+                        <RowDefinition Height="176" />
+                        <RowDefinition Height="126" />
                         <RowDefinition Height="*" />
                     </Grid.RowDefinitions>
 
@@ -415,17 +415,17 @@
                     <Border Grid.Row="2"
                             Style="{StaticResource GlassCardBorder}"
                             Background="#FF05070A">
-                        <Grid Margin="12">
+                        <Grid Margin="10">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
-                                       FontSize="20"
+                                       FontSize="17"
                                        FontWeight="Bold"
                                        Text="Motor Info" />
-                            <Grid Grid.Row="1" Margin="0,10,0,0">
+                            <Grid Grid.Row="1" Margin="0,8,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
                                     <ColumnDefinition Width="*" />
@@ -433,19 +433,19 @@
 
                                 <Border Grid.Column="0"
                                         Margin="0,0,4,0"
-                                        Padding="9,8"
+                                        Padding="7,6"
                                         Background="#22313A46"
                                         BorderBrush="{DynamicResource PanelBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="2">
                                     <StackPanel>
                                         <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
-                                                   FontSize="13"
+                                                   FontSize="11"
                                                    FontWeight="Bold"
                                                    Text="Pan Position" />
-                                        <TextBlock Margin="0,8,0,0"
+                                        <TextBlock Margin="0,6,0,0"
                                                    Foreground="{DynamicResource PrimaryTextBrush}"
-                                                   FontSize="22"
+                                                   FontSize="18"
                                                    FontWeight="Bold"
                                                    Text="{Binding PanMotorPositionText}" />
                                     </StackPanel>
@@ -453,27 +453,27 @@
 
                                 <Border Grid.Column="1"
                                         Margin="4,0,0,0"
-                                        Padding="9,8"
+                                        Padding="7,6"
                                         Background="#22313A46"
                                         BorderBrush="{DynamicResource PanelBorderBrush}"
                                         BorderThickness="1"
                                         CornerRadius="2">
                                     <StackPanel>
                                         <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
-                                                   FontSize="13"
+                                                   FontSize="11"
                                                    FontWeight="Bold"
                                                    Text="Tilt Position" />
-                                        <TextBlock Margin="0,8,0,0"
+                                        <TextBlock Margin="0,6,0,0"
                                                    Foreground="{DynamicResource PrimaryTextBrush}"
-                                                   FontSize="22"
+                                                   FontSize="18"
                                                    FontWeight="Bold"
                                                    Text="{Binding TiltMotorPositionText}" />
                                     </StackPanel>
                                 </Border>
                             </Grid>
                             <Button Grid.Row="2"
-                                    Height="30"
-                                    Margin="0,10,0,0"
+                                    Height="26"
+                                    Margin="0,8,0,0"
                                     Command="{Binding ToggleMotorDetailsCommand}"
                                     Style="{StaticResource TopBarSmallButton}"
                                     Content="Motor Details" />
@@ -484,7 +484,7 @@
                             Margin="0,12,0,0"
                             Style="{StaticResource GlassCardBorder}"
                             Background="#FF05070A">
-                        <Grid Margin="12"
+                        <Grid Margin="10"
                               IsEnabled="{Binding CanUseMotorTargetControls}">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -492,10 +492,10 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
-                                       FontSize="17"
+                                       FontSize="15"
                                        FontWeight="Bold"
                                        Text="Motor Target" />
-                            <Grid Grid.Row="1" Margin="0,10,0,0">
+                            <Grid Grid.Row="1" Margin="0,8,0,0">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="42" />
                                     <ColumnDefinition Width="*" />
@@ -504,14 +504,14 @@
                                 </Grid.ColumnDefinitions>
                                 <TextBlock VerticalAlignment="Center"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
-                                           FontSize="13"
+                                           FontSize="11"
                                            FontWeight="Bold"
                                            Text="Pan" />
                                 <TextBox Grid.Column="1"
-                                         Height="26"
+                                         Height="23"
                                          Margin="0,0,8,0"
                                          Padding="6,2"
-                                         FontSize="12"
+                                         FontSize="11"
                                          Foreground="{DynamicResource PrimaryTextBrush}"
                                          Background="#22313A46"
                                          BorderBrush="{DynamicResource PanelBorderBrush}"
@@ -519,21 +519,21 @@
                                 <TextBlock Grid.Column="2"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
-                                           FontSize="13"
+                                           FontSize="11"
                                            FontWeight="Bold"
                                            Text="Tilt" />
                                 <TextBox Grid.Column="3"
-                                         Height="26"
+                                         Height="23"
                                          Padding="6,2"
-                                         FontSize="12"
+                                         FontSize="11"
                                          Foreground="{DynamicResource PrimaryTextBrush}"
                                          Background="#22313A46"
                                          BorderBrush="{DynamicResource PanelBorderBrush}"
                                          Text="{Binding MotorTargetTiltText, UpdateSourceTrigger=PropertyChanged}" />
                             </Grid>
                             <Button Grid.Row="2"
-                                    Height="28"
-                                    Margin="0,10,0,0"
+                                    Height="25"
+                                    Margin="0,8,0,0"
                                     Command="{Binding SendMotorTargetCommand}"
                                     Style="{StaticResource TopBarSmallButton}"
                                     Content="OK" />
@@ -544,7 +544,7 @@
                             Margin="0,12,0,0"
                             Style="{StaticResource GlassCardBorder}"
                             Background="#FF05070A">
-                        <Grid Margin="12"
+                        <Grid Margin="10"
                               VerticalAlignment="Top">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
@@ -552,48 +552,39 @@
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
                             <TextBlock Foreground="#FF9DB9F4"
-                                       FontSize="17"
+                                       FontSize="14"
                                        FontWeight="Bold"
                                        Text="Step Size (+/-)" />
-                            <Grid Grid.Row="1" Margin="0,14,0,0" HorizontalAlignment="Center">
+                            <Grid Grid.Row="1" Margin="0,8,0,0">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="56" />
-                                    <ColumnDefinition Width="24" />
-                                    <ColumnDefinition Width="72" />
-                                    <ColumnDefinition Width="24" />
-                                    <ColumnDefinition Width="56" />
+                                    <ColumnDefinition Width="34" />
+                                    <ColumnDefinition Width="42" />
+                                    <ColumnDefinition Width="42" />
+                                    <ColumnDefinition Width="42" />
                                 </Grid.ColumnDefinitions>
-                                <Button Grid.Column="0"
-                                        Height="38"
-                                        Command="{Binding AdjustMotorStepCommand}"
-                                        CommandParameter="-1"
-                                        Style="{StaticResource TopBarButton}"
-                                        Content="-" />
-                                <Border Grid.Column="2"
-                                        Height="42"
-                                        Background="#33313A46"
-                                        BorderBrush="{DynamicResource PanelBorderBrush}"
-                                        BorderThickness="1"
-                                        CornerRadius="2">
-                                    <TextBlock HorizontalAlignment="Center"
-                                               VerticalAlignment="Center"
-                                               Foreground="#FFA8F0A2"
-                                               FontSize="26"
-                                               FontWeight="Bold"
-                                               Text="{Binding MotorStepSizeText}" />
+                                <TextBlock VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="12" FontWeight="Bold" Text="Pan" />
+                                <Button Grid.Column="1" Height="27" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Pan:-1" Style="{StaticResource TopBarSmallButton}" Content="-" />
+                                <Border Grid.Column="2" Height="29" Margin="5,0" Background="#33313A46" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#FFA8F0A2" FontSize="17" FontWeight="Bold" Text="{Binding PanMotorStepSizeText}" />
                                 </Border>
-                                <Button Grid.Column="4"
-                                        Height="38"
-                                        Command="{Binding AdjustMotorStepCommand}"
-                                        CommandParameter="1"
-                                        Style="{StaticResource TopBarButton}"
-                                        Content="+" />
+                                <Button Grid.Column="3" Height="27" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Pan:1" Style="{StaticResource TopBarSmallButton}" Content="+" />
+
+                                <TextBlock Grid.Row="1" VerticalAlignment="Center" Margin="0,6,0,0" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="12" FontWeight="Bold" Text="Tilt" />
+                                <Button Grid.Row="1" Grid.Column="1" Height="27" Margin="0,6,0,0" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Tilt:-1" Style="{StaticResource TopBarSmallButton}" Content="-" />
+                                <Border Grid.Row="1" Grid.Column="2" Height="29" Margin="5,6,5,0" Background="#33313A46" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
+                                    <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#FFA8F0A2" FontSize="17" FontWeight="Bold" Text="{Binding TiltMotorStepSizeText}" />
+                                </Border>
+                                <Button Grid.Row="1" Grid.Column="3" Height="27" Margin="0,6,0,0" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Tilt:1" Style="{StaticResource TopBarSmallButton}" Content="+" />
                             </Grid>
                             <TextBlock Grid.Row="2"
-                                       Margin="0,8,0,0"
+                                       Margin="0,6,0,0"
                                        HorizontalAlignment="Center"
                                        Foreground="{DynamicResource SecondaryTextBrush}"
-                                       FontSize="12"
+                                       FontSize="10"
                                        FontWeight="SemiBold"
                                        Text="keyboard: + / -" />
                         </Grid>
@@ -776,7 +767,7 @@
                         <Grid Margin="0,0,24,26"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom"
-                              Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVisibilityConverter}}">
+                              Visibility="Collapsed">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -1079,7 +1070,62 @@
                                 <TextBlock Grid.Column="4" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" FontWeight="SemiBold" TextAlignment="Right" Text="{Binding ZoomLevelText}" />
                             </Grid>
 
-                            <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="3" Grid.ColumnSpan="2" Margin="6,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
+                            <Border Grid.Row="0"
+                                    Grid.RowSpan="2"
+                                    Grid.Column="3"
+                                    Margin="6,0"
+                                    Padding="8,6"
+                                    Background="{DynamicResource OverlayPanelBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="2"
+                                    Opacity="{Binding MotorControlsOpacity}"
+                                    IsEnabled="{Binding CanUseMotorControls}">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               Text="&#xBAA8;&#xD130; &#xCEE8;&#xD2B8;&#xB864;" />
+                                    <Grid Grid.Row="1"
+                                          Width="112"
+                                          Height="82"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="26" />
+                                            <RowDefinition Height="30" />
+                                            <RowDefinition Height="26" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="38" />
+                                            <ColumnDefinition Width="36" />
+                                            <ColumnDefinition Width="38" />
+                                        </Grid.ColumnDefinitions>
+                                        <Button Grid.Row="0" Grid.Column="1" Tag="Up" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                            <materialDesign:PackIcon Kind="ArrowUpBold" Width="14" Height="14" />
+                                        </Button>
+                                        <Button Grid.Row="1" Grid.Column="0" Tag="Left" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                            <materialDesign:PackIcon Kind="ArrowLeftBold" Width="14" Height="14" />
+                                        </Button>
+                                        <Button Grid.Row="1" Grid.Column="1" Tag="Center" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                            <Ellipse Width="11" Height="11" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="1.6" Fill="Transparent" />
+                                        </Button>
+                                        <Button Grid.Row="1" Grid.Column="2" Tag="Right" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                            <materialDesign:PackIcon Kind="ArrowRightBold" Width="14" Height="14" />
+                                        </Button>
+                                        <Button Grid.Row="2" Grid.Column="1" Tag="Down" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                            <materialDesign:PackIcon Kind="ArrowDownBold" Width="14" Height="14" />
+                                        </Button>
+                                    </Grid>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Row="0" Grid.RowSpan="2" Grid.Column="4" Margin="6,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
                                 <StackPanel VerticalAlignment="Center">
                                     <TextBlock Foreground="{DynamicResource PrimaryTextBrush}" FontSize="16" FontWeight="Bold" Text="&#xC2DC;&#xC2A4;&#xD15C; &#xD604;&#xD669;" />
                                     <StackPanel Margin="0,8,0,0" Orientation="Horizontal">

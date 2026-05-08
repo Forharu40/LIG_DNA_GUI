@@ -1705,6 +1705,11 @@ public partial class MainWindow : Window
 
     private void MainWindow_OnPreviewKeyDown(object sender, KeyEventArgs e)
     {
+        if (Keyboard.FocusedElement is TextBox && e.Key == Key.C)
+        {
+            return;
+        }
+
         if (TryHandleMotorStepKey(e))
         {
             return;
@@ -1753,6 +1758,11 @@ public partial class MainWindow : Window
 
     private void MainWindow_OnPreviewKeyUp(object sender, KeyEventArgs e)
     {
+        if (Keyboard.FocusedElement is TextBox && e.Key == Key.C)
+        {
+            return;
+        }
+
         if (!TryMapKeyToMotorDirection(e.Key, out var direction))
         {
             return;
@@ -1855,6 +1865,7 @@ public partial class MainWindow : Window
             Key.Right => "Right",
             Key.Up => "Up",
             Key.Down => "Down",
+            Key.C => "Center",
             _ => string.Empty
         };
 
