@@ -84,7 +84,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         AnalysisItems = new ObservableCollection<AnalysisItem>();
         SystemLogs = new ObservableCollection<SystemLogItem>();
-        MotorStatusItems = new ObservableCollection<MotorStatusItem>(CreateDefaultMotorStatusItems());
+        PanMotorStatusItems = new ObservableCollection<MotorStatusItem>(CreateDefaultMotorStatusItems());
+        TiltMotorStatusItems = new ObservableCollection<MotorStatusItem>(CreateDefaultMotorStatusItems());
 
         AddSystemLogItem(new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), "\uC2DC\uC2A4\uD15C \uAC00\uB3D9\uC744 \uC2DC\uC791\uD569\uB2C8\uB2E4."));
 
@@ -127,7 +128,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public ObservableCollection<SystemLogItem> SystemLogs { get; }
 
-    public ObservableCollection<MotorStatusItem> MotorStatusItems { get; }
+    public ObservableCollection<MotorStatusItem> PanMotorStatusItems { get; }
+
+    public ObservableCollection<MotorStatusItem> TiltMotorStatusItems { get; }
 
     public ReadOnlyCollection<string> PrimaryTargets { get; }
 
@@ -367,9 +370,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double InsetFeedRotationAngle => _isEoPrimary ? _irDisplayRotationAngle : _eoDisplayRotationAngle;
 
-    public Stretch LargeFeedStretch => Stretch.Fill;
+    public Stretch LargeFeedStretch => Stretch.UniformToFill;
 
-    public Stretch InsetFeedStretch => Stretch.Fill;
+    public Stretch InsetFeedStretch => Stretch.UniformToFill;
 
     public string LargeFeedSubtitle => _isEoPrimary ? EoSubtitle : IrSubtitle;
 
@@ -609,21 +612,30 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(MotorTiltText));
     }
 
-    public void UpdateMotorStatus(MotorStatusPacket packet)
+    public void UpdateMotorStatus(MotorStatusSnapshot snapshot)
     {
-        SetMotorStatusValue("Motor Value", packet.PresentPosition.ToString(CultureInfo.InvariantCulture));
-        SetMotorStatusValue("Actual Value", $"{DynamixelPositionToDegrees(packet.PresentPosition):0.0} deg");
-        SetMotorStatusValue("Motor Change Value", packet.GoalPosition.ToString(CultureInfo.InvariantCulture));
-        SetMotorStatusValue("Actual Change Value", $"{DynamixelPositionToDegrees(packet.GoalPosition):0.0} deg");
-        SetMotorStatusValue("Velocity", packet.PresentVelocity.ToString(CultureInfo.InvariantCulture));
-        SetMotorStatusValue("Load", packet.PresentLoad.ToString(CultureInfo.InvariantCulture));
-        SetMotorStatusValue("PWM", packet.PresentPwm.ToString(CultureInfo.InvariantCulture));
-        SetMotorStatusValue("Temperature", $"{packet.PresentTemperature} C");
-        SetMotorStatusValue("Voltage", $"{packet.PresentInputVoltage:0.0} V");
-        SetMotorStatusValue("Moving", packet.Moving == 0 ? "Stop" : "Moving");
-        SetMotorStatusValue("Error Status", $"0x{packet.HardwareErrorStatus:X2}");
-        SetMotorStatusValue("Moving Status", $"0x{packet.MovingStatus:X2}");
-        SetMotorStatusValue("Last Update", packet.ReceivedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
+        UpdateMotorStatusItems(PanMotorStatusItems, snapshot.Pan);
+        if (snapshot.Tilt is { } tilt)
+        {
+            UpdateMotorStatusItems(TiltMotorStatusItems, tilt);
+        }
+    }
+
+    private static void UpdateMotorStatusItems(ObservableCollection<MotorStatusItem> items, MotorStatusPacket packet)
+    {
+        SetMotorStatusValue(items, "Motor Value", packet.PresentPosition.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue(items, "Actual Value", $"{DynamixelPositionToDegrees(packet.PresentPosition):0.0} deg");
+        SetMotorStatusValue(items, "Motor Change Value", packet.GoalPosition.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue(items, "Actual Change Value", $"{DynamixelPositionToDegrees(packet.GoalPosition):0.0} deg");
+        SetMotorStatusValue(items, "Velocity", packet.PresentVelocity.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue(items, "Load", packet.PresentLoad.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue(items, "PWM", packet.PresentPwm.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue(items, "Temperature", $"{packet.PresentTemperature} C");
+        SetMotorStatusValue(items, "Voltage", $"{packet.PresentInputVoltage:0.0} V");
+        SetMotorStatusValue(items, "Moving", packet.Moving == 0 ? "Stop" : "Moving");
+        SetMotorStatusValue(items, "Error Status", $"0x{packet.HardwareErrorStatus:X2}");
+        SetMotorStatusValue(items, "Moving Status", $"0x{packet.MovingStatus:X2}");
+        SetMotorStatusValue(items, "Last Update", packet.ReceivedAt.ToString("HH:mm:ss", CultureInfo.InvariantCulture));
     }
 
     public void UpdateManualButtonState(MotorButtonMask buttons)
@@ -1167,9 +1179,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         TrimCollection(SystemLogs, VisibleLogItemLimit);
     }
 
-    private void SetMotorStatusValue(string name, string value)
+    private static void SetMotorStatusValue(ObservableCollection<MotorStatusItem> items, string name, string value)
     {
-        var item = MotorStatusItems.FirstOrDefault(status => status.Name == name);
+        var item = items.FirstOrDefault(status => status.Name == name);
         if (item is not null)
         {
             item.Value = value;

@@ -19,7 +19,7 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
         _udpClient = new UdpClient(new IPEndPoint(IPAddress.Any, Port));
     }
 
-    public event EventHandler<MotorStatusPacket>? StatusReceived;
+    public event EventHandler<MotorStatusSnapshot>? StatusReceived;
 
     public event EventHandler<string>? ReceiverError;
 
@@ -50,9 +50,9 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
             try
             {
                 var result = await _udpClient.ReceiveAsync(cancellationToken);
-                if (TryParsePacket(result.Buffer, out var packet))
+                if (TryParseSnapshot(result.Buffer, out var snapshot))
                 {
-                    StatusReceived?.Invoke(this, packet);
+                    StatusReceived?.Invoke(this, snapshot);
                 }
             }
             catch (OperationCanceledException)
@@ -70,28 +70,41 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
         }
     }
 
-    private static bool TryParsePacket(byte[] buffer, out MotorStatusPacket packet)
+    private static bool TryParseSnapshot(byte[] buffer, out MotorStatusSnapshot snapshot)
     {
-        packet = default;
+        snapshot = default;
         if (buffer.Length < PacketSize)
         {
             return false;
         }
 
-        packet = new MotorStatusPacket(
+        var receivedAt = DateTime.Now;
+        var pan = ParsePacket(buffer.AsSpan(0, PacketSize), receivedAt);
+        MotorStatusPacket? tilt = null;
+        if (buffer.Length >= PacketSize * 2)
+        {
+            tilt = ParsePacket(buffer.AsSpan(PacketSize, PacketSize), receivedAt);
+        }
+
+        snapshot = new MotorStatusSnapshot(pan, tilt);
+        return true;
+    }
+
+    private static MotorStatusPacket ParsePacket(ReadOnlySpan<byte> buffer, DateTime receivedAt)
+    {
+        return new MotorStatusPacket(
             HardwareErrorStatus: buffer[0],
             PresentTemperature: buffer[1],
-            PresentInputVoltageRaw: BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(2, 2)),
-            PresentPosition: BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(4, 2)),
-            PresentVelocity: BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(6, 2)),
-            PresentLoad: BinaryPrimitives.ReadInt16LittleEndian(buffer.AsSpan(8, 2)),
-            PresentPwm: BinaryPrimitives.ReadInt16LittleEndian(buffer.AsSpan(10, 2)),
-            GoalPosition: BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(12, 2)),
-            GoalVelocity: BinaryPrimitives.ReadUInt16LittleEndian(buffer.AsSpan(14, 2)),
+            PresentInputVoltageRaw: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(2, 2)),
+            PresentPosition: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(4, 2)),
+            PresentVelocity: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(6, 2)),
+            PresentLoad: BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(8, 2)),
+            PresentPwm: BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(10, 2)),
+            GoalPosition: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(12, 2)),
+            GoalVelocity: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(14, 2)),
             Moving: buffer[16],
             MovingStatus: buffer[17],
-            ReceivedAt: DateTime.Now);
-        return true;
+            ReceivedAt: receivedAt);
     }
 
     private static int ResolvePort(int? port)
@@ -107,6 +120,10 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
             : DefaultPort;
     }
 }
+
+public readonly record struct MotorStatusSnapshot(
+    MotorStatusPacket Pan,
+    MotorStatusPacket? Tilt);
 
 public readonly record struct MotorStatusPacket(
     byte HardwareErrorStatus,

@@ -422,41 +422,110 @@
                                        FontSize="20"
                                        FontWeight="Bold"
                                        Text="Motor Info" />
-                            <ItemsControl Grid.Row="1"
-                                          Margin="0,10,0,0"
-                                          ItemsSource="{Binding MotorStatusItems}">
-                                <ItemsControl.ItemsPanel>
-                                    <ItemsPanelTemplate>
-                                        <UniformGrid Columns="2" />
-                                    </ItemsPanelTemplate>
-                                </ItemsControl.ItemsPanel>
-                                <ItemsControl.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Margin="0,0,6,7"
-                                                Padding="7,5"
-                                                Background="#22313A46"
-                                                BorderBrush="{DynamicResource PanelBorderBrush}"
-                                                BorderThickness="1"
-                                                CornerRadius="2">
-                                            <StackPanel>
-                                                <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
-                                                           FontSize="11"
-                                                           FontWeight="Bold"
-                                                           LineHeight="12"
-                                                           Text="{Binding Name}"
-                                                           TextWrapping="Wrap" />
-                                                <TextBlock Margin="0,2,0,0"
-                                                           Foreground="{DynamicResource PrimaryTextBrush}"
-                                                           FontSize="16"
-                                                           FontWeight="Bold"
-                                                           LineHeight="18"
-                                                           Text="{Binding Value}"
-                                                           TextWrapping="Wrap" />
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ItemsControl.ItemTemplate>
-                            </ItemsControl>
+                            <Grid Grid.Row="1" Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+
+                                <Border Grid.Column="0"
+                                        Margin="0,0,4,0"
+                                        Padding="6"
+                                        Background="#12000000"
+                                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="2">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   FontSize="13"
+                                                   FontWeight="Bold"
+                                                   Text="Pan Motor" />
+                                        <ItemsControl Grid.Row="1"
+                                                      Margin="0,6,0,0"
+                                                      ItemsSource="{Binding PanMotorStatusItems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Margin="0,0,0,4"
+                                                            Padding="5,3"
+                                                            Background="#22313A46"
+                                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="2">
+                                                        <StackPanel>
+                                                            <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                       FontSize="9"
+                                                                       FontWeight="Bold"
+                                                                       LineHeight="10"
+                                                                       Text="{Binding Name}"
+                                                                       TextWrapping="Wrap" />
+                                                            <TextBlock Margin="0,1,0,0"
+                                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                                       FontSize="12"
+                                                                       FontWeight="Bold"
+                                                                       LineHeight="13"
+                                                                       Text="{Binding Value}"
+                                                                       TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Column="1"
+                                        Margin="4,0,0,0"
+                                        Padding="6"
+                                        Background="#12000000"
+                                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="2">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   FontSize="13"
+                                                   FontWeight="Bold"
+                                                   Text="Tilt Motor" />
+                                        <ItemsControl Grid.Row="1"
+                                                      Margin="0,6,0,0"
+                                                      ItemsSource="{Binding TiltMotorStatusItems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Border Margin="0,0,0,4"
+                                                            Padding="5,3"
+                                                            Background="#22313A46"
+                                                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                                                            BorderThickness="1"
+                                                            CornerRadius="2">
+                                                        <StackPanel>
+                                                            <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
+                                                                       FontSize="9"
+                                                                       FontWeight="Bold"
+                                                                       LineHeight="10"
+                                                                       Text="{Binding Name}"
+                                                                       TextWrapping="Wrap" />
+                                                            <TextBlock Margin="0,1,0,0"
+                                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                                       FontSize="12"
+                                                                       FontWeight="Bold"
+                                                                       LineHeight="13"
+                                                                       Text="{Binding Value}"
+                                                                       TextWrapping="Wrap" />
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </Grid>
+                                </Border>
+                            </Grid>
                         </Grid>
                     </Border>
                 </Grid>

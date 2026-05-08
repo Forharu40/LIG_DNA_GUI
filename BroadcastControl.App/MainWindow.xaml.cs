@@ -406,9 +406,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OnMotorStatusReceived(object? sender, MotorStatusPacket packet)
+    private void OnMotorStatusReceived(object? sender, MotorStatusSnapshot snapshot)
     {
-        Dispatcher.Invoke(() => _viewModel.UpdateMotorStatus(packet));
+        Dispatcher.Invoke(() => _viewModel.UpdateMotorStatus(snapshot));
     }
 
     private void OnMotorStatusReceiverError(object? sender, string message)
@@ -518,8 +518,9 @@ public partial class MainWindow : Window
 
             var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
             var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
-            var scaleX = viewportWidth / rotatedSourceWidth;
-            var scaleY = viewportHeight / rotatedSourceHeight;
+            var baseScale = Math.Max(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
+            var scaleX = baseScale;
+            var scaleY = baseScale;
             var scaledWidth = rotatedSourceWidth * scaleX;
             var scaledHeight = rotatedSourceHeight * scaleY;
             var baseLeft = (viewportWidth - scaledWidth) / 2.0;
