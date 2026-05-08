@@ -1747,9 +1747,14 @@ public partial class MainWindow : Window
             return false;
         }
 
-        if (_viewModel.AdjustMotorStepCommand.CanExecute(delta))
+        var isManualStepKey = (Keyboard.Modifiers & ModifierKeys.Control) == ModifierKeys.Control;
+        var commandParameter = isManualStepKey
+            ? $"Manual:{delta}"
+            : $"Auto:{delta}";
+
+        if (_viewModel.AdjustMotorStepCommand.CanExecute(commandParameter))
         {
-            _viewModel.AdjustMotorStepCommand.Execute(delta);
+            _viewModel.AdjustMotorStepCommand.Execute(commandParameter);
         }
 
         e.Handled = true;
@@ -1790,6 +1795,7 @@ public partial class MainWindow : Window
         }
 
         SendActiveMotorButtons();
+        UpdateMotorPadButtonVisualStates();
 
         if (_activeMotorDirections.Count > 0)
         {
@@ -1814,6 +1820,7 @@ public partial class MainWindow : Window
         }
 
         SendActiveMotorButtons();
+        UpdateMotorPadButtonVisualStates();
 
         if (_activeMotorDirections.Count == 0)
         {
@@ -1855,6 +1862,34 @@ public partial class MainWindow : Window
         _motorHoldTimer.Stop();
         _activeMotorDirections.Clear();
         _pressedMotorKeys.Clear();
+        UpdateMotorPadButtonVisualStates();
+    }
+
+    private void UpdateMotorPadButtonVisualStates()
+    {
+        SetMotorPadButtonActive(MotorPadLeftButton, _activeMotorDirections.ContainsKey("Left"));
+        SetMotorPadButtonActive(MotorPadRightButton, _activeMotorDirections.ContainsKey("Right"));
+        SetMotorPadButtonActive(MotorPadUpButton, _activeMotorDirections.ContainsKey("Up"));
+        SetMotorPadButtonActive(MotorPadDownButton, _activeMotorDirections.ContainsKey("Down"));
+        SetMotorPadButtonActive(MotorPadCenterButton, _activeMotorDirections.ContainsKey("Center"));
+    }
+
+    private static void SetMotorPadButtonActive(Button? button, bool isActive)
+    {
+        if (button is null)
+        {
+            return;
+        }
+
+        if (!isActive)
+        {
+            button.ClearValue(Control.BackgroundProperty);
+            button.ClearValue(Control.BorderBrushProperty);
+            return;
+        }
+
+        button.Background = new SolidColorBrush(Color.FromRgb(0x36, 0x55, 0x64));
+        button.BorderBrush = new SolidColorBrush(Color.FromRgb(0x34, 0xD3, 0x99));
     }
 
     private static bool TryMapKeyToMotorDirection(Key key, out string direction)

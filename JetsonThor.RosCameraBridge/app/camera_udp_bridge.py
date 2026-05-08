@@ -34,6 +34,9 @@ from sentinel_interfaces.msg import Detection2DArray
 
 
 LEGACY_IMAGE_HEADER_SIZE = 20
+IMAGE_FRAGMENT_MAGIC = b"IMGF"
+IMAGE_FRAGMENT_HEADER_FORMAT = "!4sQIIHHHH"
+IMAGE_FRAGMENT_HEADER_SIZE = struct.calcsize(IMAGE_FRAGMENT_HEADER_FORMAT)
 DETECTION_PACKET_MAGIC = b"DETS"
 STATUS_PACKET_MAGIC = b"STAT"
 STAMP_HISTORY_LIMIT = 120
@@ -61,9 +64,10 @@ EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/video/eo/preprocessed")
 IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
 EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/detections/eo")
 IR_DETECTION_TOPIC = os.getenv("IR_DETECTION_TOPIC", "/detections/ir")
-STREAM_WIDTH = getenv_int("STREAM_WIDTH", 640)
-STREAM_HEIGHT = getenv_int("STREAM_HEIGHT", 360)
-JPEG_QUALITY = getenv_int("JPEG_QUALITY", 35)
+STREAM_WIDTH = getenv_int("STREAM_WIDTH", 0)
+STREAM_HEIGHT = getenv_int("STREAM_HEIGHT", 0)
+JPEG_QUALITY = getenv_int("JPEG_QUALITY", 85)
+MAX_UDP_PAYLOAD = getenv_int("MAX_UDP_PAYLOAD", 60000)
 UDP_SEND_BUFFER_BYTES = getenv_int("UDP_SEND_BUFFER_BYTES", 4 * 1024 * 1024)
 SEND_STATUS_WITH_IMAGE = getenv_bool("SEND_STATUS_WITH_IMAGE", True)
 RECORDING_ENABLED = getenv_bool("RECORDING_ENABLED", True)
@@ -275,6 +279,35 @@ def build_image_packet(encoded_bytes: bytes, width: int, height: int, frame_inde
     return header + encoded_bytes
 
 
+def build_image_packets(encoded_bytes: bytes, width: int, height: int, frame_index: int, stamp_ns: int) -> list[bytes]:
+    packet = build_image_packet(encoded_bytes, width, height, frame_index, stamp_ns)
+    if len(packet) <= MAX_UDP_PAYLOAD:
+        return [packet]
+
+    fragment_payload_size = max(1024, MAX_UDP_PAYLOAD - IMAGE_FRAGMENT_HEADER_SIZE)
+    fragment_count = (len(encoded_bytes) + fragment_payload_size - 1) // fragment_payload_size
+    if fragment_count > 65535:
+        raise RuntimeError(f"Encoded {width}x{height} frame is too large to fragment: {len(encoded_bytes)} bytes")
+
+    packets: list[bytes] = []
+    for fragment_index in range(fragment_count):
+        start = fragment_index * fragment_payload_size
+        end = min(start + fragment_payload_size, len(encoded_bytes))
+        header = struct.pack(
+            IMAGE_FRAGMENT_HEADER_FORMAT,
+            IMAGE_FRAGMENT_MAGIC,
+            max(0, stamp_ns),
+            max(0, frame_index),
+            len(encoded_bytes),
+            max(0, width),
+            max(0, height),
+            fragment_index,
+            fragment_count,
+        )
+        packets.append(header + encoded_bytes[start:end])
+    return packets
+
+
 def build_detection_packet(stamp_ns: int, frame_index: int, width: int, height: int, detections: list[dict]) -> bytes:
     payload = {
         "stampNs": max(0, stamp_ns),
@@ -300,6 +333,9 @@ def build_status_packet(source: str, stamp_ns: int, frame_index: int, last_error
 
 
 def fit_frame_to_stream(frame: np.ndarray) -> np.ndarray:
+    if STREAM_WIDTH <= 0 or STREAM_HEIGHT <= 0:
+        return frame
+
     height, width = frame.shape[:2]
     scale = min(STREAM_WIDTH / width, STREAM_HEIGHT / height, 1.0)
     target_width = max(2, int(width * scale))
@@ -639,14 +675,15 @@ class StreamBridge:
         if not ok:
             raise RuntimeError(f"{self.name.upper()} JPEG encode failed")
 
-        packet = build_image_packet(
+        packets = build_image_packets(
             encoded.tobytes(),
             stream_frame.shape[1],
             stream_frame.shape[0],
             frame_index,
             stamp_ns,
         )
-        self.sock.sendto(packet, (self.host, self.port))
+        for packet in packets:
+            self.sock.sendto(packet, (self.host, self.port))
 
         frame_info = FrameStampInfo(stamp_ns, frame_index, source_width, source_height)
         with self._lock:
