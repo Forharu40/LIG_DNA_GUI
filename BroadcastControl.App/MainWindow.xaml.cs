@@ -267,6 +267,11 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.IsSystemPoweredOn):
                 UpdateMotorAutomationState();
                 break;
+
+            case nameof(MainViewModel.IsEnglishLanguage):
+            case nameof(MainViewModel.IsKoreanLanguage):
+                UpdateWindowModeButtonText();
+                break;
         }
     }
 
@@ -1627,6 +1632,23 @@ public partial class MainWindow : Window
         }
     }
 
+    private void MotorDetailsBackdrop_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_viewModel.IsMotorDetailsOpen)
+        {
+            _viewModel.IsMotorDetailsOpen = false;
+            e.Handled = true;
+        }
+    }
+
+    private void Button_Click(object sender, RoutedEventArgs e)
+    {
+    }
+
+    private void Button_Click_1(object sender, RoutedEventArgs e)
+    {
+    }
+
     private void WindowModeToggleButton_OnClick(object sender, RoutedEventArgs e)
     {
         ToggleWindowMode();
@@ -1666,8 +1688,8 @@ public partial class MainWindow : Window
         }
 
         WindowModeToggleButton.Content = _isFullscreenMode
-            ? "창모드로 전환"
-            : "전체화면으로 전환";
+            ? _viewModel.Text["WindowMode"]
+            : _viewModel.Text["FullscreenMode"];
     }
 
     private void MotorButton_OnPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)

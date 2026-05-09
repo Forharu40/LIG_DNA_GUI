@@ -59,6 +59,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double _panMotorPositionDegrees;
     private double _tiltMotorPositionDegrees;
     private bool _isMotorDetailsOpen;
+    private UiLanguage _uiLanguage = UiLanguage.English;
     private string _motorTargetPanText = "0.0";
     private string _motorTargetTiltText = "0.0";
     private bool _hasTrackedTarget;
@@ -82,6 +83,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public MainViewModel(UdpMotorControlService? motorControlService = null)
     {
         _motorControlService = motorControlService ?? new UdpMotorControlService();
+        Text = new LocalizedTextProvider(() => _uiLanguage);
 
         // 앱이 현재 사용 중인 테마를 읽어서 설정 창 버튼 상태와 맞춘다.
         if (Application.Current is App app)
@@ -94,16 +96,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         PanMotorStatusItems = new ObservableCollection<MotorStatusItem>(CreateDefaultMotorStatusItems());
         TiltMotorStatusItems = new ObservableCollection<MotorStatusItem>(CreateDefaultMotorStatusItems());
 
-        AddSystemLogItem(new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), "\uC2DC\uC2A4\uD15C \uAC00\uB3D9\uC744 \uC2DC\uC791\uD569\uB2C8\uB2E4."));
+        AddSystemLogItem(new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), Text["SystemStarted"]));
 
-        PrimaryTargets = new ReadOnlyCollection<string>(new[]
-        {
-            "\uBCF5\uD569",
-            "\uC0AC\uB78C",
-            "\uBB34\uAE30\uCCB4\uACC4",
-            "\uD1B5\uC2E0 \uC7A5\uBE44",
-            "\uBE44\uAD70\uC0AC \uD45C\uC801",
-        });
+        PrimaryTargets = new ObservableCollection<PrimaryTargetOption>(CreatePrimaryTargetOptions());
 
         // 화면의 모든 버튼은 Command 바인딩으로 연결되므로 생성자에서 한 번에 등록한다.
         TogglePowerCommand = new RelayCommand(_ => TogglePower());
@@ -116,6 +111,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         ResetZoomCommand = new RelayCommand(_ => ZoomLevel = 1.0, _ => CanUseZoomControls);
         ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsSystemPoweredOn);
         SetThemeCommand = new RelayCommand(SetTheme);
+        SetLanguageCommand = new RelayCommand(SetLanguage);
         SaveAnalysisLogsCommand = new RelayCommand(_ => ManualAnalysisSaveRequested?.Invoke(this, EventArgs.Empty));
         SaveSystemLogsCommand = new RelayCommand(_ => ManualSystemLogSaveRequested?.Invoke(this, EventArgs.Empty));
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
@@ -141,7 +137,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public ObservableCollection<MotorStatusItem> TiltMotorStatusItems { get; }
 
-    public ReadOnlyCollection<string> PrimaryTargets { get; }
+    public ObservableCollection<PrimaryTargetOption> PrimaryTargets { get; }
+
+    public LocalizedTextProvider Text { get; }
 
     public ICommand TogglePowerCommand { get; }
 
@@ -160,6 +158,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public ICommand ToggleManualRecordingCommand { get; }
 
     public ICommand SetThemeCommand { get; }
+
+    public ICommand SetLanguageCommand { get; }
 
     public ICommand SaveAnalysisLogsCommand { get; }
 
@@ -215,7 +215,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public bool IsEoPrimary => _isEoPrimary;
 
     // 상단 전원 버튼은 실제 프로그램 종료 버튼으로 사용한다.
-    public string PowerButtonText => "\uC804\uC6D0 \uC885\uB8CC";
+    public string PowerButtonText => Text["PowerExit"];
 
     public string CurrentMode
     {
@@ -248,7 +248,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string CurrentModeText => $"\uCE74\uBA54\uB77C \uBAA8\uB4DC: {CurrentMode}";
+    public string CurrentModeText => $"{Text["CameraMode"]}: {TranslateMode(CurrentMode)}";
 
     // 현재 선택된 모드 버튼만 선명하게 보여서 별도 텍스트 없이도 상태를 알아볼 수 있게 한다.
     public double AutoModeOpacity => CurrentMode == "\uC790\uB3D9" ? 1.0 : 0.35;
@@ -357,7 +357,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string TrackingModeText => IsTrackingModeEnabled ? "추적" : "비추적";
+    public string TrackingModeText => IsTrackingModeEnabled ? Text["TrackingOn"] : Text["TrackingOff"];
 
     public double TrackingModeOpacity => IsSystemPoweredOn
         ? (IsTrackingModeEnabled ? 1.0 : 0.42)
@@ -385,6 +385,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double LightThemeButtonOpacity => IsLightThemeActive ? 1.0 : 0.55;
 
+    public bool IsEnglishLanguage => _uiLanguage == UiLanguage.English;
+
+    public bool IsKoreanLanguage => _uiLanguage == UiLanguage.Korean;
+
+    public double EnglishLanguageButtonOpacity => IsEnglishLanguage ? 1.0 : 0.55;
+
+    public double KoreanLanguageButtonOpacity => IsKoreanLanguage ? 1.0 : 0.55;
+
     // 수동 녹화는 수동 모드에서만 켜고 끌 수 있도록 제한한다.
     public bool IsManualRecordingEnabled
     {
@@ -402,7 +410,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ManualRecordingButtonText => IsRecordingActive ? "\uB179\uD654 \uC885\uB8CC" : "\uB179\uD654 \uC2DC\uC791";
+    public string ManualRecordingButtonText => IsRecordingActive ? Text["StopRecording"] : Text["StartRecording"];
 
     public string CurrentThreatLevel
     {
@@ -427,7 +435,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string CurrentThreatText => $"\uC704\uD5D8 \uB4F1\uAE09: {CurrentThreatLevel}";
+    public string CurrentThreatText => $"{Text["ThreatLevel"]}: {TranslateThreatLevel(CurrentThreatLevel)}";
 
     public Brush CurrentThreatBrush => CurrentThreatLevel switch
     {
@@ -449,9 +457,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string PrimaryTargetText => $"\uC8FC \uD0D0\uC9C0\uCCB4: {SelectedPrimaryTarget}";
+    public string PrimaryTargetText => $"{Text["PrimaryTarget"]}: {TranslatePrimaryTarget(SelectedPrimaryTarget)}";
 
-    public string PrimaryTargetShortText => $"\uC8FC \uD0D0\uC9C0\uCCB4: {GetShortPrimaryTargetName(SelectedPrimaryTarget)}";
+    public string PrimaryTargetShortText => $"{Text["PrimaryTarget"]}: {GetShortPrimaryTargetName(SelectedPrimaryTarget)}";
 
     // 카메라 이름은 짧고 명확하게 유지해서 실제 화면을 가리지 않도록 한다.
     public string EoTitle => "EO cam";
@@ -499,7 +507,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string BrightnessText => $"\uBC1D\uAE30 {Brightness:0}%";
+    public string BrightnessText => $"{Text["Brightness"]} {Brightness:0}%";
 
     public double Contrast
     {
@@ -514,7 +522,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
     }
 
-    public string ContrastText => $"\uB300\uC870\uBE44 {Contrast:0}%";
+    public string ContrastText => $"{Text["Contrast"]} {Contrast:0}%";
 
     public double ZoomLevel
     {
@@ -1100,6 +1108,29 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         AppendImportantLog($"\uD14C\uB9C8\uAC00 {(nextTheme == AppThemeMode.Dark ? "\uC5B4\uB450\uC6B4 \uD14C\uB9C8" : "\uBC1D\uC740 \uD14C\uB9C8")}(\uC73C)\uB85C \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
     }
 
+    private void SetLanguage(object? parameter)
+    {
+        if (parameter is not string languageName)
+        {
+            return;
+        }
+
+        var nextLanguage = string.Equals(languageName, "Korean", StringComparison.OrdinalIgnoreCase)
+            ? UiLanguage.Korean
+            : UiLanguage.English;
+
+        if (_uiLanguage == nextLanguage)
+        {
+            return;
+        }
+
+        _uiLanguage = nextLanguage;
+        Text.Refresh();
+        RefreshPrimaryTargetLabels();
+        RaiseLocalizedTextProperties();
+        AppendImportantLog(Text["LanguageChanged"]);
+    }
+
     /// <summary>
     /// 설정 창에서 주 탐지체를 선택하면 현재 선택 상태를 갱신한다.
     /// 지금 단계에서는 선택된 항목과 로그만 바꾸고, 위험 등급 변화는 이후 VLM 분석 결과와 연동할 때 반영한다.
@@ -1169,8 +1200,24 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     private static double NextRotationAngle(double currentAngle) => (currentAngle + 90) % 360;
 
-    private static string GetShortPrimaryTargetName(string target)
+    private string GetShortPrimaryTargetName(string target)
     {
+        if (_uiLanguage == UiLanguage.English)
+        {
+            return target switch
+            {
+                "\uBB34\uAE30\uCCB4\uACC4" => "Weapon",
+                "\uACF5\uC911 \uBB34\uAE30\uCCB4\uACC4" => "Air",
+                "\uC721\uC0C1 \uBB34\uAE30\uCCB4\uACC4" => "Ground",
+                "\uD574\uC0C1 \uBB34\uAE30\uCCB4\uACC4" => "Sea",
+                "\uD1B5\uC2E0 \uC7A5\uBE44" => "Comm",
+                "\uBE44\uAD70\uC0AC \uD45C\uC801" => "Civil",
+                "\uC0AC\uB78C" => "Person",
+                "\uBCF5\uD569" => "Composite",
+                _ => target,
+            };
+        }
+
         return target switch
         {
             "\uBB34\uAE30\uCCB4\uACC4" => "\uBB34\uAE30\uCCB4\uACC4",
@@ -1181,6 +1228,78 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             "\uBE44\uAD70\uC0AC \uD45C\uC801" => "\uBE44\uAD70\uC0AC",
             _ => target,
         };
+    }
+
+    private string TranslateMode(string mode)
+    {
+        return mode switch
+        {
+            "\uC790\uB3D9" => Text["AutoMode"],
+            "\uC218\uB3D9" => Text["ManualMode"],
+            _ => mode,
+        };
+    }
+
+    private string TranslateThreatLevel(string threatLevel)
+    {
+        return threatLevel switch
+        {
+            "\uB192\uC74C" => Text["ThreatHigh"],
+            "\uC911\uAC04" => Text["ThreatMedium"],
+            _ => Text["ThreatLow"],
+        };
+    }
+
+    private string TranslatePrimaryTarget(string target)
+    {
+        return target switch
+        {
+            "\uBCF5\uD569" => Text["TargetComposite"],
+            "\uC0AC\uB78C" => Text["TargetPerson"],
+            "\uBB34\uAE30\uCCB4\uACC4" => Text["TargetWeapon"],
+            "\uD1B5\uC2E0 \uC7A5\uBE44" => Text["TargetComm"],
+            "\uBE44\uAD70\uC0AC \uD45C\uC801" => Text["TargetCivil"],
+            _ => target,
+        };
+    }
+
+    private IEnumerable<PrimaryTargetOption> CreatePrimaryTargetOptions()
+    {
+        var targets = new[]
+        {
+            "\uBCF5\uD569",
+            "\uC0AC\uB78C",
+            "\uBB34\uAE30\uCCB4\uACC4",
+            "\uD1B5\uC2E0 \uC7A5\uBE44",
+            "\uBE44\uAD70\uC0AC \uD45C\uC801",
+        };
+
+        return targets.Select(target => new PrimaryTargetOption(target, TranslatePrimaryTarget(target))).ToArray();
+    }
+
+    private void RefreshPrimaryTargetLabels()
+    {
+        foreach (var option in PrimaryTargets)
+        {
+            option.DisplayName = TranslatePrimaryTarget(option.Value);
+        }
+    }
+
+    private void RaiseLocalizedTextProperties()
+    {
+        OnPropertyChanged(nameof(IsEnglishLanguage));
+        OnPropertyChanged(nameof(IsKoreanLanguage));
+        OnPropertyChanged(nameof(EnglishLanguageButtonOpacity));
+        OnPropertyChanged(nameof(KoreanLanguageButtonOpacity));
+        OnPropertyChanged(nameof(PowerButtonText));
+        OnPropertyChanged(nameof(CurrentModeText));
+        OnPropertyChanged(nameof(ManualRecordingButtonText));
+        OnPropertyChanged(nameof(TrackingModeText));
+        OnPropertyChanged(nameof(CurrentThreatText));
+        OnPropertyChanged(nameof(PrimaryTargetText));
+        OnPropertyChanged(nameof(PrimaryTargetShortText));
+        OnPropertyChanged(nameof(BrightnessText));
+        OnPropertyChanged(nameof(ContrastText));
     }
 
     private void OnRecordingStateChanged()
@@ -1673,6 +1792,125 @@ public enum MotorStepMode
 {
     Auto,
     Manual
+}
+
+public enum UiLanguage
+{
+    English,
+    Korean
+}
+
+public sealed class LocalizedTextProvider : INotifyPropertyChanged
+{
+    private static readonly Dictionary<string, (string English, string Korean)> Values = new()
+    {
+        ["PowerExit"] = ("Exit", "\uC804\uC6D0 \uC885\uB8CC"),
+        ["RecordingOn"] = ("Recording", "\uC601\uC0C1 \uB179\uD654 \uC911"),
+        ["RecordingStatus"] = ("Recording Status", "\uC601\uC0C1 \uB179\uD654 \uC0C1\uD0DC"),
+        ["Brightness"] = ("Brightness", "\uBC1D\uAE30"),
+        ["Contrast"] = ("Contrast", "\uB300\uC870\uBE44"),
+        ["AutoMode"] = ("Auto", "\uC790\uB3D9"),
+        ["ManualMode"] = ("Manual", "\uC218\uB3D9"),
+        ["StartRecording"] = ("Start Rec", "\uB179\uD654 \uC2DC\uC791"),
+        ["StopRecording"] = ("Stop Rec", "\uB179\uD654 \uC885\uB8CC"),
+        ["Settings"] = ("Settings", "\uC124\uC815\uCC3D"),
+        ["PrimaryTargetChange"] = ("Primary Target", "\uC8FC \uD0D0\uC9C0\uCCB4 \uBCC0\uACBD"),
+        ["PrimaryTarget"] = ("Target", "\uC8FC \uD0D0\uC9C0\uCCB4"),
+        ["ThemeChange"] = ("Theme", "\uD14C\uB9C8 \uBCC0\uACBD"),
+        ["DarkTheme"] = ("Dark", "\uC5B4\uB450\uC6B4 \uD14C\uB9C8"),
+        ["LightTheme"] = ("Light", "\uBC1D\uC740 \uD14C\uB9C8"),
+        ["LanguageChange"] = ("Language", "\uC5B8\uC5B4 \uBCC0\uACBD"),
+        ["English"] = ("English", "\uC601\uC5B4"),
+        ["Korean"] = ("Korean", "\uD55C\uAD6D\uC5B4"),
+        ["ScreenMode"] = ("Screen Mode", "\uD654\uBA74 \uBAA8\uB4DC"),
+        ["WindowMode"] = ("Window Mode", "\uCC3D\uBAA8\uB4DC\uB85C \uC804\uD658"),
+        ["FullscreenMode"] = ("Fullscreen", "\uC804\uCCB4\uD654\uBA74\uC73C\uB85C \uC804\uD658"),
+        ["Details"] = ("Details", "\uC0C1\uC138"),
+        ["MotorPosition"] = ("Motor Position", "\uBAA8\uD130 \uC704\uCE58"),
+        ["MotorTarget"] = ("Motor Target", "\uBAA8\uD130 \uBAA9\uD45C"),
+        ["MotorControl"] = ("Motor Control", "\uBAA8\uD130 \uCEE8\uD2B8\uB864"),
+        ["SystemStatus"] = ("System Status", "\uC2DC\uC2A4\uD15C \uD604\uD669"),
+        ["AnalysisPanel"] = ("Status of LLM Analysis", "\uC0C1\uD669 \uBD84\uC11D"),
+        ["SystemLog"] = ("System Log", "\uC2DC\uC2A4\uD15C \uB85C\uADF8"),
+        ["Save"] = ("Save", "\uC800\uC7A5"),
+        ["RecordedVideos"] = ("Recorded Videos", "\uB179\uD654 \uC601\uC0C1 \uBCF4\uAE30"),
+        ["Refresh"] = ("Refresh", "\uC0C8\uB85C\uACE0\uCE68"),
+        ["Close"] = ("Close", "\uB2EB\uAE30"),
+        ["SavedVideos"] = ("Saved Videos", "\uC800\uC7A5\uB41C \uC601\uC0C1"),
+        ["RecordedData"] = ("Recording Data", "\uC800\uC7A5 \uC601\uC0C1 \uD655\uC778"),
+        ["CamZoom"] = ("Cam ZOOM", "\uC804\uC790 ZOOM"),
+        ["ZoomMiniMap"] = ("Zoom Map", "Zoom \uBBF8\uB2C8\uB9F5"),
+        ["TrackingOn"] = ("Tracking", "\uCD94\uC801"),
+        ["TrackingOff"] = ("Tracking Off", "\uBE44\uCD94\uC801"),
+        ["ThreatLevel"] = ("Threat", "\uC704\uD5D8 \uB4F1\uAE09"),
+        ["ThreatLow"] = ("Low", "\uB0AE\uC74C"),
+        ["ThreatMedium"] = ("Medium", "\uC911\uAC04"),
+        ["ThreatHigh"] = ("High", "\uB192\uC74C"),
+        ["TargetComposite"] = ("Composite", "\uBCF5\uD569"),
+        ["TargetPerson"] = ("Person", "\uC0AC\uB78C"),
+        ["TargetWeapon"] = ("Weapon System", "\uBB34\uAE30\uCCB4\uACC4"),
+        ["TargetComm"] = ("Communication Equipment", "\uD1B5\uC2E0 \uC7A5\uBE44"),
+        ["TargetCivil"] = ("Non-military Target", "\uBE44\uAD70\uC0AC \uD45C\uC801"),
+        ["SystemStarted"] = ("System startup started.", "\uC2DC\uC2A4\uD15C \uAC00\uB3D9\uC744 \uC2DC\uC791\uD569\uB2C8\uB2E4."),
+        ["LanguageChanged"] = ("Display language changed.", "\uD45C\uC2DC \uC5B8\uC5B4\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4."),
+    };
+
+    private readonly Func<UiLanguage> _languageAccessor;
+
+    public LocalizedTextProvider(Func<UiLanguage> languageAccessor)
+    {
+        _languageAccessor = languageAccessor;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public string this[string key]
+    {
+        get
+        {
+            if (!Values.TryGetValue(key, out var value))
+            {
+                return key;
+            }
+
+            return _languageAccessor() == UiLanguage.Korean ? value.Korean : value.English;
+        }
+    }
+
+    public void Refresh()
+    {
+        PropertyChanged?.Invoke(this, new PropertyChangedEventArgs("Item[]"));
+    }
+}
+
+public sealed class PrimaryTargetOption : INotifyPropertyChanged
+{
+    private string _displayName;
+
+    public PrimaryTargetOption(string value, string displayName)
+    {
+        Value = value;
+        _displayName = displayName;
+    }
+
+    public event PropertyChangedEventHandler? PropertyChanged;
+
+    public string Value { get; }
+
+    public string DisplayName
+    {
+        get => _displayName;
+        set
+        {
+            if (string.Equals(_displayName, value, StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            _displayName = value;
+            PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(nameof(DisplayName)));
+        }
+    }
 }
 
 public sealed class MotorStatusItem : INotifyPropertyChanged

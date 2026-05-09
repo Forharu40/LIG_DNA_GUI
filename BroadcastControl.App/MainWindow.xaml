@@ -269,7 +269,7 @@
                                    Foreground="{Binding RecordingTextBrush}"
                                    FontSize="13"
                                    FontWeight="SemiBold"
-                                   Text="&#xC601;&#xC0C1; &#xB179;&#xD654; &#xC911;" />
+                                   Text="{Binding Text[RecordingOn]}" />
                         </StackPanel>
 
                         <StackPanel Grid.Column="2"
@@ -310,7 +310,7 @@
                             IsHitTestVisible="{Binding CanSelectAutoMode}"
                             Opacity="{Binding AutoModeOpacity}"
                             Style="{StaticResource TopBarButton}"
-                            Content="&#xC790;&#xB3D9;" />
+                            Content="{Binding Text[AutoMode]}" />
 
                         <Button Grid.Column="5"
                             Margin="0,0,8,0"
@@ -320,7 +320,7 @@
                             IsHitTestVisible="{Binding CanSelectManualMode}"
                             Opacity="{Binding ManualModeOpacity}"
                             Style="{StaticResource TopBarButton}"
-                            Content="&#xC218;&#xB3D9;" />
+                            Content="{Binding Text[ManualMode]}" />
 
                         <Button Grid.Column="6"
                             Width="84"
@@ -430,7 +430,7 @@
                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                            FontSize="17"
                                            FontWeight="Bold"
-                                           Text="Motor Position" />
+                                           Text="{Binding Text[MotorPosition]}" />
                                     <Button Grid.Column="1"
                                         Width="58"
                                         Height="23"
@@ -439,7 +439,7 @@
                                         FontWeight="SemiBold"
                                         Command="{Binding ToggleMotorDetailsCommand}"
                                         Style="{StaticResource TopBarSmallButton}"
-                                        Content="Details" />
+                                        Content="{Binding Text[Details]}" />
                                 </Grid>
                                 <Grid Grid.Row="1" Margin="0,8,0,0">
                                     <Grid.ColumnDefinitions>
@@ -524,7 +524,7 @@
                                 <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                        FontSize="16"
                                        FontWeight="Bold"
-                                       Text="Motor Target" />
+                                       Text="{Binding Text[MotorTarget]}" />
                                 <Grid Grid.Row="1" Margin="0,12,0,0">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="48" />
@@ -760,7 +760,7 @@
                                     <Grid Margin="10">
                                         <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
                                            FontSize="11"
-                                           Text="Zoom &#xBBF8;&#xB2C8;&#xB9F5;" />
+                                           Text="{Binding Text[ZoomMiniMap]}" />
                                         <Canvas Width="130"
                                         Height="74"
                                         Margin="0,18,0,0"
@@ -881,7 +881,7 @@
                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                            FontSize="16"
                                            FontWeight="Bold"
-                                           Text="&#xBAA8;&#xD130; &#xCEE8;&#xD2B8;&#xB864;" />
+                                           Text="{Binding Text[MotorControl]}" />
                                     </Border>
 
                                     <Button Grid.Row="1"
@@ -964,7 +964,7 @@
                                         <Button VerticalAlignment="Center"
                                         Command="{Binding ResetZoomCommand}"
                                         Style="{StaticResource TopBarSmallButton}"
-                                        Content="&#xC804;&#xC790; ZOOM" />
+                                        Content="{Binding Text[CamZoom]}" />
                                         <Slider Grid.Column="1"
                                         Margin="12,0"
                                         Minimum="1"
@@ -1014,7 +1014,7 @@
                                             Margin="0,0,10,0"
                                             Command="{Binding ResetZoomCommand}"
                                             Style="{StaticResource TopBarSmallButton}"
-                                            Content="&#xC804;&#xC790; ZOOM" />
+                                        Content="{Binding Text[CamZoom]}" />
                                             <Slider Width="210"
                                             Minimum="1"
                                             Maximum="4"
@@ -1037,7 +1037,7 @@
                                         IsHitTestVisible="{Binding CanSelectAutoMode}"
                                         Opacity="{Binding AutoModeOpacity}"
                                         Style="{StaticResource TopBarButton}"
-                                        Content="&#xC790;&#xB3D9;" />
+                                        Content="{Binding Text[AutoMode]}" />
                                         <Button Grid.Row="0"
                                         Grid.Column="2"
                                         Margin="4,0"
@@ -1046,7 +1046,7 @@
                                         IsHitTestVisible="{Binding CanSelectManualMode}"
                                         Opacity="{Binding ManualModeOpacity}"
                                         Style="{StaticResource TopBarButton}"
-                                        Content="&#xC218;&#xB3D9;" />
+                                        Content="{Binding Text[ManualMode]}" />
 
                                         <StackPanel Grid.Row="1"
                                             Grid.Column="0"
@@ -1107,7 +1107,7 @@
                                                Foreground="{Binding RecordingTextBrush}"
                                                FontSize="13"
                                                FontWeight="SemiBold"
-                                               Text="&#xC601;&#xC0C1; &#xB179;&#xD654; &#xC0C1;&#xD0DC;" />
+                                               Text="{Binding Text[RecordingStatus]}" />
                                         </StackPanel>
                                     </Grid>
                                 </Border>
@@ -1139,8 +1139,8 @@
                                     <Slider Width="220" Minimum="0" Maximum="100" Value="{Binding Contrast, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsSystemPoweredOn}" Style="{StaticResource TopBarCompactSlider}" />
                                 </StackPanel>
 
-                                <Button Grid.Row="0" Grid.Column="1" Margin="6,0" Command="{Binding SetModeCommand}" CommandParameter="&#xC790;&#xB3D9;" IsHitTestVisible="{Binding CanSelectAutoMode}" Opacity="{Binding AutoModeOpacity}" Style="{StaticResource TopBarButton}" Content="&#xC790;&#xB3D9;" />
-                                <Button Grid.Row="0" Grid.Column="2" Margin="6,0" Command="{Binding SetModeCommand}" CommandParameter="&#xC218;&#xB3D9;" IsHitTestVisible="{Binding CanSelectManualMode}" Opacity="{Binding ManualModeOpacity}" Style="{StaticResource TopBarButton}" Content="&#xC218;&#xB3D9;" />
+                                <Button Grid.Row="0" Grid.Column="1" Margin="6,0" Command="{Binding SetModeCommand}" CommandParameter="&#xC790;&#xB3D9;" IsHitTestVisible="{Binding CanSelectAutoMode}" Opacity="{Binding AutoModeOpacity}" Style="{StaticResource TopBarButton}" Content="{Binding Text[AutoMode]}" />
+                                <Button Grid.Row="0" Grid.Column="2" Margin="6,0" Command="{Binding SetModeCommand}" CommandParameter="&#xC218;&#xB3D9;" IsHitTestVisible="{Binding CanSelectManualMode}" Opacity="{Binding ManualModeOpacity}" Style="{StaticResource TopBarButton}" Content="{Binding Text[ManualMode]}" Click="Button_Click" />
 
                                 <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,6,0" Orientation="Horizontal" VerticalAlignment="Center">
                                     <Button Width="92" Margin="0,0,10,0" Command="{Binding ResetBrightnessCommand}" Style="{StaticResource TopBarSmallButton}" Content="{Binding BrightnessText}" />
@@ -1155,7 +1155,7 @@
                                         <ColumnDefinition Width="10" />
                                         <ColumnDefinition Width="44" />
                                     </Grid.ColumnDefinitions>
-                                    <Button Grid.Column="0" Command="{Binding ResetZoomCommand}" Style="{StaticResource TopBarSmallButton}" Content="&#xC804;&#xC790; ZOOM" />
+                                    <Button Grid.Column="0" Command="{Binding ResetZoomCommand}" Style="{StaticResource TopBarSmallButton}" Content="{Binding Text[CamZoom]}" />
                                     <Slider Grid.Column="2" Minimum="1" Maximum="4" TickFrequency="0.1" IsSnapToTickEnabled="False" Value="{Binding ZoomLevel, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanUseZoomControls}" Style="{StaticResource TopBarCompactSlider}" />
                                     <TextBlock Grid.Column="3" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" FontWeight="SemiBold" TextAlignment="Right" Text="{Binding ZoomLevelText}" Grid.ColumnSpan="2" Margin="3,0,7,0" />
                                 </Grid>
@@ -1190,7 +1190,7 @@
                                                Foreground="{DynamicResource PrimaryTextBrush}"
                                                FontSize="11"
                                                FontWeight="Bold"
-                                               Text="&#xBAA8;&#xD130; &#xCEE8;&#xD2B8;&#xB864;" />
+                                               Text="{Binding Text[MotorControl]}" />
                                         <Grid Grid.Row="1"
                                           Width="112"
                                           Height="98"
@@ -1227,7 +1227,7 @@
 
                                 <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="4" Margin="6,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
                                     <StackPanel VerticalAlignment="Center">
-                                        <TextBlock Foreground="{DynamicResource PrimaryTextBrush}" FontSize="16" FontWeight="Bold" Text="&#xC2DC;&#xC2A4;&#xD15C; &#xD604;&#xD669;" />
+                                        <TextBlock Foreground="{DynamicResource PrimaryTextBrush}" FontSize="16" FontWeight="Bold" Text="{Binding Text[SystemStatus]}" />
                                         <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
                                             <TextBlock Foreground="{DynamicResource PrimaryTextBrush}" FontSize="16" FontWeight="Bold" Text="{Binding CurrentThreatText}" />
                                             <Ellipse Width="13" Height="13" Margin="7,3,0,0" VerticalAlignment="Top" Fill="{Binding CurrentThreatBrush}" />
@@ -1265,20 +1265,20 @@
                                      Margin="0,0,7,0"
                                      VerticalAlignment="Center"
                                      Fill="{Binding RecordingIndicatorBrush}" />
-                                <TextBlock VerticalAlignment="Center"
+                                <TextBlock
                                        Foreground="{Binding RecordingTextBrush}"
                                        FontSize="18"
                                        FontWeight="Bold"
-                                       Text="&#xC601;&#xC0C1; &#xB179;&#xD654; &#xC911;" />
+                                       Text="{Binding Text[RecordingOn]}" />
                             </StackPanel>
                             <Button Grid.Column="2"
                                 Click="OpenRecordedVideosButton_OnClick"
                                 Style="{StaticResource TopBarButton}"
-                                Content="&#xC800;&#xC7A5; &#xC601;&#xC0C1; &#xD655;&#xC778;" />
+                                Content="{Binding Text[RecordedData]}" />
                             <Button Grid.Column="4"
                                 Command="{Binding ToggleSettingsCommand}"
                                 Style="{StaticResource TopBarButton}"
-                                Padding="0">
+                                Padding="0" Click="Button_Click_1">
                                 <materialDesign:PackIcon Kind="Cog" Width="22" Height="22" />
                             </Button>
                         </Grid>
@@ -1292,7 +1292,7 @@
                             Padding="18,12,18,12"
                             Visibility="Collapsed">
                             <StackPanel>
-                                <TextBlock Style="{StaticResource PanelTitle}" Text="&#xC2DC;&#xC2A4;&#xD15C; &#xD604;&#xD669;" />
+                                <TextBlock Style="{StaticResource PanelTitle}" Text="{Binding Text[SystemStatus]}" />
                                 <StackPanel Margin="0,10,0,5"
                                         Orientation="Horizontal">
                                     <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
@@ -1332,14 +1332,14 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Style="{StaticResource PanelTitle}" Text="&#xC0C1;&#xD669; &#xBD84;&#xC11D;" />
+                                    <TextBlock Style="{StaticResource PanelTitle}" Text="{Binding Text[AnalysisPanel]}" />
                                     <Button Grid.Column="1"
                                         Padding="10,4"
                                         FontSize="11"
                                         FontWeight="SemiBold"
                                         Style="{StaticResource TopBarSmallButton}"
                                         Command="{Binding SaveAnalysisLogsCommand}"
-                                        Content="&#xC800;&#xC7A5;" />
+                                        Content="{Binding Text[Save]}" />
                                 </Grid>
                                 <ListBox Grid.Row="1"
                                      Margin="0,10,0,0"
@@ -1387,14 +1387,14 @@
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="Auto" />
                                     </Grid.ColumnDefinitions>
-                                    <TextBlock Style="{StaticResource PanelTitle}" Text="&#xC2DC;&#xC2A4;&#xD15C; &#xB85C;&#xADF8;" />
+                                    <TextBlock Style="{StaticResource PanelTitle}" Text="{Binding Text[SystemLog]}" />
                                     <Button Grid.Column="1"
                                         Padding="10,4"
                                         FontSize="11"
                                         FontWeight="SemiBold"
                                         Style="{StaticResource TopBarSmallButton}"
                                         Command="{Binding SaveSystemLogsCommand}"
-                                        Content="&#xC800;&#xC7A5;" />
+                                        Content="{Binding Text[Save]}" />
                                 </Grid>
                                 <ListBox Grid.Row="1"
                                      Margin="0,10,0,0"
@@ -1454,7 +1454,7 @@
                             <TextBlock Foreground="{DynamicResource DrawerTextBrush}"
                                    FontSize="24"
                                    FontWeight="Bold"
-                                   Text="&#xB179;&#xD654; &#xC601;&#xC0C1; &#xBCF4;&#xAE30;" />
+                                   Text="{Binding Text[RecordedVideos]}" />
                             <TextBlock x:Name="RecordedVideosStatusText"
                                    Margin="16,5,0,0"
                                    Foreground="{DynamicResource SecondaryTextBrush}"
@@ -1467,14 +1467,14 @@
                             FontSize="12"
                             Click="RefreshRecordedVideosButton_OnClick"
                             Style="{StaticResource TopBarButton}"
-                            Content="&#xC0C8;&#xB85C;&#xACE0;&#xCE68;" />
+                            Content="{Binding Text[Refresh]}" />
                         <Button Grid.Column="3"
                             Width="70"
                             Padding="6,4"
                             FontSize="12"
                             Click="CloseRecordedVideosButton_OnClick"
                             Style="{StaticResource TopBarButton}"
-                            Content="&#xB2EB;&#xAE30;" />
+                            Content="{Binding Text[Close]}" />
                     </Grid>
 
                     <Grid Grid.Row="1">
@@ -1497,7 +1497,7 @@
                                 <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                        FontSize="17"
                                        FontWeight="Bold"
-                                       Text="&#xC800;&#xC7A5;&#xB41C; &#xC601;&#xC0C1;" />
+                                       Text="{Binding Text[SavedVideos]}" />
                                 <ListBox x:Name="RecordedVideoList"
                                       Grid.Row="1"
                                       Margin="0,10,0,0"
@@ -1646,7 +1646,7 @@
                                                Foreground="{DynamicResource PrimaryTextBrush}"
                                                FontSize="13"
                                                FontWeight="Bold"
-                                               Text="&#xD655;&#xB300;" />
+                                   Text="Zoom" />
                                         <Button x:Name="RecordedVideoZoomResetButton"
                                             Width="58"
                                             Height="28"
@@ -1673,7 +1673,7 @@
                                                Foreground="{DynamicResource PrimaryTextBrush}"
                                                FontSize="13"
                                                FontWeight="Bold"
-                                               Text="&#xC18D;&#xB3C4;" />
+                                   Text="Speed" />
                                         <ComboBox x:Name="PlaybackSpeedCombo"
                                               Width="82"
                                               SelectedIndex="3"
@@ -1711,7 +1711,8 @@
                 <Rectangle Fill="#66000000"
                            HorizontalAlignment="Stretch"
                            VerticalAlignment="Stretch"
-                           IsHitTestVisible="True" />
+                           IsHitTestVisible="True"
+                           MouseLeftButtonDown="MotorDetailsBackdrop_OnMouseLeftButtonDown" />
                 <Border Width="720"
                     MaxHeight="680"
                     HorizontalAlignment="Center"
@@ -1735,7 +1736,7 @@
                             <TextBlock Foreground="{DynamicResource DrawerTextBrush}"
                                    FontSize="24"
                                    FontWeight="Bold"
-                                   Text="Motor Details" />
+                                   Text="{Binding Text[MotorPosition]}" />
                             <Button Grid.Column="1"
                                 Width="34"
                                 Height="30"
@@ -1883,9 +1884,11 @@
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
                         <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
-                    <TextBlock Text="&#xC124;&#xC815;&#xCC3D;"
+                    <TextBlock Text="{Binding Text[Settings]}"
                            FontSize="24"
                            FontWeight="Bold"
                            Foreground="{DynamicResource DrawerTextBrush}" />
@@ -1895,7 +1898,7 @@
                         BorderBrush="{DynamicResource DrawerBorderBrush}"
                         BorderThickness="0,0,0,3">
                         <TextBlock Margin="0,0,0,10"
-                               Text="&#xC8FC; &#xD0D0;&#xC9C0;&#xCCB4; &#xBCC0;&#xACBD;"
+                               Text="{Binding Text[PrimaryTargetChange]}"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource DrawerTextBrush}" />
@@ -1907,9 +1910,9 @@
                             <DataTemplate>
                                 <Button Margin="0,0,0,10"
                                     Command="{Binding DataContext.SelectPrimaryTargetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    CommandParameter="{Binding}"
+                                    CommandParameter="{Binding Value}"
                                     Style="{StaticResource SettingsActionButton}"
-                                    Content="{Binding}" />
+                                    Content="{Binding DisplayName}" />
                             </DataTemplate>
                         </ItemsControl.ItemTemplate>
                     </ItemsControl>
@@ -1919,7 +1922,7 @@
                         BorderBrush="{DynamicResource DrawerBorderBrush}"
                         BorderThickness="0,1,0,0">
                         <TextBlock Margin="0,12,0,0"
-                               Text="&#xD14C;&#xB9C8; &#xBCC0;&#xACBD;"
+                               Text="{Binding Text[ThemeChange]}"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource DrawerTextBrush}" />
@@ -1936,13 +1939,13 @@
                             CommandParameter="Dark"
                             Opacity="{Binding DarkThemeButtonOpacity}"
                             Style="{StaticResource SettingsActionButton}"
-                            Content="&#xC5B4;&#xB450;&#xC6B4; &#xD14C;&#xB9C8;" />
+                            Content="{Binding Text[DarkTheme]}" />
                         <Button Grid.Column="1"
                             Command="{Binding SetThemeCommand}"
                             CommandParameter="Light"
                             Opacity="{Binding LightThemeButtonOpacity}"
                             Style="{StaticResource SettingsActionButton}"
-                            Content="&#xBC1D;&#xC740; &#xD14C;&#xB9C8;" />
+                            Content="{Binding Text[LightTheme]}" />
                     </Grid>
 
                     <Border Grid.Row="5"
@@ -1950,17 +1953,48 @@
                         BorderBrush="{DynamicResource DrawerBorderBrush}"
                         BorderThickness="0,1,0,0">
                         <TextBlock Margin="0,12,0,0"
-                               Text="&#xD654;&#xBA74; &#xBAA8;&#xB4DC;"
+                               Text="{Binding Text[LanguageChange]}"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource DrawerTextBrush}" />
+                    </Border>
+
+                    <Grid Grid.Row="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                            Margin="0,0,8,0"
+                            Command="{Binding SetLanguageCommand}"
+                            CommandParameter="English"
+                            Opacity="{Binding EnglishLanguageButtonOpacity}"
+                            Style="{StaticResource SettingsActionButton}"
+                            Content="{Binding Text[English]}" />
+                        <Button Grid.Column="1"
+                            Command="{Binding SetLanguageCommand}"
+                            CommandParameter="Korean"
+                            Opacity="{Binding KoreanLanguageButtonOpacity}"
+                            Style="{StaticResource SettingsActionButton}"
+                            Content="{Binding Text[Korean]}" />
+                    </Grid>
+
+                    <Border Grid.Row="7"
+                        Margin="0,18,0,12"
+                        BorderBrush="{DynamicResource DrawerBorderBrush}"
+                        BorderThickness="0,1,0,0">
+                        <TextBlock Margin="0,12,0,0"
+                               Text="{Binding Text[ScreenMode]}"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource DrawerTextBrush}" />
                     </Border>
 
                     <Button x:Name="WindowModeToggleButton"
-                        Grid.Row="6"
+                        Grid.Row="8"
                         Click="WindowModeToggleButton_OnClick"
                         Style="{StaticResource SettingsActionButton}"
-                        Content="&#xCC3D;&#xBAA8;&#xB4DC;&#xB85C; &#xC804;&#xD658;" />
+                        Content="{Binding Text[WindowMode]}" />
                 </Grid>
             </Border>
         </Grid>
