@@ -52,10 +52,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double _viewportHeight = 1;
     private double _motorPan;
     private double _motorTilt;
-    private int _autoPanMotorStepSize = 9;
-    private int _autoTiltMotorStepSize = 9;
-    private int _manualPanMotorStepSize = 9;
-    private int _manualTiltMotorStepSize = 9;
+    private int _autoPanMotorStepSize = DefaultMotorStepSize;
+    private int _autoTiltMotorStepSize = DefaultMotorStepSize;
+    private int _manualPanMotorStepSize = DefaultMotorStepSize;
+    private int _manualTiltMotorStepSize = DefaultMotorStepSize;
     private double _panMotorPositionDegrees;
     private double _tiltMotorPositionDegrees;
     private bool _isMotorDetailsOpen;
@@ -67,6 +67,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private readonly UdpMotorControlService _motorControlService;
     private const double MotorPanLimitDegrees = 360;
     private const double MotorTiltLimitDegrees = 360;
+    private const int DefaultMotorStepSize = 8;
     private const int VisibleLogItemLimit = 30;
     private const int StoredLogItemLimit = 100;
     private readonly List<AnalysisItem> _analysisHistory = new();
@@ -280,7 +281,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public bool CanUseMotorControls => IsManualMode;
 
-    public bool CanUseMotorTargetControls => IsSystemPoweredOn;
+    public bool CanUseMotorTargetControls => IsManualMode;
 
     public double MotorControlsOpacity => CanUseMotorControls ? 1.0 : 0.38;
 
@@ -625,12 +626,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     /// <summary>
     /// IR 카메라 프레임을 ViewModel에 반영한다.
-    /// 현재 장착 방향을 맞추기 위해 수신 프레임을 왼쪽으로 90도 회전한 뒤 화면에 사용한다.
+    /// 하드웨어 장착 방향을 직접 조정할 수 있도록 수신 프레임의 원본 각도를 그대로 화면에 사용한다.
     /// EO/IR 화면이 서로 바뀐 상태여도 메인 화면과 보조 화면 모두 즉시 갱신된다.
     /// </summary>
     public void UpdateIrFrame(ImageSource? frame)
     {
-        _irFrame = RotateFrame(frame, -90);
+        _irFrame = frame;
         OnPropertyChanged(nameof(LargeFeedImage));
         OnPropertyChanged(nameof(InsetFeedImage));
     }
@@ -1053,12 +1054,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         if (!TrySendCurrentModeToController(out var modeError))
         {
             AppendImportantLog($"추적 모드 전송에 실패했습니다: {modeError}");
-            return;
         }
-
-        AppendImportantLog(IsTrackingModeEnabled
-            ? "추적 모드가 활성화되었습니다."
-            : "추적 모드가 비활성화되었습니다.");
     }
 
     /// <summary>
@@ -1089,7 +1085,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     /// <summary>
     /// 설정 창에서 테마를 직접 바꿀 때 호출되는 명령 처리부다.
-    /// 앱 전체 테마를 적용한 뒤 버튼 선택 상태와 로그도 함께 갱신한다.
+    /// 앱 전체 테마를 적용한 뒤 버튼 선택 상태를 갱신한다.
     /// </summary>
     private void SetTheme(object? parameter)
     {
@@ -1105,7 +1101,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(IsLightThemeActive));
         OnPropertyChanged(nameof(DarkThemeButtonOpacity));
         OnPropertyChanged(nameof(LightThemeButtonOpacity));
-        AppendImportantLog($"\uD14C\uB9C8\uAC00 {(nextTheme == AppThemeMode.Dark ? "\uC5B4\uB450\uC6B4 \uD14C\uB9C8" : "\uBC1D\uC740 \uD14C\uB9C8")}(\uC73C)\uB85C \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
     }
 
     private void SetLanguage(object? parameter)
@@ -1128,12 +1123,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         Text.Refresh();
         RefreshPrimaryTargetLabels();
         RaiseLocalizedTextProperties();
-        AppendImportantLog(Text["LanguageChanged"]);
     }
 
     /// <summary>
     /// 설정 창에서 주 탐지체를 선택하면 현재 선택 상태를 갱신한다.
-    /// 지금 단계에서는 선택된 항목과 로그만 바꾸고, 위험 등급 변화는 이후 VLM 분석 결과와 연동할 때 반영한다.
+    /// 위험 등급 변화는 이후 VLM 분석 결과와 연동할 때 반영한다.
     /// </summary>
     private void SelectPrimaryTarget(object? parameter)
     {
@@ -1143,7 +1137,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
 
         SelectedPrimaryTarget = target;
-        AppendImportantLog($"\uC8FC \uD0D0\uC9C0\uCCB4\uAC00 {SelectedPrimaryTarget}(\uC73C)\uB85C \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
     }
 
     /// <summary>
@@ -1165,7 +1158,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(LargeFeedStretch));
         OnPropertyChanged(nameof(InsetFeedStretch));
 
-        AppendImportantLog($"{LargeFeedTitle}\uAC00 \uBA54\uC778 \uD654\uBA74\uC73C\uB85C \uC804\uD658\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
     }
 
     public void RotateLargeFeedClockwise()
@@ -1180,7 +1172,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
 
         OnPropertyChanged(nameof(LargeFeedRotationAngle));
-        AppendImportantLog($"{LargeFeedTitle} 화면이 회전되었습니다.");
     }
 
     public void RotateInsetFeedClockwise()
@@ -1195,7 +1186,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
 
         OnPropertyChanged(nameof(InsetFeedRotationAngle));
-        AppendImportantLog($"{InsetFeedTitle} 화면이 회전되었습니다.");
     }
 
     private static double NextRotationAngle(double currentAngle) => (currentAngle + 90) % 360;
@@ -1340,7 +1330,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         if (!double.TryParse(MotorTargetPanText, NumberStyles.Float, CultureInfo.InvariantCulture, out var panDegrees) ||
             !double.TryParse(MotorTargetTiltText, NumberStyles.Float, CultureInfo.InvariantCulture, out var tiltDegrees))
         {
-            AppendImportantLog("모터 목표 각도 입력값을 확인하세요. 예: 0, 45.5, 360");
+            AppendImportantLog("모터 각도 입력값을 확인하세요. 예: 0, 45.5, 360");
             return;
         }
 
@@ -1351,17 +1341,17 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         if (!_motorControlService.TrySendTargetAnglePacket(panDegrees, tiltDegrees, out var error))
         {
-            AppendImportantLog($"모터 목표 각도 전송에 실패했습니다: {error}");
+            AppendImportantLog($"모터 각도 전송에 실패했습니다: {error}");
             return;
         }
 
         SetMotorPosition(panDegrees, tiltDegrees);
-        AppendImportantLog($"모터 목표 각도 전송: pan {panDegrees:0.0}°, tilt {tiltDegrees:0.0}°");
+        AppendImportantLog($"모터 각도 전송: pan {panDegrees:0.0}°, tilt {tiltDegrees:0.0}°");
     }
 
     private void AdjustMotorStep(object? parameter)
     {
-        if (!TryParseMotorStepParameter(parameter, out var mode, out var axis, out var delta))
+        if (!TryParseMotorStepParameter(parameter, out var mode, out var axis, out var delta, out var resetToDefault))
         {
             return;
         }
@@ -1370,11 +1360,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         {
             if (mode == MotorStepMode.Auto)
             {
-                AutoPanMotorStepSize += delta;
+                AutoPanMotorStepSize = resetToDefault ? DefaultMotorStepSize : AutoPanMotorStepSize + delta;
             }
             else
             {
-                ManualPanMotorStepSize += delta;
+                ManualPanMotorStepSize = resetToDefault ? DefaultMotorStepSize : ManualPanMotorStepSize + delta;
             }
         }
 
@@ -1382,11 +1372,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         {
             if (mode == MotorStepMode.Auto)
             {
-                AutoTiltMotorStepSize += delta;
+                AutoTiltMotorStepSize = resetToDefault ? DefaultMotorStepSize : AutoTiltMotorStepSize + delta;
             }
             else
             {
-                ManualTiltMotorStepSize += delta;
+                ManualTiltMotorStepSize = resetToDefault ? DefaultMotorStepSize : ManualTiltMotorStepSize + delta;
             }
         }
 
@@ -1397,20 +1387,19 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        var modeText = mode == MotorStepMode.Auto ? "auto" : "manual";
-        AppendImportantLog(
-            $"모터 {modeText} step size 변경: pan {GetPanStepSize(mode)}, tilt {GetTiltStepSize(mode)}");
     }
 
     private static bool TryParseMotorStepParameter(
         object? parameter,
         out MotorStepMode mode,
         out MotorStepAxis axis,
-        out int delta)
+        out int delta,
+        out bool resetToDefault)
     {
         mode = MotorStepMode.Auto;
         axis = MotorStepAxis.Both;
         delta = 0;
+        resetToDefault = false;
 
         if (parameter is string text)
         {
@@ -1423,6 +1412,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 axis = string.Equals(parts[1], "Tilt", StringComparison.OrdinalIgnoreCase)
                     ? MotorStepAxis.Tilt
                     : MotorStepAxis.Pan;
+                if (string.Equals(parts[2], "Reset", StringComparison.OrdinalIgnoreCase))
+                {
+                    resetToDefault = true;
+                    return true;
+                }
+
                 return int.TryParse(parts[2], NumberStyles.Integer, CultureInfo.InvariantCulture, out delta) && delta != 0;
             }
 
@@ -1435,12 +1430,24 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                         ? MotorStepMode.Manual
                         : MotorStepMode.Auto;
                     axis = MotorStepAxis.Both;
+                    if (string.Equals(parts[1], "Reset", StringComparison.OrdinalIgnoreCase))
+                    {
+                        resetToDefault = true;
+                        return true;
+                    }
+
                     return int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out delta) && delta != 0;
                 }
 
                 axis = string.Equals(parts[0], "Tilt", StringComparison.OrdinalIgnoreCase)
                     ? MotorStepAxis.Tilt
                     : MotorStepAxis.Pan;
+                if (string.Equals(parts[1], "Reset", StringComparison.OrdinalIgnoreCase))
+                {
+                    resetToDefault = true;
+                    return true;
+                }
+
                 return int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out delta) && delta != 0;
             }
 
@@ -1807,7 +1814,7 @@ public sealed class LocalizedTextProvider : INotifyPropertyChanged
         ["PowerExit"] = ("Exit", "\uC804\uC6D0 \uC885\uB8CC"),
         ["RecordingOn"] = ("Recording", "\uC601\uC0C1 \uB179\uD654 \uC911"),
         ["RecordingStatus"] = ("Recording Status", "\uC601\uC0C1 \uB179\uD654 \uC0C1\uD0DC"),
-        ["Brightness"] = ("Brightness", "\uBC1D\uAE30"),
+        ["Brightness"] = ("Bright", "\uBC1D\uAE30"),
         ["Contrast"] = ("Contrast", "\uB300\uC870\uBE44"),
         ["AutoMode"] = ("Auto", "\uC790\uB3D9"),
         ["ManualMode"] = ("Manual", "\uC218\uB3D9"),
@@ -1827,7 +1834,7 @@ public sealed class LocalizedTextProvider : INotifyPropertyChanged
         ["FullscreenMode"] = ("Fullscreen", "\uC804\uCCB4\uD654\uBA74\uC73C\uB85C \uC804\uD658"),
         ["Details"] = ("Details", "\uC0C1\uC138"),
         ["MotorPosition"] = ("Motor Position", "\uBAA8\uD130 \uC704\uCE58"),
-        ["MotorTarget"] = ("Motor Target", "\uBAA8\uD130 \uBAA9\uD45C"),
+        ["MotorTarget"] = ("Motor Angle Setting", "\uBAA8\uD130 \uAC01\uB3C4 \uC124\uC815"),
         ["MotorControl"] = ("Motor Control", "\uBAA8\uD130 \uCEE8\uD2B8\uB864"),
         ["SystemStatus"] = ("System Status", "\uC2DC\uC2A4\uD15C \uD604\uD669"),
         ["AnalysisPanel"] = ("Status of LLM Analysis", "\uC0C1\uD669 \uBD84\uC11D"),

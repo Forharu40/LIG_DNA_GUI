@@ -47,6 +47,7 @@ public partial class MainWindow : Window
     private readonly UdpMotorControlService _motorControlService;
     private readonly UdpMotorStatusReceiverService _motorStatusReceiverService;
     private readonly MobileAlertHubService _mobileAlertHubService;
+    private readonly JetsonBridgeSshService _jetsonBridgeSshService;
     private readonly DispatcherTimer _motorHoldTimer;
     private readonly DispatcherTimer _recordedVideoPositionTimer;
     private readonly DispatcherTimer _recordingMetadataTimer;
@@ -149,6 +150,7 @@ public partial class MainWindow : Window
         _viewportRecordingService = new ViewportRecordingService();
         _motorStatusReceiverService = new UdpMotorStatusReceiverService();
         _mobileAlertHubService = new MobileAlertHubService();
+        _jetsonBridgeSshService = new JetsonBridgeSshService();
         _motorHoldTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(50)
@@ -172,7 +174,7 @@ public partial class MainWindow : Window
         PreviewKeyUp += MainWindow_OnPreviewKeyUp;
     }
 
-    private void OnLoaded(object sender, RoutedEventArgs e)
+    private async void OnLoaded(object sender, RoutedEventArgs e)
     {
         WindowState = WindowState.Maximized;
         UpdateWindowModeButtonText();
@@ -180,6 +182,7 @@ public partial class MainWindow : Window
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _viewModel.ManualAnalysisSaveRequested += ViewModel_OnManualAnalysisSaveRequested;
         _viewModel.ManualSystemLogSaveRequested += ViewModel_OnManualSystemLogSaveRequested;
+        _jetsonBridgeSshService.MessageReady += JetsonBridgeSshService_OnMessageReady;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived += OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived += OnYoloStatusReceived;
@@ -205,6 +208,7 @@ public partial class MainWindow : Window
         _recordingMetadataTimer.Start();
 
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
+        await _jetsonBridgeSshService.StartAsync();
 
         if (_eoUdpCaptureService.Start(EoUdpPort))
         {
@@ -559,9 +563,7 @@ public partial class MainWindow : Window
 
     private DisplayRotation GetCurrentDisplayRotation()
     {
-        return _viewModel.IsEoPrimary
-            ? DisplayRotation.None
-            : DisplayRotation.RotateLeft90;
+        return DisplayRotation.None;
     }
 
     private static string BuildOverlaySignature(IReadOnlyList<DetectionInfo> detections)
@@ -1015,11 +1017,6 @@ public partial class MainWindow : Window
 
     private void RotateAuxCameraButton_OnClick(object sender, RoutedEventArgs e)
     {
-        if (sender is FrameworkElement { Tag: string cameraName })
-        {
-            _viewModel.AppendImportantLog($"{cameraName} 화면이 회전되었습니다.");
-        }
-
         e.Handled = true;
     }
 
@@ -1666,7 +1663,6 @@ public partial class MainWindow : Window
             Left = Math.Max(0, (SystemParameters.WorkArea.Width - Width) / 2);
             Top = Math.Max(0, (SystemParameters.WorkArea.Height - Height) / 2);
             _isFullscreenMode = false;
-            _viewModel.AppendImportantLog("화면 모드가 창모드로 전환되었습니다.");
         }
         else
         {
@@ -1674,7 +1670,6 @@ public partial class MainWindow : Window
             ResizeMode = ResizeMode.NoResize;
             WindowState = WindowState.Maximized;
             _isFullscreenMode = true;
-            _viewModel.AppendImportantLog("화면 모드가 전체화면으로 전환되었습니다.");
         }
 
         UpdateWindowModeButtonText();
@@ -2037,6 +2032,7 @@ public partial class MainWindow : Window
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _viewModel.ManualAnalysisSaveRequested -= ViewModel_OnManualAnalysisSaveRequested;
         _viewModel.ManualSystemLogSaveRequested -= ViewModel_OnManualSystemLogSaveRequested;
+        _jetsonBridgeSshService.MessageReady -= JetsonBridgeSshService_OnMessageReady;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
@@ -2051,6 +2047,18 @@ public partial class MainWindow : Window
         _irUdpCaptureService.Dispose();
         _motorStatusReceiverService.Dispose();
         _motorControlService.Dispose();
+        _jetsonBridgeSshService.StopAsync().GetAwaiter().GetResult();
+        _jetsonBridgeSshService.Dispose();
+    }
+
+    private void JetsonBridgeSshService_OnMessageReady(string message)
+    {
+        Dispatcher.Invoke(() => _viewModel.AppendImportantLog(message));
+    }
+
+    private void Button_Click_2(object sender, RoutedEventArgs e)
+    {
+
     }
 }
 
