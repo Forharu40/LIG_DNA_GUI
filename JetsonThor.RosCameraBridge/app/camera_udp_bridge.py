@@ -208,7 +208,8 @@ def ensure_recording_segment(directory: Path, timestamp: str | None = None, crea
         ensure_default_metadata_files(segment_directory, timestamp)
         if create_placeholder_videos:
             write_placeholder_video(recording_video_path(directory, timestamp, "eo"), "eo")
-            write_placeholder_video(recording_video_path(directory, timestamp, "ir"), "ir")
+            write_placeholder_video(recording_video_path(directory, timestamp, "ir_color"), "ir_color")
+            write_placeholder_video(recording_video_path(directory, timestamp, "ir_gray"), "ir_gray")
 
         LATEST_RECORDING_SEGMENT_NAME = timestamp
         return timestamp
@@ -228,6 +229,22 @@ def create_ir_false_color_frame(frame: np.ndarray) -> np.ndarray:
         gray8 = gray
 
     return cv2.applyColorMap(gray8, cv2.COLORMAP_JET)
+
+
+def create_ir_grayscale_frame(frame: np.ndarray) -> np.ndarray:
+    if frame.ndim == 3 and frame.shape[2] == 3:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+    elif frame.ndim == 3 and frame.shape[2] == 4:
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGRA2GRAY)
+    else:
+        gray = frame
+
+    if gray.dtype != np.uint8:
+        gray8 = cv2.normalize(gray, None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+    else:
+        gray8 = gray
+
+    return cv2.cvtColor(gray8, cv2.COLOR_GRAY2BGR)
 
 DETECTION_TOPIC_QOS = QoSProfile(
     history=HistoryPolicy.KEEP_LAST,
@@ -645,11 +662,17 @@ class StreamBridge:
         self._lock = threading.Lock()
         self._stamp_history: deque[FrameStampInfo] = deque(maxlen=STAMP_HISTORY_LIMIT)
         self._last_frame_info = FrameStampInfo(0, 0, 0, 0)
-        self._recorder = (
-            VideoSegmentRecorder(name, RECORDING_DIR, RECORDING_SEGMENT_SECONDS, RECORDING_FPS)
-            if RECORDING_ENABLED
-            else None
-        )
+        self._recorders: list[VideoSegmentRecorder] = []
+        if RECORDING_ENABLED:
+            if name.lower() == "ir":
+                self._recorders = [
+                    VideoSegmentRecorder("ir_color", RECORDING_DIR, RECORDING_SEGMENT_SECONDS, RECORDING_FPS),
+                    VideoSegmentRecorder("ir_gray", RECORDING_DIR, RECORDING_SEGMENT_SECONDS, RECORDING_FPS),
+                ]
+            else:
+                self._recorders = [
+                    VideoSegmentRecorder(name, RECORDING_DIR, RECORDING_SEGMENT_SECONDS, RECORDING_FPS)
+                ]
 
     def send_image(self, message: Image) -> None:
         frame = ros_image_to_bgr(message)
@@ -659,13 +682,12 @@ class StreamBridge:
         frame_index = self.frame_index
 
         stream_frame = fit_frame_to_stream(frame)
-        if self._recorder is not None:
-            recording_frame = (
-                create_ir_false_color_frame(stream_frame)
-                if self.name.lower() == "ir"
-                else stream_frame
-            )
-            self._recorder.write(recording_frame)
+        if self._recorders:
+            if self.name.lower() == "ir":
+                self._recorders[0].write(create_ir_false_color_frame(stream_frame))
+                self._recorders[1].write(create_ir_grayscale_frame(stream_frame))
+            else:
+                self._recorders[0].write(stream_frame)
 
         ok, encoded = cv2.imencode(
             ".jpg",
@@ -741,8 +763,8 @@ class StreamBridge:
         return FrameStampInfo(stamp_ns, 0, 0, 0)
 
     def close(self) -> None:
-        if self._recorder is not None:
-            self._recorder.close()
+        for recorder in self._recorders:
+            recorder.close()
 
 
 class CameraUdpBridge(Node):
