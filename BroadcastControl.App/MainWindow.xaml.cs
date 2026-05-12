@@ -2047,8 +2047,19 @@ public partial class MainWindow : Window
         _irUdpCaptureService.Dispose();
         _motorStatusReceiverService.Dispose();
         _motorControlService.Dispose();
-        _jetsonBridgeSshService.StopAsync().GetAwaiter().GetResult();
-        _jetsonBridgeSshService.Dispose();
+        _ = StopJetsonBridgeAfterCloseAsync();
+    }
+
+    private async Task StopJetsonBridgeAfterCloseAsync()
+    {
+        try
+        {
+            await _jetsonBridgeSshService.StopAsync();
+        }
+        finally
+        {
+            _jetsonBridgeSshService.Dispose();
+        }
     }
 
     private void JetsonBridgeSshService_OnMessageReady(string message)

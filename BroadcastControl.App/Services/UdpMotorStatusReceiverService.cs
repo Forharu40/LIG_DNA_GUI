@@ -40,6 +40,14 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
     {
         _cancellationTokenSource?.Cancel();
         _udpClient.Dispose();
+        try
+        {
+            _receiveTask?.Wait(TimeSpan.FromSeconds(1));
+        }
+        catch (AggregateException)
+        {
+            // The receive loop exits through cancellation or socket disposal during shutdown.
+        }
         _cancellationTokenSource?.Dispose();
     }
 

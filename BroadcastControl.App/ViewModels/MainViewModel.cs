@@ -973,18 +973,28 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     /// <summary>
     /// 상단 전원 종료 버튼의 실제 동작을 처리한다.
-    /// 위험 등급이 높음인 경우에는 운용 중 실수로 프로그램을 닫지 못하도록 종료를 막는다.
     /// </summary>
     private void TogglePower()
     {
-        // 위험 등급이 높음이면 사용 중인 프로그램 종료를 차단한다.
-        if (CurrentThreatLevel == "\uB192\uC74C")
+        var app = Application.Current;
+        if (app is null)
         {
-            AppendImportantLog("\uC704\uD5D8 \uB4F1\uAE09\uC774 \uB192\uC74C \uC0C1\uD0DC\uC5EC\uC11C \uD504\uB85C\uADF8\uB7A8\uC744 \uC885\uB8CC\uD560 \uC218 \uC5C6\uC2B5\uB2C8\uB2E4.");
             return;
         }
 
-        Application.Current?.Shutdown();
+        void ShutdownApplication()
+        {
+            app.MainWindow?.Close();
+            app.Shutdown();
+        }
+
+        if (app.Dispatcher.CheckAccess())
+        {
+            ShutdownApplication();
+            return;
+        }
+
+        app.Dispatcher.BeginInvoke(ShutdownApplication);
     }
 
     /// <summary>
