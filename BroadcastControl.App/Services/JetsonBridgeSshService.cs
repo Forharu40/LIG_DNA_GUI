@@ -20,20 +20,24 @@ public sealed class JetsonBridgeSshService : IDisposable
         var user = GetEnvironment("JETSON_SSH_USER", "lig");
         var host = GetEnvironment("JETSON_SSH_HOST", "192.168.3.143");
         var target = $"{user}@{host}";
-        var projectDir = GetEnvironment("JETSON_BRIDGE_DIR", "~/LIG_DNA_GUI/JetsonThor.RosCameraBridge");
+        var projectDir = NormalizeRemotePath(
+            GetEnvironment("JETSON_BRIDGE_DIR", "~/LIG_DNA_GUI/JetsonThor.RosCameraBridge"),
+            user);
         var guiHost = GetEnvironment("JETSON_GUI_HOST", "192.168.1.94");
         var recordingDir = GetEnvironment("JETSON_RECORDING_DIR", "/home/lig/Desktop/video");
         var segmentSeconds = GetEnvironment("RECORDING_SEGMENT_SECONDS", "60");
         var httpPort = GetEnvironment("RECORDING_HTTP_PORT", "8090");
         var buildArg = GetBoolEnvironment("JETSON_BRIDGE_BUILD", false) ? " --build" : string.Empty;
+        var runnerPath = CombineRemotePath(projectDir, "run_camera_udp_bridge.sh");
+        var logPath = $"/home/{user}/lig_gui_camera_bridge.log";
 
         var remoteCommand =
-            $"cd {ShellQuote(projectDir)} && " +
+            "nohup setsid -f env " +
             $"GUI_HOST={ShellQuote(guiHost)} " +
             $"JETSON_RECORDING_DIR={ShellQuote(recordingDir)} " +
             $"RECORDING_SEGMENT_SECONDS={ShellQuote(segmentSeconds)} " +
             $"RECORDING_HTTP_PORT={ShellQuote(httpPort)} " +
-            $"nohup bash ./run_camera_udp_bridge.sh{buildArg} > ~/lig_gui_camera_bridge.log 2>&1 < /dev/null &";
+            $"bash {ShellQuote(runnerPath)}{buildArg} > {ShellQuote(logPath)} 2>&1 < /dev/null";
 
         var result = await RunSshAsync(target, remoteCommand, TimeSpan.FromSeconds(10), cancellationToken);
         if (result.ExitCode == 0)
@@ -102,9 +106,7 @@ public sealed class JetsonBridgeSshService : IDisposable
         startInfo.ArgumentList.Add("-o");
         startInfo.ArgumentList.Add("ConnectTimeout=5");
         startInfo.ArgumentList.Add(target);
-        startInfo.ArgumentList.Add("bash");
-        startInfo.ArgumentList.Add("-lc");
-        startInfo.ArgumentList.Add(remoteCommand);
+        startInfo.ArgumentList.Add($"bash -lc {ShellQuote(remoteCommand)}");
 
         try
         {
@@ -152,6 +154,26 @@ public sealed class JetsonBridgeSshService : IDisposable
             "0" or "false" or "no" or "off" => false,
             _ => fallback
         };
+    }
+
+    private static string NormalizeRemotePath(string path, string user)
+    {
+        if (path == "~")
+        {
+            return $"/home/{user}";
+        }
+
+        if (path.StartsWith("~/", StringComparison.Ordinal))
+        {
+            return $"/home/{user}/{path[2..]}";
+        }
+
+        return path;
+    }
+
+    private static string CombineRemotePath(string directory, string fileName)
+    {
+        return directory.TrimEnd('/') + "/" + fileName.TrimStart('/');
     }
 
     private static string ShellQuote(string value)

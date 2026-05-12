@@ -35,6 +35,7 @@ ROS_DOMAIN_ID_VALUE="${ROS_DOMAIN_ID:-}"
 RMW_IMPLEMENTATION_VALUE="${RMW_IMPLEMENTATION:-}"
 
 BUILD_IMAGE=0
+DOCKER_CMD=()
 
 print_usage() {
   cat <<'EOF'
@@ -74,13 +75,29 @@ for arg in "$@"; do
   esac
 done
 
-if ! sudo docker image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
+if docker info >/dev/null 2>&1; then
+  DOCKER_CMD=(docker)
+elif sudo -n docker info >/dev/null 2>&1; then
+  DOCKER_CMD=(sudo -n docker)
+else
+  cat >&2 <<'EOF'
+Docker is not available without an interactive password prompt.
+For GUI auto-start, add the Jetson user to the docker group and log in again:
+  sudo usermod -aG docker lig
+  exit
+  ssh lig@192.168.3.143
+  docker ps
+EOF
+  exit 1
+fi
+
+if ! "${DOCKER_CMD[@]}" image inspect "$IMAGE_NAME" >/dev/null 2>&1; then
   BUILD_IMAGE=1
 fi
 
 if [[ "$BUILD_IMAGE" -eq 1 ]]; then
   echo "Building Docker image: $IMAGE_NAME"
-  sudo docker build \
+  "${DOCKER_CMD[@]}" build \
     --build-arg "BASE_IMAGE=$BASE_IMAGE" \
     -f "$SCRIPT_DIR/Dockerfile" \
     -t "$IMAGE_NAME" \
@@ -113,9 +130,9 @@ if [[ -n "$RMW_IMPLEMENTATION_VALUE" ]]; then
   echo "RMW_IMPLEMENTATION=$RMW_IMPLEMENTATION_VALUE"
 fi
 
-if sudo docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
+if "${DOCKER_CMD[@]}" container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
   echo "Removing previous container: $CONTAINER_NAME"
-  sudo docker rm -f "$CONTAINER_NAME" >/dev/null
+  "${DOCKER_CMD[@]}" rm -f "$CONTAINER_NAME" >/dev/null
 fi
 
 mkdir -p "$JETSON_RECORDING_DIR"
@@ -157,4 +174,4 @@ if [[ -n "$RMW_IMPLEMENTATION_VALUE" ]]; then
   docker_args+=(-e "RMW_IMPLEMENTATION=$RMW_IMPLEMENTATION_VALUE")
 fi
 
-sudo docker "${docker_args[@]}" "$IMAGE_NAME"
+"${DOCKER_CMD[@]}" "${docker_args[@]}" "$IMAGE_NAME"
