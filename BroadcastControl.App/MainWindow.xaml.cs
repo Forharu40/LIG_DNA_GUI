@@ -192,6 +192,7 @@ public partial class MainWindow : Window
         _viewModel.ManualSystemLogSaveRequested += ViewModel_OnManualSystemLogSaveRequested;
         _jetsonBridgeSshService.MessageReady += JetsonBridgeSshService_OnMessageReady;
         _rosTopicBridgeProcessService.MessageReady += RosTopicBridgeProcessService_OnMessageReady;
+        _rosTopicBridgeProcessService.PacketReceived += RosTopicBridgeProcessService_OnPacketReceived;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived += OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived += OnYoloStatusReceived;
@@ -221,7 +222,7 @@ public partial class MainWindow : Window
         if (videoInputMode == VideoInputMode.Ros2Topics)
         {
             _viewModel.AppendImportantLog("ROS2 topic input mode enabled. Jetson UDP bridge auto-start is skipped.");
-            if (!_rosTopicBridgeProcessService.Start(EoUdpPort, IrUdpPort))
+            if (!_rosTopicBridgeProcessService.Start())
             {
                 _viewModel.AppendImportantLog("Failed to start the local ROS2 topic bridge. Check ROS2_SETUP_BAT or ROS2_PYTHON.");
             }
@@ -232,20 +233,17 @@ public partial class MainWindow : Window
             await _jetsonBridgeSshService.StartAsync();
         }
 
-        if (_eoUdpCaptureService.Start(EoUdpPort))
+        if (videoInputMode == VideoInputMode.JetsonUdpBridge)
         {
-        }
-        else
-        {
-            _viewModel.AppendImportantLog($"Failed to start the EO UDP stream receiver on port {EoUdpPort}.");
-        }
+            if (!_eoUdpCaptureService.Start(EoUdpPort))
+            {
+                _viewModel.AppendImportantLog($"Failed to start the EO UDP stream receiver on port {EoUdpPort}.");
+            }
 
-        if (_irUdpCaptureService.Start(IrUdpPort))
-        {
-        }
-        else
-        {
-            _viewModel.AppendImportantLog($"Failed to start the IR UDP stream receiver on port {IrUdpPort}.");
+            if (!_irUdpCaptureService.Start(IrUdpPort))
+            {
+                _viewModel.AppendImportantLog($"Failed to start the IR UDP stream receiver on port {IrUdpPort}.");
+            }
         }
 
         if (_mobileAlertHubService.Start(MobileAlertPort))
@@ -2056,6 +2054,7 @@ public partial class MainWindow : Window
         _viewModel.ManualSystemLogSaveRequested -= ViewModel_OnManualSystemLogSaveRequested;
         _jetsonBridgeSshService.MessageReady -= JetsonBridgeSshService_OnMessageReady;
         _rosTopicBridgeProcessService.MessageReady -= RosTopicBridgeProcessService_OnMessageReady;
+        _rosTopicBridgeProcessService.PacketReceived -= RosTopicBridgeProcessService_OnPacketReceived;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
@@ -2083,6 +2082,18 @@ public partial class MainWindow : Window
     private void RosTopicBridgeProcessService_OnMessageReady(string message)
     {
         Dispatcher.Invoke(() => _viewModel.AppendImportantLog(message));
+    }
+
+    private void RosTopicBridgeProcessService_OnPacketReceived(string stream, byte[] packet)
+    {
+        if (string.Equals(stream, "eo", StringComparison.OrdinalIgnoreCase))
+        {
+            _eoUdpCaptureService.ProcessLocalPacket(packet);
+        }
+        else if (string.Equals(stream, "ir", StringComparison.OrdinalIgnoreCase))
+        {
+            _irUdpCaptureService.ProcessLocalPacket(packet);
+        }
     }
 
     private static VideoInputMode GetVideoInputMode()

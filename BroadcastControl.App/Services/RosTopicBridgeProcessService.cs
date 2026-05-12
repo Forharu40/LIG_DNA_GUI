@@ -1,18 +1,25 @@
 using System.Diagnostics;
-using System.Globalization;
 using System.IO;
+using System.Text.Json;
 
 namespace BroadcastControl.App.Services;
 
 public sealed class RosTopicBridgeProcessService : IDisposable
 {
+    private static readonly JsonSerializerOptions JsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private Process? _process;
 
     public event Action<string>? MessageReady;
 
+    public event Action<string, byte[]>? PacketReceived;
+
     public bool IsRunning => _process is { HasExited: false };
 
-    public bool Start(int eoPort, int irPort)
+    public bool Start()
     {
         if (IsRunning)
         {
@@ -32,9 +39,6 @@ public sealed class RosTopicBridgeProcessService : IDisposable
             return false;
         }
 
-        startInfo.Environment["GUI_HOST"] = "127.0.0.1";
-        startInfo.Environment["EO_GUI_PORT"] = eoPort.ToString(CultureInfo.InvariantCulture);
-        startInfo.Environment["IR_GUI_PORT"] = irPort.ToString(CultureInfo.InvariantCulture);
         SetDefaultEnvironment(startInfo, "EO_IMAGE_TOPIC", "/video/eo/preprocessed");
         SetDefaultEnvironment(startInfo, "IR_IMAGE_TOPIC", "/camera/ir");
         SetDefaultEnvironment(startInfo, "EO_DETECTION_TOPIC", "/detections/eo");
@@ -48,7 +52,7 @@ public sealed class RosTopicBridgeProcessService : IDisposable
                 EnableRaisingEvents = true
             };
             _process.OutputDataReceived += OnOutputDataReceived;
-            _process.ErrorDataReceived += OnOutputDataReceived;
+            _process.ErrorDataReceived += OnErrorDataReceived;
             _process.Exited += OnProcessExited;
 
             if (!_process.Start())
@@ -59,7 +63,7 @@ public sealed class RosTopicBridgeProcessService : IDisposable
 
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
-            MessageReady?.Invoke("ROS2 topic bridge started. Subscribing to image and detection topics locally.");
+            MessageReady?.Invoke("ROS2 topic bridge started. GUI video UDP sockets are disabled.");
             return true;
         }
         catch (Exception ex)
@@ -91,7 +95,7 @@ public sealed class RosTopicBridgeProcessService : IDisposable
         finally
         {
             _process.OutputDataReceived -= OnOutputDataReceived;
-            _process.ErrorDataReceived -= OnOutputDataReceived;
+            _process.ErrorDataReceived -= OnErrorDataReceived;
             _process.Exited -= OnProcessExited;
             _process.Dispose();
             _process = null;
@@ -151,9 +155,44 @@ public sealed class RosTopicBridgeProcessService : IDisposable
 
     private void OnOutputDataReceived(object sender, DataReceivedEventArgs e)
     {
+        if (string.IsNullOrWhiteSpace(e.Data))
+        {
+            return;
+        }
+
+        if (!TryHandleBridgePacket(e.Data))
+        {
+            MessageReady?.Invoke($"ROS2 topic bridge: {e.Data}");
+        }
+    }
+
+    private void OnErrorDataReceived(object sender, DataReceivedEventArgs e)
+    {
         if (!string.IsNullOrWhiteSpace(e.Data))
         {
             MessageReady?.Invoke($"ROS2 topic bridge: {e.Data}");
+        }
+    }
+
+    private bool TryHandleBridgePacket(string line)
+    {
+        try
+        {
+            var packet = JsonSerializer.Deserialize<RosBridgePacket>(line, JsonOptions);
+            if (packet is null ||
+                string.IsNullOrWhiteSpace(packet.Stream) ||
+                string.IsNullOrWhiteSpace(packet.Packet))
+            {
+                return false;
+            }
+
+            var bytes = Convert.FromBase64String(packet.Packet);
+            PacketReceived?.Invoke(packet.Stream, bytes);
+            return true;
+        }
+        catch
+        {
+            return false;
         }
     }
 
@@ -163,5 +202,12 @@ public sealed class RosTopicBridgeProcessService : IDisposable
         {
             MessageReady?.Invoke($"ROS2 topic bridge exited. exit={process.ExitCode}");
         }
+    }
+
+    private sealed record RosBridgePacket
+    {
+        public string Stream { get; init; } = string.Empty;
+
+        public string Packet { get; init; } = string.Empty;
     }
 }

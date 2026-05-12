@@ -113,6 +113,11 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         }
     }
 
+    public void ProcessLocalPacket(byte[] packet)
+    {
+        TryProcessPacket(packet, null);
+    }
+
     public void Stop()
     {
         _cancellationTokenSource?.Cancel();

@@ -3,12 +3,13 @@
 
 from __future__ import annotations
 
+import base64
 from collections import OrderedDict
 from dataclasses import dataclass
 import json
 import os
-import socket
 import struct
+import sys
 import time
 
 import cv2
@@ -25,9 +26,6 @@ STATUS_PACKET_MAGIC = b"STAT"
 IMAGE_FRAGMENT_MAGIC = b"IMGF"
 IMAGE_FRAGMENT_HEADER_FORMAT = "!4sQIIHHHH"
 IMAGE_FRAGMENT_HEADER_SIZE = struct.calcsize(IMAGE_FRAGMENT_HEADER_FORMAT)
-GUI_HOST = os.getenv("GUI_HOST", "127.0.0.1")
-EO_GUI_PORT = int(os.getenv("EO_GUI_PORT", os.getenv("GUI_PORT", "5000")))
-IR_GUI_PORT = int(os.getenv("IR_GUI_PORT", "5001"))
 EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/video/eo/preprocessed")
 IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
 EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/detections/eo")
@@ -43,7 +41,6 @@ class StreamConfig:
     name: str
     image_topic: str
     detection_topic: str
-    gui_port: int
 
 
 def stamp_to_ns(stamp) -> int:
@@ -152,10 +149,23 @@ def build_status_packet(source: str, frame_index: int, stamp_ns: int = 0, error:
     return STATUS_PACKET_MAGIC + json.dumps(payload, separators=(",", ":")).encode("utf-8")
 
 
+def emit_packet(stream_name: str, packet: bytes) -> None:
+    sys.stdout.write(
+        json.dumps(
+            {
+                "stream": stream_name.lower(),
+                "packet": base64.b64encode(packet).decode("ascii"),
+            },
+            separators=(",", ":"),
+        )
+        + "\n"
+    )
+    sys.stdout.flush()
+
+
 class StreamState:
-    def __init__(self, config: StreamConfig, sock: socket.socket) -> None:
+    def __init__(self, config: StreamConfig) -> None:
         self.config = config
-        self.sock = sock
         self.frame_index = 0
         self.latest_width = 0
         self.latest_height = 0
@@ -205,7 +215,7 @@ class StreamState:
             stamp_ns,
         )
         for packet in packets:
-            self.sock.sendto(packet, (GUI_HOST, self.config.gui_port))
+            emit_packet(self.config.name, packet)
 
         pending = self.pending_detections.pop(stamp_ns, None)
         if pending is not None:
@@ -220,7 +230,7 @@ class StreamState:
             self.latest_height,
             detections,
         )
-        self.sock.sendto(packet, (GUI_HOST, self.config.gui_port))
+        emit_packet(self.config.name, packet)
 
     def handle_detection_message(self, message: Detection2DArray) -> None:
         stamp_ns = stamp_to_ns(message.stamp) or time.time_ns()
@@ -249,10 +259,9 @@ class StreamState:
 class GuiRosTopicBridge(Node):
     def __init__(self) -> None:
         super().__init__("gui_ros_topic_bridge")
-        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.streams = [
-            StreamState(StreamConfig("EO", EO_IMAGE_TOPIC, EO_DETECTION_TOPIC, EO_GUI_PORT), self.sock),
-            StreamState(StreamConfig("IR", IR_IMAGE_TOPIC, IR_DETECTION_TOPIC, IR_GUI_PORT), self.sock),
+            StreamState(StreamConfig("EO", EO_IMAGE_TOPIC, EO_DETECTION_TOPIC)),
+            StreamState(StreamConfig("IR", IR_IMAGE_TOPIC, IR_DETECTION_TOPIC)),
         ]
 
         for state in self.streams:
@@ -270,33 +279,22 @@ class GuiRosTopicBridge(Node):
             )
             self.get_logger().info(
                 f"{state.config.name}: {state.config.image_topic} + {state.config.detection_topic} "
-                f"-> {GUI_HOST}:{state.config.gui_port}"
+                "-> GUI process pipe"
             )
-            self.sock.sendto(
-                build_status_packet(state.config.image_topic, 0),
-                (GUI_HOST, state.config.gui_port),
-            )
+            emit_packet(state.config.name, build_status_packet(state.config.image_topic, 0))
 
     def on_image(self, state: StreamState, message: Image) -> None:
         try:
             state.send_image(message)
         except Exception as exc:
             self.get_logger().error(f"{state.config.name} image bridge failed: {exc}")
-            self.sock.sendto(
-                build_status_packet(state.config.image_topic, state.frame_index, error=str(exc)),
-                (GUI_HOST, state.config.gui_port),
-            )
+            emit_packet(state.config.name, build_status_packet(state.config.image_topic, state.frame_index, error=str(exc)))
 
     def on_detection(self, state: StreamState, message: Detection2DArray) -> None:
         try:
             state.handle_detection_message(message)
         except Exception as exc:
             self.get_logger().error(f"{state.config.name} detection bridge failed: {exc}")
-
-    def destroy_node(self) -> bool:
-        self.sock.close()
-        return super().destroy_node()
-
 
 def main() -> None:
     rclpy.init()
