@@ -13,7 +13,7 @@ namespace BroadcastControl.App.Services;
 
 public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
-    private const int DefaultPort = 5000;
+    private const int DefaultPort = 6000;
     private const int LegacyHeaderSize = 20;
     private const int ImageFragmentHeaderSize = 28;
     private const int MaxImageFragmentBuffers = 32;

@@ -58,8 +58,8 @@ def getenv_bool(name: str, default: bool) -> bool:
 
 
 GUI_HOST = os.getenv("GUI_HOST", "192.168.1.94")
-EO_GUI_PORT = getenv_int("EO_GUI_PORT", 5000)
-IR_GUI_PORT = getenv_int("IR_GUI_PORT", 5001)
+EO_GUI_PORT = getenv_int("EO_GUI_PORT", 6000)
+IR_GUI_PORT = getenv_int("IR_GUI_PORT", 6001)
 EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/video/eo/preprocessed")
 IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
 EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/detections/eo")

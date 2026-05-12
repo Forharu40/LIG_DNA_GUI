@@ -23,8 +23,8 @@ from sentinel_interfaces.msg import Detection2DArray
 DETECTION_PACKET_MAGIC = b"DETS"
 STATUS_PACKET_MAGIC = b"STAT"
 GUI_HOST = os.getenv("GUI_HOST", "127.0.0.1")
-EO_GUI_PORT = int(os.getenv("EO_GUI_PORT", os.getenv("GUI_PORT", "5000")))
-IR_GUI_PORT = int(os.getenv("IR_GUI_PORT", "5001"))
+EO_GUI_PORT = int(os.getenv("EO_GUI_PORT", os.getenv("GUI_PORT", "6000")))
+IR_GUI_PORT = int(os.getenv("IR_GUI_PORT", "6001"))
 EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/video/eo/preprocessed")
 IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
 EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/detections/eo")

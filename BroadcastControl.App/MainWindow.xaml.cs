@@ -31,8 +31,8 @@ public partial class MainWindow : Window
     private const double SettingsDrawerClosedOffset = 320;
     private const double WindowedWidth = 1600;
     private const double WindowedHeight = 900;
-    private const int EoUdpPort = 5000;
-    private const int IrUdpPort = 5001;
+    private const int EoUdpPort = 6000;
+    private const int IrUdpPort = 6001;
     private const int MobileAlertPort = 8088;
     private const string DefaultRecordedVideoUrl = "http://192.168.3.143:8090/";
     private const string RecordedVideoCacheFolderName = "LIG_DNA_GUI_recorded_videos";

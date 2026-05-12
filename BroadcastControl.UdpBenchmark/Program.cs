@@ -76,8 +76,8 @@ internal sealed record BenchmarkOptions(
         }
 
         return new BenchmarkOptions(
-            GetInt(options, "eo-port", 5000),
-            GetInt(options, "ir-port", 5001),
+            GetInt(options, "eo-port", 6000),
+            GetInt(options, "ir-port", 6001),
             GetDouble(options, "seconds", 20),
             GetDouble(options, "warmup", 3),
             GetDouble(options, "pause", 2),
