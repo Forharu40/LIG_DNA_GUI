@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Subscribe to ROS2 image/detection topics and feed the WPF GUI UDP receiver."""
+"""Subscribe to ROS2 image/detection topics and feed the WPF GUI local receiver."""
 
 from __future__ import annotations
 
@@ -22,6 +22,9 @@ from sentinel_interfaces.msg import Detection2DArray
 
 DETECTION_PACKET_MAGIC = b"DETS"
 STATUS_PACKET_MAGIC = b"STAT"
+IMAGE_FRAGMENT_MAGIC = b"IMGF"
+IMAGE_FRAGMENT_HEADER_FORMAT = "!4sQIIHHHH"
+IMAGE_FRAGMENT_HEADER_SIZE = struct.calcsize(IMAGE_FRAGMENT_HEADER_FORMAT)
 GUI_HOST = os.getenv("GUI_HOST", "127.0.0.1")
 EO_GUI_PORT = int(os.getenv("EO_GUI_PORT", os.getenv("GUI_PORT", "5000")))
 IR_GUI_PORT = int(os.getenv("IR_GUI_PORT", "5001"))
@@ -30,6 +33,7 @@ IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
 EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/detections/eo")
 IR_DETECTION_TOPIC = os.getenv("IR_DETECTION_TOPIC", "/detections/ir")
 JPEG_QUALITY = int(os.getenv("ROS_BRIDGE_JPEG_QUALITY", "70"))
+MAX_UDP_PAYLOAD = int(os.getenv("ROS_BRIDGE_MAX_UDP_PAYLOAD", "60000"))
 MAX_STAMP_CACHE = int(os.getenv("ROS_BRIDGE_MAX_STAMP_CACHE", "120"))
 STAMP_TOLERANCE_NS = int(float(os.getenv("ROS_BRIDGE_STAMP_TOLERANCE_MS", "80")) * 1_000_000)
 
@@ -73,6 +77,13 @@ def image_to_bgr(message: Image) -> np.ndarray:
         row = data.reshape(height, step)[:, :width]
         return cv2.cvtColor(row.reshape(height, width), cv2.COLOR_GRAY2BGR)
 
+    if encoding in {"mono16", "16uc1"}:
+        data16 = np.frombuffer(message.data, dtype=np.uint16)
+        pixels_per_step = step // 2
+        row = data16.reshape(height, pixels_per_step)[:, :width]
+        gray8 = cv2.normalize(row.reshape(height, width), None, 0, 255, cv2.NORM_MINMAX).astype(np.uint8)
+        return cv2.cvtColor(gray8, cv2.COLOR_GRAY2BGR)
+
     raise ValueError(f"Unsupported image encoding: {message.encoding}")
 
 
@@ -86,6 +97,35 @@ def build_image_packet(encoded_bytes: bytes, width: int, height: int, frame_inde
         max(0, height),
     )
     return header + encoded_bytes
+
+
+def build_image_packets(encoded_bytes: bytes, width: int, height: int, frame_index: int, stamp_ns: int) -> list[bytes]:
+    packet = build_image_packet(encoded_bytes, width, height, frame_index, stamp_ns)
+    if len(packet) <= MAX_UDP_PAYLOAD:
+        return [packet]
+
+    fragment_payload_size = max(1024, MAX_UDP_PAYLOAD - IMAGE_FRAGMENT_HEADER_SIZE)
+    fragment_count = (len(encoded_bytes) + fragment_payload_size - 1) // fragment_payload_size
+    if fragment_count > 65535:
+        raise RuntimeError(f"Encoded {width}x{height} frame is too large to fragment: {len(encoded_bytes)} bytes")
+
+    packets: list[bytes] = []
+    for fragment_index in range(fragment_count):
+        start = fragment_index * fragment_payload_size
+        end = min(start + fragment_payload_size, len(encoded_bytes))
+        header = struct.pack(
+            IMAGE_FRAGMENT_HEADER_FORMAT,
+            IMAGE_FRAGMENT_MAGIC,
+            max(0, stamp_ns),
+            max(0, frame_index),
+            len(encoded_bytes),
+            max(0, width),
+            max(0, height),
+            fragment_index,
+            fragment_count,
+        )
+        packets.append(header + encoded_bytes[start:end])
+    return packets
 
 
 def build_detection_packet(stamp_ns: int, frame_index: int, width: int, height: int, detections: list[dict]) -> bytes:
@@ -157,14 +197,15 @@ class StreamState:
         self.latest_height = frame.shape[0]
         self.remember_frame(stamp_ns, self.frame_index)
 
-        packet = build_image_packet(
+        packets = build_image_packets(
             encoded.tobytes(),
             self.latest_width,
             self.latest_height,
             self.frame_index,
             stamp_ns,
         )
-        self.sock.sendto(packet, (GUI_HOST, self.config.gui_port))
+        for packet in packets:
+            self.sock.sendto(packet, (GUI_HOST, self.config.gui_port))
 
         pending = self.pending_detections.pop(stamp_ns, None)
         if pending is not None:

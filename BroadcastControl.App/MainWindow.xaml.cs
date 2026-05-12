@@ -28,6 +28,12 @@ public partial class MainWindow : Window
         RotateLeft90
     }
 
+    private enum VideoInputMode
+    {
+        Ros2Topics,
+        JetsonUdpBridge
+    }
+
     private const double SettingsDrawerClosedOffset = 320;
     private const double WindowedWidth = 1600;
     private const double WindowedHeight = 900;
@@ -48,6 +54,7 @@ public partial class MainWindow : Window
     private readonly UdpMotorStatusReceiverService _motorStatusReceiverService;
     private readonly MobileAlertHubService _mobileAlertHubService;
     private readonly JetsonBridgeSshService _jetsonBridgeSshService;
+    private readonly RosTopicBridgeProcessService _rosTopicBridgeProcessService;
     private readonly DispatcherTimer _motorHoldTimer;
     private readonly DispatcherTimer _recordedVideoPositionTimer;
     private readonly DispatcherTimer _recordingMetadataTimer;
@@ -151,6 +158,7 @@ public partial class MainWindow : Window
         _motorStatusReceiverService = new UdpMotorStatusReceiverService();
         _mobileAlertHubService = new MobileAlertHubService();
         _jetsonBridgeSshService = new JetsonBridgeSshService();
+        _rosTopicBridgeProcessService = new RosTopicBridgeProcessService();
         _motorHoldTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(50)
@@ -183,6 +191,7 @@ public partial class MainWindow : Window
         _viewModel.ManualAnalysisSaveRequested += ViewModel_OnManualAnalysisSaveRequested;
         _viewModel.ManualSystemLogSaveRequested += ViewModel_OnManualSystemLogSaveRequested;
         _jetsonBridgeSshService.MessageReady += JetsonBridgeSshService_OnMessageReady;
+        _rosTopicBridgeProcessService.MessageReady += RosTopicBridgeProcessService_OnMessageReady;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived += OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived += OnYoloStatusReceived;
@@ -208,7 +217,20 @@ public partial class MainWindow : Window
         _recordingMetadataTimer.Start();
 
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
-        await _jetsonBridgeSshService.StartAsync();
+        var videoInputMode = GetVideoInputMode();
+        if (videoInputMode == VideoInputMode.Ros2Topics)
+        {
+            _viewModel.AppendImportantLog("ROS2 topic input mode enabled. Jetson UDP bridge auto-start is skipped.");
+            if (!_rosTopicBridgeProcessService.Start(EoUdpPort, IrUdpPort))
+            {
+                _viewModel.AppendImportantLog("Failed to start the local ROS2 topic bridge. Check ROS2_SETUP_BAT or ROS2_PYTHON.");
+            }
+        }
+        else
+        {
+            _viewModel.AppendImportantLog("Jetson UDP bridge input mode enabled.");
+            await _jetsonBridgeSshService.StartAsync();
+        }
 
         if (_eoUdpCaptureService.Start(EoUdpPort))
         {
@@ -2033,6 +2055,7 @@ public partial class MainWindow : Window
         _viewModel.ManualAnalysisSaveRequested -= ViewModel_OnManualAnalysisSaveRequested;
         _viewModel.ManualSystemLogSaveRequested -= ViewModel_OnManualSystemLogSaveRequested;
         _jetsonBridgeSshService.MessageReady -= JetsonBridgeSshService_OnMessageReady;
+        _rosTopicBridgeProcessService.MessageReady -= RosTopicBridgeProcessService_OnMessageReady;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
@@ -2049,11 +2072,32 @@ public partial class MainWindow : Window
         _motorControlService.Dispose();
         _jetsonBridgeSshService.StopAsync().GetAwaiter().GetResult();
         _jetsonBridgeSshService.Dispose();
+        _rosTopicBridgeProcessService.Dispose();
     }
 
     private void JetsonBridgeSshService_OnMessageReady(string message)
     {
         Dispatcher.Invoke(() => _viewModel.AppendImportantLog(message));
+    }
+
+    private void RosTopicBridgeProcessService_OnMessageReady(string message)
+    {
+        Dispatcher.Invoke(() => _viewModel.AppendImportantLog(message));
+    }
+
+    private static VideoInputMode GetVideoInputMode()
+    {
+        var value = Environment.GetEnvironmentVariable("GUI_VIDEO_INPUT");
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return VideoInputMode.Ros2Topics;
+        }
+
+        return value.Trim().ToLowerInvariant() switch
+        {
+            "udp" or "jetson" or "jetson_udp" or "jetson-udp" => VideoInputMode.JetsonUdpBridge,
+            _ => VideoInputMode.Ros2Topics
+        };
     }
 
     private void Button_Click_2(object sender, RoutedEventArgs e)

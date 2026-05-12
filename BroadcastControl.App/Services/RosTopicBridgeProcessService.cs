@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 
 namespace BroadcastControl.App.Services;
@@ -21,7 +22,7 @@ public sealed class RosTopicBridgeProcessService : IDisposable
         var scriptPath = Path.Combine(AppContext.BaseDirectory, "Ros", "ros_topic_gui_bridge.py");
         if (!File.Exists(scriptPath))
         {
-            MessageReady?.Invoke($"ROS2 토픽 브릿지 스크립트를 찾을 수 없습니다: {scriptPath}");
+            MessageReady?.Invoke($"ROS2 topic bridge script was not found: {scriptPath}");
             return false;
         }
 
@@ -32,8 +33,8 @@ public sealed class RosTopicBridgeProcessService : IDisposable
         }
 
         startInfo.Environment["GUI_HOST"] = "127.0.0.1";
-        startInfo.Environment["EO_GUI_PORT"] = eoPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
-        startInfo.Environment["IR_GUI_PORT"] = irPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        startInfo.Environment["EO_GUI_PORT"] = eoPort.ToString(CultureInfo.InvariantCulture);
+        startInfo.Environment["IR_GUI_PORT"] = irPort.ToString(CultureInfo.InvariantCulture);
         SetDefaultEnvironment(startInfo, "EO_IMAGE_TOPIC", "/video/eo/preprocessed");
         SetDefaultEnvironment(startInfo, "IR_IMAGE_TOPIC", "/camera/ir");
         SetDefaultEnvironment(startInfo, "EO_DETECTION_TOPIC", "/detections/eo");
@@ -52,18 +53,18 @@ public sealed class RosTopicBridgeProcessService : IDisposable
 
             if (!_process.Start())
             {
-                MessageReady?.Invoke("ROS2 토픽 브릿지를 시작하지 못했습니다.");
+                MessageReady?.Invoke("Failed to start the ROS2 topic bridge process.");
                 return false;
             }
 
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
-            MessageReady?.Invoke("ROS2 토픽 브릿지를 시작했습니다. /video/eo, /video/ir, /detections/eo, /detections/ir 토픽을 구독합니다.");
+            MessageReady?.Invoke("ROS2 topic bridge started. Subscribing to image and detection topics locally.");
             return true;
         }
         catch (Exception ex)
         {
-            MessageReady?.Invoke($"ROS2 토픽 브릿지 시작 실패: {ex.Message}");
+            MessageReady?.Invoke($"ROS2 topic bridge start failed: {ex.Message}");
             Stop();
             return false;
         }
@@ -97,6 +98,11 @@ public sealed class RosTopicBridgeProcessService : IDisposable
         }
     }
 
+    public void Dispose()
+    {
+        Stop();
+    }
+
     private static void SetDefaultEnvironment(ProcessStartInfo startInfo, string name, string defaultValue)
     {
         var value = Environment.GetEnvironmentVariable(name);
@@ -112,19 +118,19 @@ public sealed class RosTopicBridgeProcessService : IDisposable
         {
             if (!File.Exists(ros2SetupBat))
             {
-                MessageReady?.Invoke($"ROS2_SETUP_BAT 파일을 찾을 수 없습니다: {ros2SetupBat}");
+                MessageReady?.Invoke($"ROS2_SETUP_BAT file was not found: {ros2SetupBat}");
                 return null;
             }
 
             return CreateBaseStartInfo(
                 "cmd.exe",
-                $"/c \"call \"{ros2SetupBat}\" && python \"{scriptPath}\"\"");
+                $"/d /s /c \"\"call \"{ros2SetupBat}\" && python \"{scriptPath}\"\"\"");
         }
 
         if (string.IsNullOrWhiteSpace(pythonExecutable))
         {
             pythonExecutable = "python";
-            MessageReady?.Invoke("ROS2_PYTHON/ROS2_SETUP_BAT이 설정되지 않았습니다. 기본 python으로 ROS2 토픽 브릿지를 실행합니다.");
+            MessageReady?.Invoke("ROS2_PYTHON/ROS2_SETUP_BAT is not set. Trying the default python executable.");
         }
 
         return CreateBaseStartInfo(pythonExecutable, $"\"{scriptPath}\"");
@@ -147,7 +153,7 @@ public sealed class RosTopicBridgeProcessService : IDisposable
     {
         if (!string.IsNullOrWhiteSpace(e.Data))
         {
-            MessageReady?.Invoke($"ROS2 토픽 브릿지: {e.Data}");
+            MessageReady?.Invoke($"ROS2 topic bridge: {e.Data}");
         }
     }
 
@@ -155,12 +161,7 @@ public sealed class RosTopicBridgeProcessService : IDisposable
     {
         if (_process is { } process)
         {
-            MessageReady?.Invoke($"ROS2 토픽 브릿지가 종료되었습니다. exit={process.ExitCode}");
+            MessageReady?.Invoke($"ROS2 topic bridge exited. exit={process.ExitCode}");
         }
-    }
-
-    public void Dispose()
-    {
-        Stop();
     }
 }
