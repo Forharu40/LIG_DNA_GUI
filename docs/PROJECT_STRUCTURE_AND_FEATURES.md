@@ -1,14 +1,15 @@
 # Project Structure And Features
 
 This document is the current short map of the repository after removing
-obsolete MEVA demo-video and laptop-webcam experiment paths.
+obsolete MEVA demo-video, laptop-webcam, and standalone EO YOLO experiment paths.
 
 ## Active Runtime
 
 ```text
-Jetson/Zybo camera and YOLO runtime
--> UDP video packets on 5000/5001
--> UDP DETS/STAT packets
+Zybo / camera
+-> Jetson video_rx, preprocessing, and YOLO ROS2 runtime
+-> gui_camera_bridge subscribes ROS2 image and detection topics
+-> UDP video, DETS, and STAT packets on 6000/6001
 -> WPF GUI rendering, recording, motor control, mobile alert page
 ```
 
@@ -17,9 +18,9 @@ Jetson/Zybo camera and YOLO runtime
 | Path | Role |
 | --- | --- |
 | `BroadcastControl.App` | Main WPF application for EO/IR monitoring and operator controls. |
-| `BroadcastControl.App/Ros/ros_topic_gui_bridge.py` | Optional GUI-side bridge when the notebook itself reads ROS2 topics and forwards them to local GUI UDP ports. |
 | `JetsonThor.RosCameraBridge` | Jetson-side Docker bridge that reads ROS2 camera topics and sends GUI-compatible UDP video packets. |
-| `JetsonThor.EoTopicYoloDocker` | EO-topic YOLO bridge retained only for fallback or standalone YOLO bridge testing. It is not needed when `sentinel_bringup video_and_yolo.launch.py` already provides the YOLO output used by the GUI. |
+| `BroadcastControl.UdpBenchmark` | UDP receive benchmark for EO/IR video and future YOLO/VLM/motor data transport checks. |
+| `docs` | Project structure and feature notes. |
 
 ## Removed Folders
 
@@ -28,6 +29,7 @@ Jetson/Zybo camera and YOLO runtime
 | `JetsonThor.MevaVideoDemoDocker` | MEVA demo videos are no longer used as the JetsonThor YOLO input path. |
 | `JetsonThor.WebcamTopicYoloDocker` | Laptop webcam YOLO topic and UDP experiments are no longer used. |
 | `LaptopWebcam.RosTopicPublisher` | Notebook webcam publishing is no longer part of the active camera path. |
+| `JetsonThor.EoTopicYoloDocker` | Standalone EO YOLO Docker is no longer used because YOLO detections are consumed from Jetson ROS2 topics. |
 
 ## Current GUI Responsibilities
 
@@ -44,20 +46,16 @@ Jetson/Zybo camera and YOLO runtime
 
 | Data | Port |
 | --- | --- |
-| EO video and EO detections | `5000` |
-| IR video and IR detections | `5001` |
+| EO video and EO detections | `6000` |
+| IR video and IR detections | `6001` |
 | Mobile alert web app | `8088` |
 
 ## Notes
 
-When another Docker runtime already launches the camera and YOLO pipeline with:
+The GUI system does not run YOLO inference by itself. YOLO runs in the Jetson
+ROS2 runtime, and the bridge only forwards the already-published
+`/detections/eo` and `/detections/ir` topics to the GUI.
 
-```bash
-source /opt/ros/jazzy/setup.bash
-source /ros2_ws/install/setup.bash
-ros2 launch sentinel_bringup video_and_yolo.launch.py
-```
-
-the repository should avoid duplicating YOLO inference paths. Keep only the
-bridge code that is needed to convert that runtime's output into the GUI UDP
-format.
+IR camera input from Zybo to Jetson can still use `5001/udp`; that is a
+different network segment from the Jetson bridge to PC GUI output port
+`6001/udp`.

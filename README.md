@@ -30,9 +30,10 @@ Zybo / Camera
 | `BroadcastControl.UdpBenchmark` | EO/IR UDP 수신 성능 비교 도구 |
 | `docs` | 구조와 기능 정리 문서 |
 
-## 현재 사용하지 않는 구성
+## 제거된 구성
 
-`JetsonThor.EoTopicYoloDocker`는 EO 토픽을 별도로 구독해서 자체 YOLO를 돌리던 실험용 Docker 구성입니다.
+`JetsonThor.EoTopicYoloDocker`는 EO 토픽을 별도로 구독해서 자체 YOLO를 돌리던 실험용 Docker 구성이었고,
+현재 저장소에서는 제거되었습니다.
 
 현재 시스템은 Jetson/팀원 ROS2 환경에서 이미 발행되는 `/detections/eo`, `/detections/ir` 토픽을
 `gui_camera_bridge`가 구독하는 구조로 정리되었습니다. 따라서 운용통제 GUI 시스템에서는
@@ -42,7 +43,7 @@ Zybo / Camera
 
 - 자체 YOLO 실행: 사용하지 않음
 - detection 토픽 구독: 사용
-- `JetsonThor.EoTopicYoloDocker`: 운영 경로에서 제외, 필요 없으면 삭제 가능
+- `JetsonThor.EoTopicYoloDocker`: 제거됨
 - `BroadcastControl.UdpBenchmark`: 향후 EO/IR 영상, YOLO/VLM 결과, 모터 데이터 전송 성능 비교용으로 유지
 
 ## PC GUI 역할
