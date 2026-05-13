@@ -61,7 +61,7 @@ GUI에서 별도 수신하는 UDP 포트:
 | `Dockerfile` | `gui_camera_bridge` 이미지 빌드 파일 |
 | `run_camera_udp_bridge.sh` | 컨테이너 빌드/실행 스크립트 |
 | `app/camera_udp_bridge.py` | ROS2 토픽 구독 및 GUI UDP 전송 노드 |
-| `fastdds_no_shm.xml` | 실행 시 자동 생성되는 FastDDS UDP-only 설정 파일 |
+| `fastdds_no_shm.xml` | 컨테이너 간 DDS shared memory 문제를 피하기 위한 FastDDS UDP-only 설정 파일 |
 
 ## 실행
 
@@ -107,7 +107,8 @@ gui_camera_bridge 컨테이너에서는 /camera/ir header 수신 불가
 
 이 경우 FastDDS shared memory 전송 문제가 원인이 될 수 있습니다.
 현재 `run_camera_udp_bridge.sh`는 기본적으로 shared memory를 끄고 UDPv4 transport만 사용하도록
-`fastdds_no_shm.xml`을 자동 생성하고 컨테이너에 마운트합니다.
+저장소에 포함된 `fastdds_no_shm.xml`을 컨테이너에 마운트합니다.
+파일이 없으면 실행 전에 같은 내용으로 다시 생성합니다.
 
 기본 사용:
 
