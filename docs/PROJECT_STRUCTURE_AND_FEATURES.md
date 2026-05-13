@@ -10,6 +10,7 @@ Zybo / camera
 -> Jetson video_rx, preprocessing, and YOLO ROS2 runtime
 -> gui_camera_bridge subscribes ROS2 image and detection topics
 -> UDP video, DETS, and STAT packets on 6000/6001
+-> VLM result packets on 6002
 -> WPF GUI rendering, recording, motor control, mobile alert page
 ```
 
@@ -38,6 +39,7 @@ Zybo / camera
 | Layout and user interaction | `BroadcastControl.App/MainWindow.xaml`, `BroadcastControl.App/MainWindow.xaml.cs` |
 | GUI state, mode, logs, recording status | `BroadcastControl.App/ViewModels/MainViewModel.cs` |
 | UDP video, detection, and status packet receive | `BroadcastControl.App/Services/UdpEncodedVideoReceiverService.cs` |
+| UDP VLM result receive | `BroadcastControl.App/Services/UdpVlmResultReceiverService.cs` |
 | Viewport recording | `BroadcastControl.App/Services/ViewportRecordingService.cs` |
 | Motor command and status | `BroadcastControl.App/Services/UdpMotorControlService.cs`, `BroadcastControl.App/Services/UdpMotorStatusReceiverService.cs` |
 | Mobile alert web app | `BroadcastControl.App/Services/MobileAlertHubService.cs` |
@@ -48,6 +50,9 @@ Zybo / camera
 | --- | --- |
 | EO video and EO detections | `6000` |
 | IR video and IR detections | `6001` |
+| VLM result | `6002` |
+| Motor command | `3000` |
+| Motor status | `3001` |
 | Mobile alert web app | `8088` |
 
 ## Notes
@@ -59,3 +64,7 @@ ROS2 runtime, and the bridge only forwards the already-published
 IR camera input from Zybo to Jetson can still use `5001/udp`; that is a
 different network segment from the Jetson bridge to PC GUI output port
 `6001/udp`.
+
+Motor data intentionally keeps the existing `3000/3001` command/status split.
+VLM results are separated onto `6002/udp` so image receive, motor feedback, and
+analysis updates can be handled independently.

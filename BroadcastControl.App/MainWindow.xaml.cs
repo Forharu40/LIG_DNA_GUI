@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private const double WindowedHeight = 900;
     private const int EoUdpPort = 6000;
     private const int IrUdpPort = 6001;
+    private const int VlmResultUdpPort = 6002;
     private const int MobileAlertPort = 8088;
     private const string DefaultRecordedVideoUrl = "http://192.168.3.143:8090/";
     private const string RecordedVideoCacheFolderName = "LIG_DNA_GUI_recorded_videos";
@@ -46,6 +47,7 @@ public partial class MainWindow : Window
     private readonly ViewportRecordingService _viewportRecordingService;
     private readonly UdpMotorControlService _motorControlService;
     private readonly UdpMotorStatusReceiverService _motorStatusReceiverService;
+    private readonly UdpVlmResultReceiverService _vlmResultReceiverService;
     private readonly MobileAlertHubService _mobileAlertHubService;
     private readonly JetsonBridgeSshService _jetsonBridgeSshService;
     private readonly DispatcherTimer _motorHoldTimer;
@@ -149,6 +151,7 @@ public partial class MainWindow : Window
         _irUdpCaptureService = new UdpEncodedVideoReceiverService(applyIrFalseColor: true);
         _viewportRecordingService = new ViewportRecordingService();
         _motorStatusReceiverService = new UdpMotorStatusReceiverService();
+        _vlmResultReceiverService = new UdpVlmResultReceiverService(VlmResultUdpPort);
         _mobileAlertHubService = new MobileAlertHubService();
         _jetsonBridgeSshService = new JetsonBridgeSshService();
         _motorHoldTimer = new DispatcherTimer
@@ -191,6 +194,8 @@ public partial class MainWindow : Window
         _irUdpCaptureService.StatusReceived += OnYoloStatusReceived;
         _motorStatusReceiverService.StatusReceived += OnMotorStatusReceived;
         _motorStatusReceiverService.ReceiverError += OnMotorStatusReceiverError;
+        _vlmResultReceiverService.ResultReceived += OnVlmResultReceived;
+        _vlmResultReceiverService.ReceiverError += OnVlmResultReceiverError;
 
         _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
         _eoUdpCaptureService.SetContrast(_viewModel.Contrast);
@@ -199,6 +204,8 @@ public partial class MainWindow : Window
         _viewModel.InitializeMotorControlState();
         _motorStatusReceiverService.Start();
         _viewModel.AppendImportantLog($"모터 상태 수신 대기 포트: {_motorStatusReceiverService.Port}");
+        _vlmResultReceiverService.Start();
+        _viewModel.AppendImportantLog($"VLM 결과 수신 대기 포트: {_vlmResultReceiverService.Port}");
 
         _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
         UpdateRecordingViewportState();
@@ -423,6 +430,26 @@ public partial class MainWindow : Window
     private void OnMotorStatusReceiverError(object? sender, string message)
     {
         Dispatcher.Invoke(() => _viewModel.AppendImportantLog($"모터 상태 수신 오류: {message}"));
+    }
+
+    private void OnVlmResultReceived(object? sender, VlmResultPacket result)
+    {
+        Dispatcher.Invoke(() =>
+        {
+            var threatLevel = string.IsNullOrWhiteSpace(result.ThreatLevel)
+                ? _viewModel.CurrentThreatLevel
+                : result.ThreatLevel;
+            var analysisMessage = string.IsNullOrWhiteSpace(result.DetectionSummary)
+                ? result.AnalysisMessage
+                : $"{result.AnalysisMessage} 탐지 내용: {result.DetectionSummary}";
+
+            _viewModel.ApplyVlmAnalysisResult(threatLevel, analysisMessage);
+        });
+    }
+
+    private void OnVlmResultReceiverError(object? sender, string message)
+    {
+        Dispatcher.Invoke(() => _viewModel.AppendImportantLog($"VLM 결과 수신 오류: {message}"));
     }
 
     private void OnIrFrameReady(ReceivedVideoFrame frame)
@@ -2041,11 +2068,14 @@ public partial class MainWindow : Window
         _irUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
         _motorStatusReceiverService.StatusReceived -= OnMotorStatusReceived;
         _motorStatusReceiverService.ReceiverError -= OnMotorStatusReceiverError;
+        _vlmResultReceiverService.ResultReceived -= OnVlmResultReceived;
+        _vlmResultReceiverService.ReceiverError -= OnVlmResultReceiverError;
         _mobileAlertHubService.Dispose();
         _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
         _irUdpCaptureService.Dispose();
         _motorStatusReceiverService.Dispose();
+        _vlmResultReceiverService.Dispose();
         _motorControlService.Dispose();
         _ = StopJetsonBridgeAfterCloseAsync();
     }

@@ -17,7 +17,7 @@ Zybo / Camera
   -> YOLO detector node
   -> /tracks/eo, /tracks/ir
   -> gui_camera_bridge
-  -> PC GUI UDP 6000/6001
+  -> PC GUI UDP 6000/6001, VLM UDP 6002
   -> BroadcastControl.App 화면 출력, 바운딩 박스, 녹화, 알림, 모터 제어
 ```
 
@@ -36,6 +36,9 @@ Zybo / Camera
 
 - EO 영상 UDP 수신: `6000`
 - IR 영상 UDP 수신: `6001`
+- VLM 결과 UDP 수신: `6002`
+- 모터 명령 UDP 송신: `3000`
+- 모터 상태 UDP 수신: `3001`
 - YOLO detection 패킷 수신 및 바운딩 박스 표시
 - EO/IR 화면 회전, 전자 줌, 밝기/대조비 조절
 - 녹화 영상 목록 확인 및 재생
@@ -64,6 +67,9 @@ PC GUI로 보내는 UDP 포트:
 | --- | --- |
 | EO 영상 및 EO detection | `6000` |
 | IR 영상 및 IR detection | `6001` |
+| VLM 결과 | `6002` |
+| 모터 명령 | `3000` |
+| 모터 상태 | `3001` |
 
 IR 카메라가 Zybo에서 Jetson `video_rx_node`로 들어올 때는 `5001` 포트를 사용합니다.
 혼동을 피하기 위해 Jetson bridge에서 PC GUI로 보내는 IR 포트는 `6001`로 분리했습니다.
@@ -153,7 +159,7 @@ IR first image sent!
 ### Jetson -> PC GUI UDP 송신 확인
 
 ```bash
-sudo tcpdump -ni any dst host 192.168.1.94 and udp and \( port 6000 or port 6001 \)
+sudo tcpdump -ni any dst host 192.168.1.94 and udp and \( port 6000 or port 6001 or port 6002 \)
 ```
 
 ### Windows에서 UDP 수신 확인
