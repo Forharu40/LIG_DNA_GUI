@@ -30,7 +30,10 @@ from rclpy.qos import (
     qos_profile_sensor_data,
 )
 from sensor_msgs.msg import Image
-from sentinel_interfaces.msg import Detection2DArray
+try:
+    from sentinel_interfaces.msg import TrackedDetection2DArray as TrackArrayMessage
+except ImportError:
+    from sentinel_interfaces.msg import Detection2DArray as TrackArrayMessage
 
 
 LEGACY_IMAGE_HEADER_SIZE = 20
@@ -62,8 +65,8 @@ EO_GUI_PORT = getenv_int("EO_GUI_PORT", 6000)
 IR_GUI_PORT = getenv_int("IR_GUI_PORT", 6001)
 EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/video/eo/preprocessed")
 IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
-EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/detections/eo")
-IR_DETECTION_TOPIC = os.getenv("IR_DETECTION_TOPIC", "/detections/ir")
+EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/tracks/eo")
+IR_DETECTION_TOPIC = os.getenv("IR_DETECTION_TOPIC", "/tracks/ir")
 STREAM_WIDTH = getenv_int("STREAM_WIDTH", 0)
 STREAM_HEIGHT = getenv_int("STREAM_HEIGHT", 0)
 JPEG_QUALITY = getenv_int("JPEG_QUALITY", 85)
@@ -716,29 +719,31 @@ class StreamBridge:
             status_packet = build_status_packet(self.image_topic, stamp_ns, frame_index)
             self.sock.sendto(status_packet, (self.host, self.port))
 
-    def send_detection(self, message: Detection2DArray) -> None:
+    def send_detection(self, message) -> None:
         stamp_ns = extract_stamp_ns(message)
         with self._lock:
             frame_info = self._match_frame_info(stamp_ns)
 
         detections: list[dict] = []
-        for index, detection in enumerate(message.detections, start=1):
-            x1 = float(detection.x1)
-            y1 = float(detection.y1)
-            x2 = float(detection.x2)
-            y2 = float(detection.y2)
+        tracks = getattr(message, "tracks", getattr(message, "detections", []))
+        for index, track in enumerate(tracks, start=1):
+            x1 = float(track.x1)
+            y1 = float(track.y1)
+            x2 = float(track.x2)
+            y2 = float(track.y2)
             if x2 <= x1 or y2 <= y1:
                 continue
 
             detections.append(
                 {
-                    "className": detection.class_name,
-                    "score": float(detection.score),
+                    "className": track.class_name,
+                    "classId": int(getattr(track, "class_id", -1)),
+                    "score": float(track.score),
                     "x1": x1,
                     "y1": y1,
                     "x2": x2,
                     "y2": y2,
-                    "objectId": index,
+                    "objectId": int(getattr(track, "track_id", index)),
                 }
             )
 
@@ -782,8 +787,8 @@ class CameraUdpBridge(Node):
 
         self.create_subscription(Image, EO_IMAGE_TOPIC, self._on_eo_image, IMAGE_TOPIC_QOS)
         self.create_subscription(Image, IR_IMAGE_TOPIC, self._on_ir_image, IMAGE_TOPIC_QOS)
-        self.create_subscription(Detection2DArray, EO_DETECTION_TOPIC, self._on_eo_detection, DETECTION_TOPIC_QOS)
-        self.create_subscription(Detection2DArray, IR_DETECTION_TOPIC, self._on_ir_detection, DETECTION_TOPIC_QOS)
+        self.create_subscription(TrackArrayMessage, EO_DETECTION_TOPIC, self._on_eo_detection, DETECTION_TOPIC_QOS)
+        self.create_subscription(TrackArrayMessage, IR_DETECTION_TOPIC, self._on_ir_detection, DETECTION_TOPIC_QOS)
 
         self.get_logger().info(f"EO image topic: {EO_IMAGE_TOPIC}")
         self.get_logger().info(f"IR image topic: {IR_IMAGE_TOPIC}")
@@ -815,7 +820,7 @@ class CameraUdpBridge(Node):
         except Exception as exc:
             self.get_logger().error(f"Failed to forward IR image: {exc}")
 
-    def _on_eo_detection(self, message: Detection2DArray) -> None:
+    def _on_eo_detection(self, message) -> None:
         try:
             self._eo.send_detection(message)
             if not self._eo.first_detection_logged:
@@ -824,7 +829,7 @@ class CameraUdpBridge(Node):
         except Exception as exc:
             self.get_logger().error(f"Failed to forward EO detections: {exc}")
 
-    def _on_ir_detection(self, message: Detection2DArray) -> None:
+    def _on_ir_detection(self, message) -> None:
         try:
             self._ir.send_detection(message)
             if not self._ir.first_detection_logged:

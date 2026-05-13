@@ -17,7 +17,10 @@ import rclpy
 from rclpy.node import Node
 from rclpy.qos import qos_profile_sensor_data
 from sensor_msgs.msg import Image
-from sentinel_interfaces.msg import Detection2DArray
+try:
+    from sentinel_interfaces.msg import TrackedDetection2DArray as TrackArrayMessage
+except ImportError:
+    from sentinel_interfaces.msg import Detection2DArray as TrackArrayMessage
 
 
 DETECTION_PACKET_MAGIC = b"DETS"
@@ -27,8 +30,8 @@ EO_GUI_PORT = int(os.getenv("EO_GUI_PORT", os.getenv("GUI_PORT", "6000")))
 IR_GUI_PORT = int(os.getenv("IR_GUI_PORT", "6001"))
 EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/video/eo/preprocessed")
 IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
-EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/detections/eo")
-IR_DETECTION_TOPIC = os.getenv("IR_DETECTION_TOPIC", "/detections/ir")
+EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/tracks/eo")
+IR_DETECTION_TOPIC = os.getenv("IR_DETECTION_TOPIC", "/tracks/ir")
 JPEG_QUALITY = int(os.getenv("ROS_BRIDGE_JPEG_QUALITY", "70"))
 MAX_STAMP_CACHE = int(os.getenv("ROS_BRIDGE_MAX_STAMP_CACHE", "120"))
 STAMP_TOLERANCE_NS = int(float(os.getenv("ROS_BRIDGE_STAMP_TOLERANCE_MS", "80")) * 1_000_000)
@@ -181,19 +184,21 @@ class StreamState:
         )
         self.sock.sendto(packet, (GUI_HOST, self.config.gui_port))
 
-    def handle_detection_message(self, message: Detection2DArray) -> None:
+    def handle_detection_message(self, message) -> None:
         stamp_ns = stamp_to_ns(message.stamp) or time.time_ns()
+        tracks = getattr(message, "tracks", getattr(message, "detections", []))
         detections = [
             {
-                "className": detection.class_name,
-                "score": float(detection.score),
-                "x1": float(detection.x1),
-                "y1": float(detection.y1),
-                "x2": float(detection.x2),
-                "y2": float(detection.y2),
-                "objectId": index,
+                "className": track.class_name,
+                "classId": int(getattr(track, "class_id", -1)),
+                "score": float(track.score),
+                "x1": float(track.x1),
+                "y1": float(track.y1),
+                "x2": float(track.x2),
+                "y2": float(track.y2),
+                "objectId": int(getattr(track, "track_id", index)),
             }
-            for index, detection in enumerate(message.detections, start=1)
+            for index, track in enumerate(tracks, start=1)
         ]
 
         if self.stamp_to_frame:
@@ -222,7 +227,7 @@ class GuiRosTopicBridge(Node):
                 qos_profile_sensor_data,
             )
             self.create_subscription(
-                Detection2DArray,
+                TrackArrayMessage,
                 state.config.detection_topic,
                 lambda message, stream_state=state: self.on_detection(stream_state, message),
                 qos_profile_sensor_data,
@@ -246,7 +251,7 @@ class GuiRosTopicBridge(Node):
                 (GUI_HOST, state.config.gui_port),
             )
 
-    def on_detection(self, state: StreamState, message: Detection2DArray) -> None:
+    def on_detection(self, state: StreamState, message) -> None:
         try:
             state.handle_detection_message(message)
         except Exception as exc:

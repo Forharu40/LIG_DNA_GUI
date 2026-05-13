@@ -54,7 +54,7 @@ Zybo / camera
 
 The GUI system does not run YOLO inference by itself. YOLO runs in the Jetson
 ROS2 runtime, and the bridge only forwards the already-published
-`/detections/eo` and `/detections/ir` topics to the GUI.
+`/tracks/eo` and `/tracks/ir` topics to the GUI.
 
 IR camera input from Zybo to Jetson can still use `5001/udp`; that is a
 different network segment from the Jetson bridge to PC GUI output port

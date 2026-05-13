@@ -15,8 +15,8 @@ PC 운용통제 GUI가 받을 수 있는 UDP 패킷으로 변환해 전송하는
 - 녹화 파일 및 기본 로그/VLM 더미 파일 생성
 - 녹화 영상 확인용 HTTP 서버 제공
 
-이 브릿지는 YOLO를 직접 실행하지 않습니다. YOLO 처리는 Jetson의 별도 ROS2 노드가 담당하고,
-브릿지는 이미 발행된 `/detections/eo`, `/detections/ir` 토픽만 구독해서 GUI로 전달합니다.
+이 브릿지는 YOLO를 직접 실행하지 않습니다. YOLO/추적 처리는 Jetson의 별도 ROS2 노드가 담당하고,
+브릿지는 이미 발행된 `/tracks/eo`, `/tracks/ir` 토픽만 구독해서 GUI로 전달합니다.
 
 ## 기본 입력 토픽
 
@@ -24,8 +24,8 @@ PC 운용통제 GUI가 받을 수 있는 UDP 패킷으로 변환해 전송하는
 | --- | --- | --- |
 | EO image | `/video/eo/preprocessed` | `sensor_msgs/msg/Image` |
 | IR image | `/camera/ir` | `sensor_msgs/msg/Image` |
-| EO detection | `/detections/eo` | `sentinel_interfaces/msg/Detection2DArray` |
-| IR detection | `/detections/ir` | `sentinel_interfaces/msg/Detection2DArray` |
+| EO track/detection | `/tracks/eo` | `sentinel_interfaces/msg/TrackedDetection2DArray` |
+| IR track/detection | `/tracks/ir` | `sentinel_interfaces/msg/TrackedDetection2DArray` |
 
 EO가 동작하지 않는 실험 상태에서도 IR은 `/camera/ir`만 정상 발행되면 GUI로 전송할 수 있습니다.
 

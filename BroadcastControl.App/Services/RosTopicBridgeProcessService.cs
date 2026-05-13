@@ -36,8 +36,8 @@ public sealed class RosTopicBridgeProcessService : IDisposable
         startInfo.Environment["IR_GUI_PORT"] = irPort.ToString(System.Globalization.CultureInfo.InvariantCulture);
         SetDefaultEnvironment(startInfo, "EO_IMAGE_TOPIC", "/video/eo/preprocessed");
         SetDefaultEnvironment(startInfo, "IR_IMAGE_TOPIC", "/camera/ir");
-        SetDefaultEnvironment(startInfo, "EO_DETECTION_TOPIC", "/detections/eo");
-        SetDefaultEnvironment(startInfo, "IR_DETECTION_TOPIC", "/detections/ir");
+        SetDefaultEnvironment(startInfo, "EO_DETECTION_TOPIC", "/tracks/eo");
+        SetDefaultEnvironment(startInfo, "IR_DETECTION_TOPIC", "/tracks/ir");
 
         try
         {
@@ -58,7 +58,7 @@ public sealed class RosTopicBridgeProcessService : IDisposable
 
             _process.BeginOutputReadLine();
             _process.BeginErrorReadLine();
-            MessageReady?.Invoke("ROS2 토픽 브릿지를 시작했습니다. /video/eo, /video/ir, /detections/eo, /detections/ir 토픽을 구독합니다.");
+            MessageReady?.Invoke("ROS2 토픽 브릿지를 시작했습니다. /video/eo, /video/ir, /tracks/eo, /tracks/ir 토픽을 구독합니다.");
             return true;
         }
         catch (Exception ex)
