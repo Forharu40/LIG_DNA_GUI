@@ -6,7 +6,7 @@ namespace BroadcastControl.App.Services;
 
 public sealed class UdpMotorStatusReceiverService : IDisposable
 {
-    private const int DefaultPort = 3001;
+    private const int DefaultPort = 8001;
     private const int CurrentPacketSize = 18;
     private const int CurrentSnapshotSize = CurrentPacketSize * 2;
     private const int LegacyPacketSize = 32;
@@ -90,19 +90,43 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
         }
 
         var receivedAt = DateTime.Now;
-        var packetSize = buffer.Length >= LegacySnapshotSize ? LegacyPacketSize : CurrentPacketSize;
-        var pan = ParsePacket(buffer.AsSpan(0, packetSize), receivedAt);
+        var isLegacyPacket = buffer.Length >= LegacySnapshotSize || buffer.Length == LegacyPacketSize;
+        var packetSize = isLegacyPacket ? LegacyPacketSize : CurrentPacketSize;
+        var pan = isLegacyPacket
+            ? ParseLegacyPacket(buffer.AsSpan(0, packetSize), receivedAt)
+            : ParseCurrentPacket(buffer.AsSpan(0, packetSize), receivedAt);
         MotorStatusPacket? tilt = null;
         if (buffer.Length >= packetSize * 2)
         {
-            tilt = ParsePacket(buffer.AsSpan(packetSize, packetSize), receivedAt);
+            tilt = isLegacyPacket
+                ? ParseLegacyPacket(buffer.AsSpan(packetSize, packetSize), receivedAt)
+                : ParseCurrentPacket(buffer.AsSpan(packetSize, packetSize), receivedAt);
         }
 
         snapshot = new MotorStatusSnapshot(pan, tilt);
         return true;
     }
 
-    private static MotorStatusPacket ParsePacket(ReadOnlySpan<byte> buffer, DateTime receivedAt)
+    private static MotorStatusPacket ParseCurrentPacket(ReadOnlySpan<byte> buffer, DateTime receivedAt)
+    {
+        var presentPosition = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(10, 4));
+        var presentVelocity = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(6, 4));
+        return new MotorStatusPacket(
+            HardwareErrorStatus: buffer[17],
+            PresentTemperature: buffer[16],
+            PresentInputVoltageRaw: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(14, 2)),
+            PresentPosition: presentPosition,
+            PresentVelocity: presentVelocity,
+            PresentCurrentRaw: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(4, 2)),
+            PresentPwm: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(2, 2)),
+            GoalPosition: presentPosition,
+            GoalVelocity: 0,
+            Moving: buffer[0],
+            MovingStatus: buffer[1],
+            ReceivedAt: receivedAt);
+    }
+
+    private static MotorStatusPacket ParseLegacyPacket(ReadOnlySpan<byte> buffer, DateTime receivedAt)
     {
         return new MotorStatusPacket(
             HardwareErrorStatus: buffer[0],
@@ -110,8 +134,8 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
             PresentInputVoltageRaw: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(2, 2)),
             PresentPosition: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(4, 2)),
             PresentVelocity: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(6, 2)),
-            PresentLoad: BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(8, 2)),
-            PresentPwm: BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(10, 2)),
+            PresentCurrentRaw: (ushort)Math.Max(0, (int)BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(8, 2))),
+            PresentPwm: (ushort)Math.Max(0, (int)BinaryPrimitives.ReadInt16LittleEndian(buffer.Slice(10, 2))),
             GoalPosition: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(12, 2)),
             GoalVelocity: BinaryPrimitives.ReadUInt16LittleEndian(buffer.Slice(14, 2)),
             Moving: buffer[16],
@@ -141,12 +165,12 @@ public readonly record struct MotorStatusPacket(
     byte HardwareErrorStatus,
     byte PresentTemperature,
     ushort PresentInputVoltageRaw,
-    ushort PresentPosition,
-    ushort PresentVelocity,
-    short PresentLoad,
-    short PresentPwm,
-    ushort GoalPosition,
-    ushort GoalVelocity,
+    uint PresentPosition,
+    uint PresentVelocity,
+    ushort PresentCurrentRaw,
+    ushort PresentPwm,
+    uint GoalPosition,
+    uint GoalVelocity,
     byte Moving,
     byte MovingStatus,
     DateTime ReceivedAt)

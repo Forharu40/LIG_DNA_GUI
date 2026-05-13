@@ -37,8 +37,8 @@ Zybo / Camera
 - EO 영상 UDP 수신: `6000`
 - IR 영상 UDP 수신: `6001`
 - VLM 결과 UDP 수신: `6002`
-- 모터 명령 UDP 송신: `3000`
-- 모터 상태 UDP 수신: `3001`
+- 모터 명령 UDP 송신: `8000`
+- 모터 상태 UDP 수신: `8001`
 - YOLO detection 패킷 수신 및 바운딩 박스 표시
 - EO/IR 화면 회전, 전자 줌, 밝기/대조비 조절
 - 녹화 영상 목록 확인 및 재생
@@ -66,10 +66,10 @@ PC GUI로 보내는 UDP 포트:
 | 데이터 | GUI 포트 |
 | --- | --- |
 | EO 영상 및 EO detection | `6000` |
-| IR 영상 및 IR detection | `6001` |
+| IR 영상 | `6001` |
 | VLM 결과 | `6002` |
-| 모터 명령 | `3000` |
-| 모터 상태 | `3001` |
+| 모터 명령 | `8000` |
+| 모터 상태 | `8001` |
 
 IR 카메라가 Zybo에서 Jetson `video_rx_node`로 들어올 때는 `5001` 포트를 사용합니다.
 혼동을 피하기 위해 Jetson bridge에서 PC GUI로 보내는 IR 포트는 `6001`로 분리했습니다.
@@ -78,11 +78,11 @@ IR 카메라가 Zybo에서 Jetson `video_rx_node`로 들어올 때는 `5001` 포
 
 | 방향 | 포트 | 크기 | 내용 |
 | --- | --- | --- | --- |
-| GUI -> Thor | `3000/udp` | `12B` | mode 1B, tracking 1B, pan 2B, tilt 2B, auto step 1B, manual step 1B, object id 4B |
-| Thor -> GUI | `3001/udp` | `36B` | pan motor 18B + tilt motor 18B |
+| GUI -> Thor | `8000/udp` | `9B` | mode 1B, tracking 1B, btn_mask 1B, pan_pos 2B, tilt_pos 2B, scan_step 1B, manual_step 1B |
+| Thor -> GUI | `8001/udp` | `36B` | pan motor 18B + tilt motor 18B |
 
-GUI -> Thor의 pan/tilt는 0.1도 단위 UInt16 little-endian 값입니다.
-YOLO에서 받은 객체 ID는 `int32` little-endian으로 전송하며, 선택된 객체가 없으면 `-1`을 보냅니다.
+GUI -> Thor의 pan_pos/tilt_pos는 Dynamixel 위치값 `0~4095` 범위의 UInt16 little-endian 값입니다.
+btn_mask는 `0x01` PAN+, `0x02` PAN-, `0x04` TILT+, `0x08` TILT- 비트를 사용합니다.
 
 ## 실행 순서
 

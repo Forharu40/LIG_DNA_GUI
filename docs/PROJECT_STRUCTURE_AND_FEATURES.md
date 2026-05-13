@@ -9,7 +9,7 @@ obsolete MEVA demo-video, laptop-webcam, and standalone EO YOLO experiment paths
 Zybo / camera
 -> Jetson video_rx, preprocessing, and YOLO ROS2 runtime
 -> gui_camera_bridge subscribes ROS2 image and detection topics
--> UDP video, DETS, and STAT packets on 6000/6001
+-> SNTL UDP video and detection packets on 6000/6001
 -> VLM result packets on 6002
 -> WPF GUI rendering, recording, motor control, mobile alert page
 ```
@@ -49,10 +49,10 @@ Zybo / camera
 | Data | Port |
 | --- | --- |
 | EO video and EO detections | `6000` |
-| IR video and IR detections | `6001` |
+| IR video | `6001` |
 | VLM result | `6002` |
-| Motor command | `3000` |
-| Motor status | `3001` |
+| Motor command | `8000` |
+| Motor status | `8001` |
 | Mobile alert web app | `8088` |
 
 ## Notes
@@ -65,7 +65,7 @@ IR camera input from Zybo to Jetson can still use `5001/udp`; that is a
 different network segment from the Jetson bridge to PC GUI output port
 `6001/udp`.
 
-Motor data intentionally keeps the existing `3000/3001` command/status split.
+Motor data uses the `8000/8001` command/status split.
 VLM results are separated onto `6002/udp` so image receive, motor feedback, and
 analysis updates can be handled independently.
 
@@ -73,9 +73,9 @@ Motor packet details:
 
 | Direction | Port | Size | Fields |
 | --- | --- | --- | --- |
-| GUI -> Thor | `3000/udp` | `12B` | mode, tracking, pan, tilt, auto step, manual step, object id |
-| Thor -> GUI | `3001/udp` | `36B` | pan motor 18B + tilt motor 18B |
+| GUI -> Thor | `8000/udp` | `9B` | mode, tracking, btn_mask, pan_pos, tilt_pos, scan_step, manual_step |
+| Thor -> GUI | `8001/udp` | `36B` | pan motor 18B + tilt motor 18B |
 
-GUI -> Thor uses little-endian integers. Pan and tilt are UInt16 values in
-0.1 degree units; object id is the int32 YOLO/track object id, or `-1` when no
-target is selected.
+GUI -> Thor uses little-endian integers. `pan_pos` and `tilt_pos` are UInt16
+Dynamixel position values in the `0~4095` range. `btn_mask` uses `0x01` PAN+,
+`0x02` PAN-, `0x04` TILT+, and `0x08` TILT-.

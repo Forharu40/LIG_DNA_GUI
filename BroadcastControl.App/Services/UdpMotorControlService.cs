@@ -6,8 +6,8 @@ namespace BroadcastControl.App.Services;
 public sealed class UdpMotorControlService : IDisposable
 {
     private const string DefaultHost = "192.168.3.143";
-    private const int DefaultPort = 3000;
-    private const int MotorStatePacketSize = 12;
+    private const int DefaultPort = 8000;
+    private const int MotorCommandPacketSize = 9;
 
     private readonly UdpClient _udpClient = new();
 
@@ -21,24 +21,24 @@ public sealed class UdpMotorControlService : IDisposable
 
     public int Port { get; }
 
-    public bool TrySendMotorStatePacket(
-        bool isManualMode,
-        bool isTrackingEnabled,
-        double panDegrees,
-        double tiltDegrees,
-        int autoStepSize,
-        int manualStepSize,
-        int objectId,
+    public bool TrySendMotorCommandPacket(
+        byte mode,
+        byte tracking,
+        MotorButtonMask btnMask,
+        ushort panPos,
+        ushort tiltPos,
+        byte scanStep,
+        byte manualStep,
         out string? error)
     {
-        var packet = new byte[MotorStatePacketSize];
-        packet[0] = isManualMode ? (byte)1 : (byte)0;
-        packet[1] = isTrackingEnabled ? (byte)1 : (byte)0;
-        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(2, 2), EncodeDegrees(panDegrees));
-        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(4, 2), EncodeDegrees(tiltDegrees));
-        packet[6] = EncodeStepSize(autoStepSize);
-        packet[7] = EncodeStepSize(manualStepSize);
-        BinaryPrimitives.WriteInt32LittleEndian(packet.AsSpan(8, 4), objectId);
+        var packet = new byte[MotorCommandPacketSize];
+        packet[0] = mode;
+        packet[1] = tracking;
+        packet[2] = EncodeButtonMask(btnMask);
+        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(3, 2), panPos);
+        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(5, 2), tiltPos);
+        packet[7] = EncodeStepSize(scanStep);
+        packet[8] = EncodeStepSize(manualStep);
         return TrySendPacket(packet, out error);
     }
 
@@ -62,15 +62,14 @@ public sealed class UdpMotorControlService : IDisposable
         }
     }
 
-    private static ushort EncodeDegrees(double degrees)
-    {
-        var tenths = (int)Math.Round(Math.Clamp(degrees, 0, 360) * 10, MidpointRounding.AwayFromZero);
-        return (ushort)Math.Clamp(tenths, 0, 3600);
-    }
-
     private static byte EncodeStepSize(int stepSize)
     {
         return (byte)Math.Clamp(stepSize, 1, 10);
+    }
+
+    private static byte EncodeButtonMask(MotorButtonMask buttons)
+    {
+        return (byte)((byte)buttons & 0x0F);
     }
 
     private static string ResolveHost(string? host)
@@ -104,8 +103,8 @@ public sealed class UdpMotorControlService : IDisposable
 public enum MotorButtonMask : byte
 {
     None = 0,
-    Left = 0x01,
-    Right = 0x02,
+    Right = 0x01,
+    Left = 0x02,
     Up = 0x04,
     Down = 0x08,
     Center = 0x10

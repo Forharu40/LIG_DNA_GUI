@@ -14,10 +14,15 @@ namespace BroadcastControl.App.Services;
 public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
     private const int DefaultPort = 6000;
+    private const int SentinelImageHeaderSize = 15;
+    private const int SentinelDetectionHeaderSize = 17;
+    private const int SentinelDetectionRecordSize = 36;
+    private const int SentinelTrackedDetectionRecordSize = 44;
     private const int LegacyHeaderSize = 20;
     private const int ImageFragmentHeaderSize = 28;
     private const int MaxImageFragmentBuffers = 32;
     private const int MetadataPacketSize = 36;
+    private static readonly byte[] SentinelPacketMagic = "SNTL"u8.ToArray();
     private static readonly byte[] ImageFragmentMagic = "IMGF"u8.ToArray();
     private static readonly byte[] DetectionPacketMagic = "DETS"u8.ToArray();
     private static readonly byte[] StatusPacketMagic = "STAT"u8.ToArray();
@@ -297,6 +302,18 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             return;
         }
 
+        if (TryExtractSentinelDetectionPacket(packet, out var sentinelDetectionPacket))
+        {
+            _detectionPacketCount++;
+            if (sentinelDetectionPacket.Detections.Count > 0)
+            {
+                _nonEmptyDetectionPacketCount++;
+            }
+
+            _dispatcher.BeginInvoke(() => DetectionsReceived?.Invoke(sentinelDetectionPacket));
+            return;
+        }
+
         if (TryExtractStatusPacket(packet, out var statusPacket))
         {
             _dispatcher.BeginInvoke(() => StatusReceived?.Invoke(statusPacket));
@@ -322,6 +339,26 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                         PublishDiagnosticMessage(
                             $"Fragmented UDP image decode failed. failures={_decodeFailureCount}, bytes={assembledFrame.EncodedBytes.Length}");
                     }
+                }
+            }
+
+            return;
+        }
+
+        if (TryExtractSentinelImageFragmentPacket(packet, out var sentinelFragmentPacket))
+        {
+            if (TryAssembleImageFragment(sentinelFragmentPacket, out var assembledFrame))
+            {
+                var decoded = TryDecodeFrame(
+                    assembledFrame.EncodedBytes,
+                    assembledFrame.DeclaredWidth,
+                    assembledFrame.DeclaredHeight,
+                    assembledFrame.FrameStampNs,
+                    assembledFrame.FrameIndex,
+                    null);
+                if (!decoded)
+                {
+                    _decodeFailureCount++;
                 }
             }
 
@@ -961,6 +998,48 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         return true;
     }
 
+    private static bool TryExtractSentinelImageFragmentPacket(byte[] packet, out ImageFragmentPacket fragment)
+    {
+        fragment = default;
+
+        if (!HasPacketMagic(packet, SentinelPacketMagic) || packet.Length < SentinelImageHeaderSize)
+        {
+            return false;
+        }
+
+        var packetType = packet[4];
+        if (packetType is not (0x01 or 0x02))
+        {
+            return false;
+        }
+
+        var header = packet.AsSpan(0, SentinelImageHeaderSize);
+        var frameId = BinaryPrimitives.ReadUInt32LittleEndian(header.Slice(5, 4));
+        var chunkIndex = BinaryPrimitives.ReadUInt16LittleEndian(header.Slice(9, 2));
+        var totalChunks = BinaryPrimitives.ReadUInt16LittleEndian(header.Slice(11, 2));
+        var payloadSize = BinaryPrimitives.ReadUInt16LittleEndian(header.Slice(13, 2));
+
+        if (totalChunks == 0 ||
+            chunkIndex >= totalChunks ||
+            payloadSize == 0 ||
+            packet.Length < SentinelImageHeaderSize + payloadSize)
+        {
+            return false;
+        }
+
+        var payload = packet.AsSpan(SentinelImageHeaderSize, payloadSize).ToArray();
+        fragment = new ImageFragmentPacket(
+            0,
+            frameId,
+            0,
+            0,
+            0,
+            chunkIndex,
+            totalChunks,
+            payload);
+        return true;
+    }
+
     private bool TryAssembleImageFragment(ImageFragmentPacket fragment, out EncodedFrame frame)
     {
         frame = default;
@@ -1073,6 +1152,105 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         {
             return false;
         }
+    }
+
+    private static bool TryExtractSentinelDetectionPacket(byte[] packet, out DetectionPacket detectionPacket)
+    {
+        detectionPacket = default;
+
+        if (!HasPacketMagic(packet, SentinelPacketMagic) ||
+            packet.Length < SentinelDetectionHeaderSize + 2 ||
+            packet[4] != 0x10)
+        {
+            return false;
+        }
+
+        try
+        {
+            var frameId = BinaryPrimitives.ReadUInt32LittleEndian(packet.AsSpan(5, 4));
+            var stampSec = BinaryPrimitives.ReadUInt32LittleEndian(packet.AsSpan(9, 4));
+            var stampNsec = BinaryPrimitives.ReadUInt32LittleEndian(packet.AsSpan(13, 4));
+            var stampNs = ((ulong)stampSec * 1_000_000_000UL) + stampNsec;
+            var offset = SentinelDetectionHeaderSize;
+            var detections = new List<DetectionInfo>();
+
+            if (!TryReadUInt16(packet, ref offset, out var detectionCount))
+            {
+                return false;
+            }
+
+            for (var index = 0; index < detectionCount; index++)
+            {
+                if (packet.Length < offset + SentinelDetectionRecordSize)
+                {
+                    return false;
+                }
+
+                var className = ReadFixedUtf8(packet.AsSpan(offset, 16));
+                var score = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 16, 4));
+                var x1 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 20, 4));
+                var y1 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 24, 4));
+                var x2 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 28, 4));
+                var y2 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 32, 4));
+                detections.Add(new DetectionInfo(className, score, x1, y1, x2, y2, index + 1));
+                offset += SentinelDetectionRecordSize;
+            }
+
+            if (!TryReadUInt16(packet, ref offset, out var trackedCount))
+            {
+                return false;
+            }
+
+            for (var index = 0; index < trackedCount; index++)
+            {
+                if (packet.Length < offset + SentinelTrackedDetectionRecordSize)
+                {
+                    return false;
+                }
+
+                var trackId = BinaryPrimitives.ReadInt32LittleEndian(packet.AsSpan(offset, 4));
+                var className = ReadFixedUtf8(packet.AsSpan(offset + 8, 16));
+                var score = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 24, 4));
+                var x1 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 28, 4));
+                var y1 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 32, 4));
+                var x2 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 36, 4));
+                var y2 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 40, 4));
+                detections.Add(new DetectionInfo(className, score, x1, y1, x2, y2, trackId));
+                offset += SentinelTrackedDetectionRecordSize;
+            }
+
+            detectionPacket = new DetectionPacket(stampNs, frameId, 0, 0, detections);
+            return true;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    private static bool TryReadUInt16(byte[] packet, ref int offset, out ushort value)
+    {
+        value = 0;
+        if (packet.Length < offset + 2)
+        {
+            return false;
+        }
+
+        value = BinaryPrimitives.ReadUInt16LittleEndian(packet.AsSpan(offset, 2));
+        offset += 2;
+        return true;
+    }
+
+    private static string ReadFixedUtf8(ReadOnlySpan<byte> bytes)
+    {
+        var length = bytes.IndexOf((byte)0);
+        if (length < 0)
+        {
+            length = bytes.Length;
+        }
+
+        var text = Encoding.UTF8.GetString(bytes[..length]).Trim();
+        return string.IsNullOrWhiteSpace(text) ? "unknown" : text;
     }
 
     private static bool TryExtractStatusPacket(byte[] packet, out YoloStatusPacket statusPacket)
@@ -1204,6 +1382,22 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
         public byte[] Assemble()
         {
+            if (TotalLength == 0)
+            {
+                var dynamicOutput = new List<byte>();
+                foreach (var part in _parts)
+                {
+                    if (part is null)
+                    {
+                        return [];
+                    }
+
+                    dynamicOutput.AddRange(part);
+                }
+
+                return dynamicOutput.ToArray();
+            }
+
             var output = new byte[TotalLength];
             var offset = 0;
             foreach (var part in _parts)

@@ -37,6 +37,13 @@ except ImportError:
 
 
 LEGACY_IMAGE_HEADER_SIZE = 20
+SENTINEL_PACKET_MAGIC = b"SNTL"
+SENTINEL_IMAGE_HEADER_FORMAT = "<4sBIHHH"
+SENTINEL_IMAGE_HEADER_SIZE = struct.calcsize(SENTINEL_IMAGE_HEADER_FORMAT)
+SENTINEL_DETECTION_HEADER_FORMAT = "<4sBIII"
+SENTINEL_DETECTION_HEADER_SIZE = struct.calcsize(SENTINEL_DETECTION_HEADER_FORMAT)
+SENTINEL_DETECTION_RECORD_SIZE = 36
+SENTINEL_TRACK_RECORD_SIZE = 44
 IMAGE_FRAGMENT_MAGIC = b"IMGF"
 IMAGE_FRAGMENT_HEADER_FORMAT = "!4sQIIHHHH"
 IMAGE_FRAGMENT_HEADER_SIZE = struct.calcsize(IMAGE_FRAGMENT_HEADER_FORMAT)
@@ -299,12 +306,8 @@ def build_image_packet(encoded_bytes: bytes, width: int, height: int, frame_inde
     return header + encoded_bytes
 
 
-def build_image_packets(encoded_bytes: bytes, width: int, height: int, frame_index: int, stamp_ns: int) -> list[bytes]:
-    packet = build_image_packet(encoded_bytes, width, height, frame_index, stamp_ns)
-    if len(packet) <= MAX_UDP_PAYLOAD:
-        return [packet]
-
-    fragment_payload_size = max(1024, MAX_UDP_PAYLOAD - IMAGE_FRAGMENT_HEADER_SIZE)
+def build_image_packets(encoded_bytes: bytes, width: int, height: int, frame_index: int, stamp_ns: int, packet_type: int) -> list[bytes]:
+    fragment_payload_size = max(1024, MAX_UDP_PAYLOAD - SENTINEL_IMAGE_HEADER_SIZE)
     fragment_count = (len(encoded_bytes) + fragment_payload_size - 1) // fragment_payload_size
     if fragment_count > 65535:
         raise RuntimeError(f"Encoded {width}x{height} frame is too large to fragment: {len(encoded_bytes)} bytes")
@@ -314,29 +317,51 @@ def build_image_packets(encoded_bytes: bytes, width: int, height: int, frame_ind
         start = fragment_index * fragment_payload_size
         end = min(start + fragment_payload_size, len(encoded_bytes))
         header = struct.pack(
-            IMAGE_FRAGMENT_HEADER_FORMAT,
-            IMAGE_FRAGMENT_MAGIC,
-            max(0, stamp_ns),
+            SENTINEL_IMAGE_HEADER_FORMAT,
+            SENTINEL_PACKET_MAGIC,
+            packet_type,
             max(0, frame_index),
-            len(encoded_bytes),
-            max(0, width),
-            max(0, height),
             fragment_index,
             fragment_count,
+            end - start,
         )
         packets.append(header + encoded_bytes[start:end])
     return packets
 
 
+def fixed_utf8(value: object, length: int = 16) -> bytes:
+    raw = str(value or "unknown").encode("utf-8")[:length]
+    return raw + (b"\0" * (length - len(raw)))
+
+
 def build_detection_packet(stamp_ns: int, frame_index: int, width: int, height: int, detections: list[dict]) -> bytes:
-    payload = {
-        "stampNs": max(0, stamp_ns),
-        "frameId": max(0, frame_index),
-        "width": max(0, width),
-        "height": max(0, height),
-        "detections": detections,
-    }
-    return DETECTION_PACKET_MAGIC + json.dumps(payload, separators=(",", ":")).encode("utf-8")
+    stamp_sec = max(0, stamp_ns) // 1_000_000_000
+    stamp_nsec = max(0, stamp_ns) % 1_000_000_000
+    packet = bytearray(
+        struct.pack(
+            SENTINEL_DETECTION_HEADER_FORMAT,
+            SENTINEL_PACKET_MAGIC,
+            0x10,
+            max(0, frame_index),
+            stamp_sec,
+            stamp_nsec,
+        )
+    )
+    packet += struct.pack("<H", 0)
+    packet += struct.pack("<H", min(len(detections), 65535))
+    for detection in detections[:65535]:
+        packet += struct.pack(
+            "<ii16sfffff",
+            int(detection.get("objectId", -1)),
+            int(detection.get("classId", -1)),
+            fixed_utf8(detection.get("className")),
+            float(detection.get("score", 0.0)),
+            float(detection.get("x1", 0.0)),
+            float(detection.get("y1", 0.0)),
+            float(detection.get("x2", 0.0)),
+            float(detection.get("y2", 0.0)),
+        )
+    return bytes(packet)
 
 
 def build_status_packet(source: str, stamp_ns: int, frame_index: int, last_error: str = "") -> bytes:
@@ -706,6 +731,7 @@ class StreamBridge:
             stream_frame.shape[0],
             frame_index,
             stamp_ns,
+            0x01 if self.name == "eo" else 0x02,
         )
         for packet in packets:
             self.sock.sendto(packet, (self.host, self.port))
@@ -720,6 +746,9 @@ class StreamBridge:
             self.sock.sendto(status_packet, (self.host, self.port))
 
     def send_detection(self, message) -> None:
+        if self.name != "eo":
+            return
+
         stamp_ns = extract_stamp_ns(message)
         with self._lock:
             frame_info = self._match_frame_info(stamp_ns)

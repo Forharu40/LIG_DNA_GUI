@@ -670,7 +670,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         _hasTrackedTarget = hasTrackedTarget;
         _trackedObjectId = trackedObjectId;
 
-        if (!TrySendMotorStatePacket(out var modeError))
+        if (!TrySendMotorCommandPacket(out var modeError))
         {
             AppendImportantLog($"자동 모드 상태 전송에 실패했습니다: {modeError}");
             return;
@@ -699,7 +699,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void InitializeMotorControlState()
     {
-        if (!TrySendMotorStatePacket(out var modeError))
+        if (!TrySendMotorCommandPacket(out var modeError))
         {
             AppendImportantLog($"초기 모터 제어 패킷 전송에 실패했습니다: {modeError}");
             return;
@@ -749,7 +749,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         SetMotorStatusValue(items, "Motor Change Value", packet.GoalPosition.ToString(CultureInfo.InvariantCulture));
         SetMotorStatusValue(items, "Actual Change Value", $"{DynamixelPositionToDegrees(packet.GoalPosition):0.0} deg");
         SetMotorStatusValue(items, "Velocity", packet.PresentVelocity.ToString(CultureInfo.InvariantCulture));
-        SetMotorStatusValue(items, "Load", packet.PresentLoad.ToString(CultureInfo.InvariantCulture));
+        SetMotorStatusValue(items, "Current", packet.PresentCurrentRaw.ToString(CultureInfo.InvariantCulture));
         SetMotorStatusValue(items, "PWM", packet.PresentPwm.ToString(CultureInfo.InvariantCulture));
         SetMotorStatusValue(items, "Temperature", $"{packet.PresentTemperature} C");
         SetMotorStatusValue(items, "Voltage", $"{packet.PresentInputVoltage:0.0} V");
@@ -768,7 +768,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         ApplyMotorButtonStateToUi(buttons);
 
-        if (!TrySendMotorStatePacket(out var modeError))
+        if (!TrySendMotorCommandPacket(out var modeError, buttons))
         {
             AppendImportantLog($"모터 수동 제어 패킷 전송에 실패했습니다: {modeError}");
             return;
@@ -1017,7 +1017,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         OnRecordingStateChanged();
 
-        if (!TrySendMotorStatePacket(out var modeError))
+        if (!TrySendMotorCommandPacket(out var modeError))
         {
             AppendImportantLog($"모터 모드 전송에 실패했습니다: {modeError}");
         }
@@ -1034,7 +1034,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         IsTrackingModeEnabled = !IsTrackingModeEnabled;
 
-        if (!TrySendMotorStatePacket(out var modeError))
+        if (!TrySendMotorCommandPacket(out var modeError))
         {
             AppendImportantLog($"추적 모드 전송에 실패했습니다: {modeError}");
         }
@@ -1327,7 +1327,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         _panMotorPositionDegrees = _motorPan;
         _tiltMotorPositionDegrees = _motorTilt;
 
-        if (!TrySendMotorStatePacket(out var error))
+        if (!TrySendMotorCommandPacket(out var error))
         {
             AppendImportantLog($"모터 각도 전송에 실패했습니다: {error}");
             return;
@@ -1371,7 +1371,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
         }
 
-        if (!TrySendMotorStatePacket(out var error))
+        if (!TrySendMotorCommandPacket(out var error))
         {
             AppendImportantLog($"모터 step size 전송에 실패했습니다: {error}");
             return;
@@ -1566,7 +1566,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             "Motor Change Value",
             "Actual Change Value",
             "Velocity",
-            "Load",
+            "Current",
             "PWM",
             "Temperature",
             "Voltage",
@@ -1585,9 +1585,15 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         return Math.Clamp(rounded, 0, limit);
     }
 
-    private static double DynamixelPositionToDegrees(ushort position)
+    private static double DynamixelPositionToDegrees(uint position)
     {
-        return position * 360.0 / 4095.0;
+        return Math.Clamp(position, 0, 4095) * 360.0 / 4095.0;
+    }
+
+    private static ushort DegreesToDynamixelPosition(double degrees)
+    {
+        var position = (int)Math.Round(Math.Clamp(degrees, 0, 360) * 4095.0 / 360.0, MidpointRounding.AwayFromZero);
+        return (ushort)Math.Clamp(position, 0, 4095);
     }
 
     /// <summary>
@@ -1664,16 +1670,16 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         return image;
     }
 
-    private bool TrySendMotorStatePacket(out string? error)
+    private bool TrySendMotorCommandPacket(out string? error, MotorButtonMask buttons = MotorButtonMask.None)
     {
-        return _motorControlService.TrySendMotorStatePacket(
-            IsManualMode,
-            IsTrackingModeEnabled,
-            _motorPan,
-            _motorTilt,
-            GetUnifiedStepSize(AutoPanMotorStepSize, AutoTiltMotorStepSize),
-            GetUnifiedStepSize(ManualPanMotorStepSize, ManualTiltMotorStepSize),
-            _trackedObjectId,
+        return _motorControlService.TrySendMotorCommandPacket(
+            mode: IsManualMode ? (byte)1 : (byte)0,
+            tracking: IsTrackingModeEnabled ? (byte)1 : (byte)0,
+            btnMask: buttons,
+            panPos: DegreesToDynamixelPosition(_motorPan),
+            tiltPos: DegreesToDynamixelPosition(_motorTilt),
+            scanStep: (byte)GetUnifiedStepSize(AutoPanMotorStepSize, AutoTiltMotorStepSize),
+            manualStep: (byte)GetUnifiedStepSize(ManualPanMotorStepSize, ManualTiltMotorStepSize),
             out error);
     }
 
