@@ -33,6 +33,9 @@ RECORDING_HTTP_ENABLED="${RECORDING_HTTP_ENABLED:-true}"
 RECORDING_HTTP_PORT="${RECORDING_HTTP_PORT:-8090}"
 ROS_DOMAIN_ID_VALUE="${ROS_DOMAIN_ID:-}"
 RMW_IMPLEMENTATION_VALUE="${RMW_IMPLEMENTATION:-}"
+FASTDDS_NO_SHM="${FASTDDS_NO_SHM:-true}"
+FASTDDS_PROFILE_FILE="${FASTDDS_PROFILE_FILE:-$SCRIPT_DIR/fastdds_no_shm.xml}"
+FASTDDS_CONTAINER_PROFILE_FILE="/fastdds_no_shm.xml"
 
 BUILD_IMAGE=0
 
@@ -54,6 +57,31 @@ Important environment overrides:
   JETSON_RECORDING_DIR, RECORDING_ENABLED, RECORDING_SEGMENT_SECONDS
   RECORDING_FPS, RECORDING_HTTP_ENABLED, RECORDING_HTTP_PORT
   ROS_DOMAIN_ID, RMW_IMPLEMENTATION
+  FASTDDS_NO_SHM, FASTDDS_PROFILE_FILE
+EOF
+}
+
+ensure_fastdds_no_shm_profile() {
+  mkdir -p "$(dirname "$FASTDDS_PROFILE_FILE")"
+  cat > "$FASTDDS_PROFILE_FILE" <<'EOF'
+<?xml version="1.0" encoding="UTF-8" ?>
+<profiles xmlns="http://www.eprosima.com/XMLSchemas/fastRTPS_Profiles">
+  <transport_descriptors>
+    <transport_descriptor>
+      <transport_id>udp_transport</transport_id>
+      <type>UDPv4</type>
+    </transport_descriptor>
+  </transport_descriptors>
+
+  <participant profile_name="no_shm_participant" is_default_profile="true">
+    <rtps>
+      <userTransports>
+        <transport_id>udp_transport</transport_id>
+      </userTransports>
+      <useBuiltinTransports>false</useBuiltinTransports>
+    </rtps>
+  </participant>
+</profiles>
 EOF
 }
 
@@ -106,6 +134,10 @@ echo "RECORDING_DIR=$RECORDING_DIR"
 echo "RECORDING_SEGMENT_SECONDS=$RECORDING_SEGMENT_SECONDS"
 echo "RECORDING_HTTP_PORT=$RECORDING_HTTP_PORT"
 echo "MAX_UDP_PAYLOAD=$MAX_UDP_PAYLOAD"
+echo "FASTDDS_NO_SHM=$FASTDDS_NO_SHM"
+if [[ "$FASTDDS_NO_SHM" == "true" ]]; then
+  echo "FASTDDS_PROFILE_FILE=$FASTDDS_PROFILE_FILE"
+fi
 if [[ -n "$ROS_DOMAIN_ID_VALUE" ]]; then
   echo "ROS_DOMAIN_ID=$ROS_DOMAIN_ID_VALUE"
 fi
@@ -119,6 +151,9 @@ if sudo docker container inspect "$CONTAINER_NAME" >/dev/null 2>&1; then
 fi
 
 mkdir -p "$JETSON_RECORDING_DIR"
+if [[ "$FASTDDS_NO_SHM" == "true" ]]; then
+  ensure_fastdds_no_shm_profile
+fi
 
 docker_args=(
   run --rm
@@ -148,6 +183,13 @@ docker_args=(
   -v "$WORKSPACE_DIR:/ros2_ws:$WORKSPACE_MOUNT_MODE"
   -v "$JETSON_RECORDING_DIR:$RECORDING_DIR:rw"
 )
+
+if [[ "$FASTDDS_NO_SHM" == "true" ]]; then
+  docker_args+=(
+    -e "FASTRTPS_DEFAULT_PROFILES_FILE=$FASTDDS_CONTAINER_PROFILE_FILE"
+    -v "$FASTDDS_PROFILE_FILE:$FASTDDS_CONTAINER_PROFILE_FILE:ro"
+  )
+fi
 
 if [[ -n "$ROS_DOMAIN_ID_VALUE" ]]; then
   docker_args+=(-e "ROS_DOMAIN_ID=$ROS_DOMAIN_ID_VALUE")
