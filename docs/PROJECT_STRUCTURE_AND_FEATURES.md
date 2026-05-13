@@ -68,3 +68,14 @@ different network segment from the Jetson bridge to PC GUI output port
 Motor data intentionally keeps the existing `3000/3001` command/status split.
 VLM results are separated onto `6002/udp` so image receive, motor feedback, and
 analysis updates can be handled independently.
+
+Motor packet details:
+
+| Direction | Port | Size | Fields |
+| --- | --- | --- | --- |
+| GUI -> Thor | `3000/udp` | `12B` | mode, tracking, pan, tilt, auto step, manual step, object id |
+| Thor -> GUI | `3001/udp` | `36B` | pan motor 18B + tilt motor 18B |
+
+GUI -> Thor uses little-endian integers. Pan and tilt are UInt16 values in
+0.1 degree units; object id is the int32 YOLO/track object id, or `-1` when no
+target is selected.

@@ -7,7 +7,10 @@ namespace BroadcastControl.App.Services;
 public sealed class UdpMotorStatusReceiverService : IDisposable
 {
     private const int DefaultPort = 3001;
-    private const int PacketSize = 32;
+    private const int CurrentPacketSize = 18;
+    private const int CurrentSnapshotSize = CurrentPacketSize * 2;
+    private const int LegacyPacketSize = 32;
+    private const int LegacySnapshotSize = LegacyPacketSize * 2;
 
     private readonly UdpClient _udpClient;
     private CancellationTokenSource? _cancellationTokenSource;
@@ -81,17 +84,18 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
     private static bool TryParseSnapshot(byte[] buffer, out MotorStatusSnapshot snapshot)
     {
         snapshot = default;
-        if (buffer.Length < PacketSize)
+        if (buffer.Length < CurrentSnapshotSize && buffer.Length < LegacyPacketSize)
         {
             return false;
         }
 
         var receivedAt = DateTime.Now;
-        var pan = ParsePacket(buffer.AsSpan(0, PacketSize), receivedAt);
+        var packetSize = buffer.Length >= LegacySnapshotSize ? LegacyPacketSize : CurrentPacketSize;
+        var pan = ParsePacket(buffer.AsSpan(0, packetSize), receivedAt);
         MotorStatusPacket? tilt = null;
-        if (buffer.Length >= PacketSize * 2)
+        if (buffer.Length >= packetSize * 2)
         {
-            tilt = ParsePacket(buffer.AsSpan(PacketSize, PacketSize), receivedAt);
+            tilt = ParsePacket(buffer.AsSpan(packetSize, packetSize), receivedAt);
         }
 
         snapshot = new MotorStatusSnapshot(pan, tilt);

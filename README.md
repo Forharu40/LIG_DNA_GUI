@@ -74,6 +74,16 @@ PC GUI로 보내는 UDP 포트:
 IR 카메라가 Zybo에서 Jetson `video_rx_node`로 들어올 때는 `5001` 포트를 사용합니다.
 혼동을 피하기 위해 Jetson bridge에서 PC GUI로 보내는 IR 포트는 `6001`로 분리했습니다.
 
+모터 UDP 패킷:
+
+| 방향 | 포트 | 크기 | 내용 |
+| --- | --- | --- | --- |
+| GUI -> Thor | `3000/udp` | `12B` | mode 1B, tracking 1B, pan 2B, tilt 2B, auto step 1B, manual step 1B, object id 4B |
+| Thor -> GUI | `3001/udp` | `36B` | pan motor 18B + tilt motor 18B |
+
+GUI -> Thor의 pan/tilt는 0.1도 단위 UInt16 little-endian 값입니다.
+YOLO에서 받은 객체 ID는 `int32` little-endian으로 전송하며, 선택된 객체가 없으면 `-1`을 보냅니다.
+
 ## 실행 순서
 
 ### 1. Jetson에서 ROS2 영상 토픽 확인

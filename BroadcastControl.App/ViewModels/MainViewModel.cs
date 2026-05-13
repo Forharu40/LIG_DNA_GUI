@@ -64,6 +64,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private string _motorTargetTiltText = "0.0";
     private bool _hasTrackedTarget;
     private bool _isTrackingModeEnabled = true;
+    private int _trackedObjectId = -1;
     private readonly UdpMotorControlService _motorControlService;
     private const double MotorPanLimitDegrees = 360;
     private const double MotorTiltLimitDegrees = 360;
@@ -657,19 +658,19 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     {
         // 자동 모드에서는 탐지 유무를 보고 스캔(0)과 추적(1) 모드 패킷을 전환한다.
         var hasTrackedTarget = detections.Count > 0;
-        if (_hasTrackedTarget == hasTrackedTarget)
+        var trackedObjectId = detections
+            .OrderByDescending(detection => detection.Score)
+            .Select(detection => detection.ObjectId)
+            .FirstOrDefault(-1);
+        if (_hasTrackedTarget == hasTrackedTarget && _trackedObjectId == trackedObjectId)
         {
             return;
         }
 
         _hasTrackedTarget = hasTrackedTarget;
+        _trackedObjectId = trackedObjectId;
 
-        if (!IsAutoMode)
-        {
-            return;
-        }
-
-        if (!TrySendCurrentModeToController(out var modeError))
+        if (!TrySendMotorStatePacket(out var modeError))
         {
             AppendImportantLog($"자동 모드 상태 전송에 실패했습니다: {modeError}");
             return;
@@ -698,20 +699,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void InitializeMotorControlState()
     {
-        if (!TrySendCurrentModeToController(out var modeError))
+        if (!TrySendMotorStatePacket(out var modeError))
         {
-            AppendImportantLog($"초기 모터 모드 전송에 실패했습니다: {modeError}");
+            AppendImportantLog($"초기 모터 제어 패킷 전송에 실패했습니다: {modeError}");
             return;
-        }
-
-        if (!TrySendButtonPacket(MotorButtonMask.None, out var buttonError))
-        {
-            AppendImportantLog($"초기 버튼 패킷 전송에 실패했습니다: {buttonError}");
-        }
-
-        if (!TrySendStepSizePacket(out var stepError))
-        {
-            AppendImportantLog($"초기 모터 step size 전송에 실패했습니다: {stepError}");
         }
     }
 
@@ -777,15 +768,10 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         ApplyMotorButtonStateToUi(buttons);
 
-        if (!TrySendCurrentModeToController(out var modeError))
+        if (!TrySendMotorStatePacket(out var modeError))
         {
-            AppendImportantLog($"모터 수동 모드 전송에 실패했습니다: {modeError}");
+            AppendImportantLog($"모터 수동 제어 패킷 전송에 실패했습니다: {modeError}");
             return;
-        }
-
-        if (!TrySendButtonPacket(buttons, out var buttonError))
-        {
-            AppendImportantLog($"모터 버튼 패킷 전송에 실패했습니다: {buttonError}");
         }
     }
 
@@ -1031,22 +1017,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         OnRecordingStateChanged();
 
-        if (!TrySendCurrentModeToController(out var modeError))
+        if (!TrySendMotorStatePacket(out var modeError))
         {
             AppendImportantLog($"모터 모드 전송에 실패했습니다: {modeError}");
-        }
-
-        if (!TrySendStepSizePacket(out var stepError))
-        {
-            AppendImportantLog($"모터 step size 전송에 실패했습니다: {stepError}");
-        }
-
-        if (IsAutoMode)
-        {
-            if (!TrySendButtonPacket(MotorButtonMask.None, out var buttonError))
-            {
-                AppendImportantLog($"자동 모드 버튼 패킷 전송에 실패했습니다: {buttonError}");
-            }
         }
 
         AppendImportantLog($"\uCE74\uBA54\uB77C \uC81C\uC5B4 \uBAA8\uB4DC\uAC00 {CurrentMode}(\uC73C)\uB85C \uC804\uD658\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
@@ -1061,7 +1034,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         IsTrackingModeEnabled = !IsTrackingModeEnabled;
 
-        if (!TrySendCurrentModeToController(out var modeError))
+        if (!TrySendMotorStatePacket(out var modeError))
         {
             AppendImportantLog($"추적 모드 전송에 실패했습니다: {modeError}");
         }
@@ -1349,13 +1322,21 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         MotorTargetPanText = panDegrees.ToString("0.0", CultureInfo.InvariantCulture);
         MotorTargetTiltText = tiltDegrees.ToString("0.0", CultureInfo.InvariantCulture);
 
-        if (!_motorControlService.TrySendTargetAnglePacket(panDegrees, tiltDegrees, out var error))
+        _motorPan = panDegrees;
+        _motorTilt = tiltDegrees;
+        _panMotorPositionDegrees = _motorPan;
+        _tiltMotorPositionDegrees = _motorTilt;
+
+        if (!TrySendMotorStatePacket(out var error))
         {
             AppendImportantLog($"모터 각도 전송에 실패했습니다: {error}");
             return;
         }
 
-        SetMotorPosition(panDegrees, tiltDegrees);
+        OnPropertyChanged(nameof(MotorPanText));
+        OnPropertyChanged(nameof(MotorTiltText));
+        OnPropertyChanged(nameof(PanMotorPositionText));
+        OnPropertyChanged(nameof(TiltMotorPositionText));
         AppendImportantLog($"모터 각도 전송: pan {panDegrees:0.0}°, tilt {tiltDegrees:0.0}°");
     }
 
@@ -1390,8 +1371,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
         }
 
-        if ((mode == MotorStepMode.Auto && IsAutoMode || mode == MotorStepMode.Manual && IsManualMode) &&
-            !TrySendStepSizePacket(out var error))
+        if (!TrySendMotorStatePacket(out var error))
         {
             AppendImportantLog($"모터 step size 전송에 실패했습니다: {error}");
             return;
@@ -1684,26 +1664,22 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         return image;
     }
 
-    private bool TrySendCurrentModeToController(out string? error)
+    private bool TrySendMotorStatePacket(out string? error)
     {
-        var mode = IsManualMode
-            ? MotorPacketMode.Manual
-            : IsTrackingModeEnabled && _hasTrackedTarget
-                ? MotorPacketMode.Tracking
-                : MotorPacketMode.Scan;
-
-        return _motorControlService.TrySendModePacket(mode, out error);
+        return _motorControlService.TrySendMotorStatePacket(
+            IsManualMode,
+            IsTrackingModeEnabled,
+            _motorPan,
+            _motorTilt,
+            GetUnifiedStepSize(AutoPanMotorStepSize, AutoTiltMotorStepSize),
+            GetUnifiedStepSize(ManualPanMotorStepSize, ManualTiltMotorStepSize),
+            _trackedObjectId,
+            out error);
     }
 
-    private bool TrySendButtonPacket(MotorButtonMask buttons, out string? error)
+    private static int GetUnifiedStepSize(int panStepSize, int tiltStepSize)
     {
-        return _motorControlService.TrySendButtonPacket(buttons, out error);
-    }
-
-    private bool TrySendStepSizePacket(out string? error)
-    {
-        var mode = IsManualMode ? MotorStepMode.Manual : MotorStepMode.Auto;
-        return _motorControlService.TrySendStepSizePacket(GetPanStepSize(mode), GetTiltStepSize(mode), out error);
+        return Math.Clamp(Math.Max(panStepSize, tiltStepSize), 1, 10);
     }
 
     private void ApplyMotorButtonStateToUi(MotorButtonMask buttons)

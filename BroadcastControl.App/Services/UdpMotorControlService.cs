@@ -1,15 +1,13 @@
+using System.Buffers.Binary;
 using System.Net.Sockets;
 
 namespace BroadcastControl.App.Services;
 
-/// <summary>
-/// 운용통제 GUI에서 미션 PC로 모터 제어용 UDP 패킷을 보내는 서비스다.
-/// 현재 프로토콜은 2바이트 mode packet과 2바이트 button packet을 사용한다.
-/// </summary>
 public sealed class UdpMotorControlService : IDisposable
 {
     private const string DefaultHost = "192.168.3.143";
     private const int DefaultPort = 3000;
+    private const int MotorStatePacketSize = 12;
 
     private readonly UdpClient _udpClient = new();
 
@@ -23,31 +21,24 @@ public sealed class UdpMotorControlService : IDisposable
 
     public int Port { get; }
 
-    public bool TrySendModePacket(MotorPacketMode mode, out string? error)
+    public bool TrySendMotorStatePacket(
+        bool isManualMode,
+        bool isTrackingEnabled,
+        double panDegrees,
+        double tiltDegrees,
+        int autoStepSize,
+        int manualStepSize,
+        int objectId,
+        out string? error)
     {
-        return TrySendPacket([0x01, (byte)mode], out error);
-    }
-
-    public bool TrySendButtonPacket(MotorButtonMask buttons, out string? error)
-    {
-        return TrySendPacket([0x02, (byte)buttons], out error);
-    }
-
-    public bool TrySendStepSizePacket(int panStepSize, int tiltStepSize, out string? error)
-    {
-        return TrySendPacket([
-            0x04,
-            (byte)Math.Clamp(panStepSize, 1, 10),
-            (byte)Math.Clamp(tiltStepSize, 1, 10)
-        ], out error);
-    }
-
-    public bool TrySendTargetAnglePacket(double panDegrees, double tiltDegrees, out string? error)
-    {
-        var packet = new byte[17];
-        packet[0] = 0x03;
-        BitConverter.TryWriteBytes(packet.AsSpan(1, 8), panDegrees);
-        BitConverter.TryWriteBytes(packet.AsSpan(9, 8), tiltDegrees);
+        var packet = new byte[MotorStatePacketSize];
+        packet[0] = isManualMode ? (byte)1 : (byte)0;
+        packet[1] = isTrackingEnabled ? (byte)1 : (byte)0;
+        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(2, 2), EncodeDegrees(panDegrees));
+        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(4, 2), EncodeDegrees(tiltDegrees));
+        packet[6] = EncodeStepSize(autoStepSize);
+        packet[7] = EncodeStepSize(manualStepSize);
+        BinaryPrimitives.WriteInt32LittleEndian(packet.AsSpan(8, 4), objectId);
         return TrySendPacket(packet, out error);
     }
 
@@ -69,6 +60,17 @@ public sealed class UdpMotorControlService : IDisposable
             error = ex.Message;
             return false;
         }
+    }
+
+    private static ushort EncodeDegrees(double degrees)
+    {
+        var tenths = (int)Math.Round(Math.Clamp(degrees, 0, 360) * 10, MidpointRounding.AwayFromZero);
+        return (ushort)Math.Clamp(tenths, 0, 3600);
+    }
+
+    private static byte EncodeStepSize(int stepSize)
+    {
+        return (byte)Math.Clamp(stepSize, 1, 10);
     }
 
     private static string ResolveHost(string? host)
@@ -96,13 +98,6 @@ public sealed class UdpMotorControlService : IDisposable
             ? parsedPort
             : DefaultPort;
     }
-}
-
-public enum MotorPacketMode : byte
-{
-    Scan = 0,
-    Tracking = 1,
-    Manual = 2
 }
 
 [Flags]
