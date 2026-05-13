@@ -13,9 +13,12 @@ namespace BroadcastControl.App.Services;
 
 public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
-    private const int DefaultPort = 5000;
+    private const int DefaultPort = 6000;
     private const int LegacyHeaderSize = 20;
+    private const int ImageFragmentHeaderSize = 28;
+    private const int MaxImageFragmentBuffers = 32;
     private const int MetadataPacketSize = 36;
+    private static readonly byte[] ImageFragmentMagic = "IMGF"u8.ToArray();
     private static readonly byte[] DetectionPacketMagic = "DETS"u8.ToArray();
     private static readonly byte[] StatusPacketMagic = "STAT"u8.ToArray();
     private static readonly JsonSerializerOptions PacketJsonOptions = new()
@@ -24,6 +27,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     };
 
     private readonly Dispatcher _dispatcher;
+    private readonly bool _applyIrFalseColor;
 
     private UdpClient? _udpClient;
     private CancellationTokenSource? _cancellationTokenSource;
@@ -50,12 +54,15 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     private long _nonEmptyDetectionPacketCount;
     private long _decodeFailureCount;
     private long _unknownPacketCount;
+    private readonly object _fragmentLock = new();
+    private readonly Dictionary<FrameFragmentKey, ImageFragmentBuffer> _imageFragments = new();
     private readonly object _frameDispatchLock = new();
     private ReceivedVideoFrame? _pendingFrame;
     private bool _frameDispatchScheduled;
 
-    public UdpEncodedVideoReceiverService()
+    public UdpEncodedVideoReceiverService(bool applyIrFalseColor = false)
     {
+        _applyIrFalseColor = applyIrFalseColor;
         _dispatcher = System.Windows.Application.Current?.Dispatcher ?? Dispatcher.CurrentDispatcher;
     }
 
@@ -140,6 +147,10 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         _nonEmptyDetectionPacketCount = 0;
         _decodeFailureCount = 0;
         _unknownPacketCount = 0;
+        lock (_fragmentLock)
+        {
+            _imageFragments.Clear();
+        }
         StopRecording();
     }
 
@@ -292,6 +303,31 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             return;
         }
 
+        if (TryExtractImageFragmentPacket(packet, out var fragmentPacket))
+        {
+            if (TryAssembleImageFragment(fragmentPacket, out var assembledFrame))
+            {
+                var decoded = TryDecodeFrame(
+                    assembledFrame.EncodedBytes,
+                    assembledFrame.DeclaredWidth,
+                    assembledFrame.DeclaredHeight,
+                    assembledFrame.FrameStampNs,
+                    assembledFrame.FrameIndex,
+                    null);
+                if (!decoded)
+                {
+                    _decodeFailureCount++;
+                    if (_decodeFailureCount == 1 || _decodeFailureCount % 20 == 0)
+                    {
+                        PublishDiagnosticMessage(
+                            $"Fragmented UDP image decode failed. failures={_decodeFailureCount}, bytes={assembledFrame.EncodedBytes.Length}");
+                    }
+                }
+            }
+
+            return;
+        }
+
         if (LooksLikeJpeg(packet))
         {
             var decoded = TryDecodeFrame(packet, 0, 0, 0, 0, null);
@@ -391,10 +427,13 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             {
             }
 
+            using var falseColorFrame = _applyIrFalseColor ? CreateIrFalseColorFrame(decoded) : new Mat();
+            var displaySource = _applyIrFalseColor ? falseColorFrame : decoded;
+
             using var adjusted = new Mat();
             var alpha = 0.5 + (_contrast / 100.0);
             var beta = (_brightness - 50.0) * 2.0;
-            decoded.ConvertTo(adjusted, MatType.CV_8UC3, alpha, beta);
+            displaySource.ConvertTo(adjusted, MatType.CV_8UC3, alpha, beta);
 
             _latestRecordableFrame?.Dispose();
             _latestRecordableFrame = adjusted.Clone();
@@ -406,8 +445,11 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 WriteRecordingFrame(recordingFrame);
             }
 
+            using var upscaledDisplay = _applyIrFalseColor ? CreateIrUpscaledDisplayFrame(adjusted) : new Mat();
+            var displayFrame = upscaledDisplay.Empty() ? adjusted : upscaledDisplay;
+
             using var converted = new Mat();
-            Cv2.CvtColor(adjusted, converted, ColorConversionCodes.BGR2BGRA);
+            Cv2.CvtColor(displayFrame, converted, ColorConversionCodes.BGR2BGRA);
 
             var bufferSize = checked((int)(converted.Step() * converted.Rows));
             var stride = checked((int)converted.Step());
@@ -474,6 +516,79 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
             FrameReady?.Invoke(frameToPublish.Value);
         }
+    }
+
+    private static Mat CreateIrFalseColorFrame(Mat source)
+    {
+        using var gray = new Mat();
+        if (source.Channels() == 3)
+        {
+            Cv2.CvtColor(source, gray, ColorConversionCodes.BGR2GRAY);
+        }
+        else if (source.Channels() == 4)
+        {
+            Cv2.CvtColor(source, gray, ColorConversionCodes.BGRA2GRAY);
+        }
+        else
+        {
+            source.CopyTo(gray);
+        }
+
+        using var gray8 = new Mat();
+        if (gray.Type() == MatType.CV_8UC1)
+        {
+            gray.CopyTo(gray8);
+        }
+        else
+        {
+            Cv2.Normalize(gray, gray8, 0, 255, NormTypes.MinMax, MatType.CV_8U);
+        }
+
+        // IR false-color view:
+        var colorized = new Mat();
+        Cv2.ApplyColorMap(gray8, colorized, ColormapTypes.Jet);
+        return colorized;
+
+        //var grayscale = new Mat();
+        //Cv2.CvtColor(gray8, grayscale, ColorConversionCodes.GRAY2BGR);
+        //return grayscale;
+    }
+
+    private Mat CreateIrUpscaledDisplayFrame(Mat source)
+    {
+        if (source.Empty())
+        {
+            return new Mat();
+        }
+
+        var targetWidth = Math.Max(source.Width, (int)Math.Round(_viewportWidth));
+        var targetHeight = Math.Max(source.Height, (int)Math.Round(_viewportHeight));
+        var scale = Math.Max(
+            targetWidth / (double)source.Width,
+            targetHeight / (double)source.Height);
+
+        if (scale <= 1.05)
+        {
+            return new Mat();
+        }
+
+        var outputWidth = Math.Clamp((int)Math.Round(source.Width * scale), source.Width, 1920);
+        var outputHeight = Math.Clamp((int)Math.Round(source.Height * scale), source.Height, 1080);
+
+        if (outputWidth == source.Width && outputHeight == source.Height)
+        {
+            return new Mat();
+        }
+
+        var upscaled = new Mat();
+        Cv2.Resize(
+            source,
+            upscaled,
+            new OpenCvSharp.Size(outputWidth, outputHeight),
+            0,
+            0,
+            InterpolationFlags.Lanczos4);
+        return upscaled;
     }
 
     private Mat CreateRecordedFrame(Mat source)
@@ -800,6 +915,123 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         return true;
     }
 
+    private static bool TryExtractImageFragmentPacket(byte[] packet, out ImageFragmentPacket fragment)
+    {
+        fragment = default;
+
+        if (!HasPacketMagic(packet, ImageFragmentMagic) || packet.Length <= ImageFragmentHeaderSize)
+        {
+            return false;
+        }
+
+        var header = packet.AsSpan(0, ImageFragmentHeaderSize);
+        var stampNs = BinaryPrimitives.ReadUInt64BigEndian(header.Slice(4, 8));
+        var frameIndex = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(12, 4));
+        var totalLength = BinaryPrimitives.ReadUInt32BigEndian(header.Slice(16, 4));
+        var declaredWidth = BinaryPrimitives.ReadUInt16BigEndian(header.Slice(20, 2));
+        var declaredHeight = BinaryPrimitives.ReadUInt16BigEndian(header.Slice(22, 2));
+        var fragmentIndex = BinaryPrimitives.ReadUInt16BigEndian(header.Slice(24, 2));
+        var fragmentCount = BinaryPrimitives.ReadUInt16BigEndian(header.Slice(26, 2));
+
+        if (totalLength == 0 ||
+            totalLength > 16 * 1024 * 1024 ||
+            fragmentCount == 0 ||
+            fragmentIndex >= fragmentCount ||
+            declaredWidth == 0 ||
+            declaredHeight == 0)
+        {
+            return false;
+        }
+
+        var payload = packet[ImageFragmentHeaderSize..];
+        if (payload.Length == 0)
+        {
+            return false;
+        }
+
+        fragment = new ImageFragmentPacket(
+            stampNs,
+            frameIndex,
+            totalLength,
+            declaredWidth,
+            declaredHeight,
+            fragmentIndex,
+            fragmentCount,
+            payload);
+        return true;
+    }
+
+    private bool TryAssembleImageFragment(ImageFragmentPacket fragment, out EncodedFrame frame)
+    {
+        frame = default;
+
+        lock (_fragmentLock)
+        {
+            CleanupStaleImageFragments();
+            var key = new FrameFragmentKey(fragment.StampNs, fragment.FrameIndex);
+            if (!_imageFragments.TryGetValue(key, out var buffer) || !buffer.IsCompatibleWith(fragment))
+            {
+                buffer = new ImageFragmentBuffer(fragment);
+                _imageFragments[key] = buffer;
+            }
+
+            if (!buffer.Add(fragment))
+            {
+                return false;
+            }
+
+            if (!buffer.IsComplete)
+            {
+                return false;
+            }
+
+            _imageFragments.Remove(key);
+            var encodedBytes = buffer.Assemble();
+            if (encodedBytes.Length == 0 || !LooksLikeJpeg(encodedBytes))
+            {
+                return false;
+            }
+
+            frame = new EncodedFrame(
+                encodedBytes,
+                fragment.DeclaredWidth,
+                fragment.DeclaredHeight,
+                fragment.StampNs,
+                fragment.FrameIndex);
+            return true;
+        }
+    }
+
+    private void CleanupStaleImageFragments()
+    {
+        var now = Environment.TickCount64;
+        var staleKeys = _imageFragments
+            .Where(pair => now - pair.Value.LastUpdatedTicks > 2_000)
+            .Select(pair => pair.Key)
+            .ToArray();
+
+        foreach (var key in staleKeys)
+        {
+            _imageFragments.Remove(key);
+        }
+
+        if (_imageFragments.Count <= MaxImageFragmentBuffers)
+        {
+            return;
+        }
+
+        var overflowKeys = _imageFragments
+            .OrderBy(pair => pair.Value.LastUpdatedTicks)
+            .Take(_imageFragments.Count - MaxImageFragmentBuffers)
+            .Select(pair => pair.Key)
+            .ToArray();
+
+        foreach (var key in overflowKeys)
+        {
+            _imageFragments.Remove(key);
+        }
+    }
+
     private static bool TryExtractDetectionPacket(byte[] packet, out DetectionPacket detectionPacket)
     {
         detectionPacket = default;
@@ -893,6 +1125,101 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         ushort DeclaredHeight,
         ulong FrameStampNs,
         uint FrameIndex);
+
+    private readonly record struct FrameFragmentKey(ulong StampNs, uint FrameIndex);
+
+    private readonly record struct ImageFragmentPacket(
+        ulong StampNs,
+        uint FrameIndex,
+        uint TotalLength,
+        ushort DeclaredWidth,
+        ushort DeclaredHeight,
+        ushort FragmentIndex,
+        ushort FragmentCount,
+        byte[] Payload);
+
+    private sealed class ImageFragmentBuffer
+    {
+        private readonly byte[]?[] _parts;
+
+        public ImageFragmentBuffer(ImageFragmentPacket firstFragment)
+        {
+            StampNs = firstFragment.StampNs;
+            FrameIndex = firstFragment.FrameIndex;
+            TotalLength = firstFragment.TotalLength;
+            DeclaredWidth = firstFragment.DeclaredWidth;
+            DeclaredHeight = firstFragment.DeclaredHeight;
+            FragmentCount = firstFragment.FragmentCount;
+            _parts = new byte[FragmentCount][];
+            LastUpdatedTicks = Environment.TickCount64;
+        }
+
+        public ulong StampNs { get; }
+
+        public uint FrameIndex { get; }
+
+        public uint TotalLength { get; }
+
+        public ushort DeclaredWidth { get; }
+
+        public ushort DeclaredHeight { get; }
+
+        public ushort FragmentCount { get; }
+
+        public int ReceivedCount { get; private set; }
+
+        public long LastUpdatedTicks { get; private set; }
+
+        public bool IsComplete => ReceivedCount == FragmentCount;
+
+        public bool IsCompatibleWith(ImageFragmentPacket fragment)
+        {
+            return StampNs == fragment.StampNs &&
+                   FrameIndex == fragment.FrameIndex &&
+                   TotalLength == fragment.TotalLength &&
+                   DeclaredWidth == fragment.DeclaredWidth &&
+                   DeclaredHeight == fragment.DeclaredHeight &&
+                   FragmentCount == fragment.FragmentCount;
+        }
+
+        public bool Add(ImageFragmentPacket fragment)
+        {
+            if (!IsCompatibleWith(fragment))
+            {
+                return false;
+            }
+
+            var index = fragment.FragmentIndex;
+            if (_parts[index] is not null)
+            {
+                LastUpdatedTicks = Environment.TickCount64;
+                return false;
+            }
+
+            _parts[index] = fragment.Payload;
+            ReceivedCount++;
+            LastUpdatedTicks = Environment.TickCount64;
+            return true;
+        }
+
+        public byte[] Assemble()
+        {
+            var output = new byte[TotalLength];
+            var offset = 0;
+            foreach (var part in _parts)
+            {
+                if (part is null || offset + part.Length > output.Length)
+                {
+                    return [];
+                }
+
+                Buffer.BlockCopy(part, 0, output, offset, part.Length);
+                offset += part.Length;
+            }
+
+            return offset == output.Length ? output : [];
+        }
+    }
 
     private sealed record DetectionPacketPayload
     {

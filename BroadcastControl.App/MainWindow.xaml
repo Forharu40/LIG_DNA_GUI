@@ -1,14 +1,16 @@
-<Window x:Class="BroadcastControl.App.MainWindow"
+﻿<Window x:Class="BroadcastControl.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
-        Title="LIG DNA GUI - MEVA YOLO Demo"
+        Title="LIG DNA GUI"
         WindowState="Maximized"
         WindowStyle="None"
         ResizeMode="NoResize"
         Background="{DynamicResource WindowBackgroundBrush}"
         UseLayoutRounding="True"
-        SnapsToDevicePixels="True">
+        SnapsToDevicePixels="True"
+        TextOptions.TextFormattingMode="Display"
+        TextOptions.TextRenderingMode="ClearType">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVisibilityConverter" />
 
@@ -111,6 +113,66 @@
             <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
         </Style>
 
+        <Style x:Key="MotorPadButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+            <Setter Property="Width" Value="34" />
+            <Setter Property="Height" Value="28" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="#33475663" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#55475663" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#66475663" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="InlineRotateButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+            <Setter Property="Width" Value="24" />
+            <Setter Property="Height" Value="20" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="#00FFFFFF" />
+            <Setter Property="BorderBrush" Value="#55FFFFFF" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#1F475663" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#33475663" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="PlaybackIconButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
+            <Setter Property="Width" Value="42" />
+            <Setter Property="Height" Value="36" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="Background" Value="#22313A46" />
+            <Setter Property="BorderBrush" Value="{DynamicResource PanelBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
+            <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#33475663" />
+                    <Setter Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                </Trigger>
+                <Trigger Property="IsPressed" Value="True">
+                    <Setter Property="Background" Value="#55475663" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
         <Style x:Key="PanelTitle" TargetType="TextBlock">
             <Setter Property="Foreground" Value="{DynamicResource PrimaryTextBrush}" />
             <Setter Property="FontSize" Value="18" />
@@ -140,123 +202,127 @@
         </Style>
     </Window.Resources>
 
-    <Grid x:Name="RootLayout">
-        <!-- 전체 창 최상위 컨테이너임.
-             상단 툴바, 본문 패널, 설정 드로어를 이 Grid 안에 배치 -->
-        <Grid Margin="12">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="66" />
-                <RowDefinition Height="*" />
-            </Grid.RowDefinitions>
+    <Viewbox Stretch="Uniform">
+        <Grid x:Name="RootLayout"
+          Width="1600"
+          Height="900">
+            <!-- ?꾩껜 李?理쒖긽??而⑦뀒?대꼫??
+             ?곷떒 ?대컮, 蹂몃Ц ?⑤꼸, ?ㅼ젙 ?쒕줈?대? ??Grid ?덉뿉 諛곗튂 -->
+            <Grid Margin="12">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="0" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
 
-            <Rectangle Grid.RowSpan="2"
+                <Rectangle Grid.RowSpan="2"
                        Margin="-4"
                        IsHitTestVisible="False">
-                <Rectangle.Fill>
-                    <DynamicResource ResourceKey="WindowBackdropBrush" />
-                </Rectangle.Fill>
-            </Rectangle>
+                    <Rectangle.Fill>
+                        <DynamicResource ResourceKey="WindowBackdropBrush" />
+                    </Rectangle.Fill>
+                </Rectangle>
 
-            <!-- 상단 툴바:
-                 전원 종료, 녹화 상태, 밝기/대조비, 모드 전환, 설정 버튼 배치 -->
-            <Border Grid.Row="0"
+                <!-- ?곷떒 ?대컮:
+                 ?꾩썝 醫낅즺, ?뱁솕 ?곹깭, 諛앷린/?議곕퉬, 紐⑤뱶 ?꾪솚, ?ㅼ젙 踰꾪듉 諛곗튂 -->
+                <Border Grid.Row="0"
+                    Visibility="Collapsed"
                     Style="{StaticResource GlassCardBorder}"
                     CornerRadius="2"
                     Effect="{StaticResource TopBarShadow}">
-                <Grid Margin="14,10,42,10">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="152" />
-                        <ColumnDefinition Width="152" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="96" />
-                        <ColumnDefinition Width="Auto" />
-                    </Grid.ColumnDefinitions>
+                    <Grid Margin="14,10,42,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="152" />
+                            <ColumnDefinition Width="152" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="96" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
 
-                    <Button Grid.Column="0"
+                        <Button Grid.Column="0"
                             MinWidth="126"
                             Command="{Binding TogglePowerCommand}"
                             Style="{StaticResource TopBarButton}">
-                        <StackPanel Orientation="Horizontal">
-                            <Ellipse Width="16"
+                            <StackPanel Orientation="Horizontal">
+                                <Ellipse Width="16"
                                      Height="16"
                                      Margin="0,0,8,0"
                                      Fill="{Binding CurrentThreatBrush}" />
-                            <TextBlock Text="{Binding PowerButtonText}" />
-                        </StackPanel>
-                    </Button>
+                                <TextBlock Text="{Binding PowerButtonText}" />
+                            </StackPanel>
+                        </Button>
 
-                    <StackPanel Grid.Column="1"
+                        <StackPanel Grid.Column="1"
                                 Margin="16,0,0,0"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Center"
                                 Orientation="Horizontal"
                                 Opacity="{Binding RecordingIndicatorOpacity}">
-                        <Ellipse Width="12"
+                            <Ellipse Width="12"
                                  Height="12"
                                  Margin="0,0,8,0"
                                  VerticalAlignment="Center"
                                  Fill="{Binding RecordingIndicatorBrush}" />
-                        <TextBlock VerticalAlignment="Center"
+                            <TextBlock VerticalAlignment="Center"
                                    Foreground="{Binding RecordingTextBrush}"
                                    FontSize="13"
                                    FontWeight="SemiBold"
-                                   Text="영상 녹화 중" />
-                    </StackPanel>
+                                   Text="{Binding Text[RecordingOn]}" />
+                        </StackPanel>
 
-                    <StackPanel Grid.Column="2"
+                        <StackPanel Grid.Column="2"
                                 Margin="0,0,12,0"
                                 VerticalAlignment="Center">
-                        <Button HorizontalAlignment="Left"
+                            <Button HorizontalAlignment="Left"
                                 Command="{Binding ResetBrightnessCommand}"
                                 Style="{StaticResource TopBarSmallButton}"
                                 Content="{Binding BrightnessText}" />
-                        <Slider Margin="0,2,0,0"
+                            <Slider Margin="0,2,0,0"
                                 Minimum="0"
                                 Maximum="100"
                                 Style="{StaticResource TopBarCompactSlider}"
                                 Value="{Binding Brightness, UpdateSourceTrigger=PropertyChanged}"
                                 IsEnabled="{Binding IsSystemPoweredOn}" />
-                    </StackPanel>
+                        </StackPanel>
 
-                    <StackPanel Grid.Column="3"
+                        <StackPanel Grid.Column="3"
                                 Margin="0,0,14,0"
                                 VerticalAlignment="Center">
-                        <Button HorizontalAlignment="Left"
+                            <Button HorizontalAlignment="Left"
                                 Command="{Binding ResetContrastCommand}"
                                 Style="{StaticResource TopBarSmallButton}"
                                 Content="{Binding ContrastText}" />
-                        <Slider Margin="0,2,0,0"
+                            <Slider Margin="0,2,0,0"
                                 Minimum="0"
                                 Maximum="100"
                                 Style="{StaticResource TopBarCompactSlider}"
                                 Value="{Binding Contrast, UpdateSourceTrigger=PropertyChanged}"
                                 IsEnabled="{Binding IsSystemPoweredOn}" />
-                    </StackPanel>
+                        </StackPanel>
 
-                    <Button Grid.Column="4"
+                        <Button Grid.Column="4"
                             Margin="0,0,8,0"
                             Width="92"
                             Command="{Binding SetModeCommand}"
-                            CommandParameter="자동"
+                            CommandParameter="&#xC790;&#xB3D9;"
                             IsHitTestVisible="{Binding CanSelectAutoMode}"
                             Opacity="{Binding AutoModeOpacity}"
                             Style="{StaticResource TopBarButton}"
-                            Content="자동" />
+                            Content="{Binding Text[AutoMode]}" />
 
-                    <Button Grid.Column="5"
+                        <Button Grid.Column="5"
                             Margin="0,0,8,0"
                             Width="92"
                             Command="{Binding SetModeCommand}"
-                            CommandParameter="수동"
+                            CommandParameter="&#xC218;&#xB3D9;"
                             IsHitTestVisible="{Binding CanSelectManualMode}"
                             Opacity="{Binding ManualModeOpacity}"
                             Style="{StaticResource TopBarButton}"
-                            Content="수동" />
+                            Content="{Binding Text[ManualMode]}" />
 
-                    <Button Grid.Column="6"
+                        <Button Grid.Column="6"
                             Width="84"
                             Margin="0,0,12,0"
                             Padding="10,4"
@@ -268,78 +334,419 @@
                             Command="{Binding ToggleManualRecordingCommand}"
                             Content="{Binding ManualRecordingButtonText}" />
 
-                    <Button Grid.Column="7"
+                        <Button Grid.Column="7"
                             Width="54"
                             Command="{Binding ToggleSettingsCommand}"
                             Style="{StaticResource TopBarButton}">
-                        <materialDesign:PackIcon Kind="Menu"
+                            <materialDesign:PackIcon Kind="Menu"
                                                  Width="24"
                                                  Height="24" />
-                    </Button>
-                </Grid>
-            </Border>
+                        </Button>
+                    </Grid>
+                </Border>
 
-            <!-- 본문 영역:
-                 왼쪽 카메라 화면, 오른쪽 시스템 현황/상황 분석/시스템 로그 패널 -->
-            <Grid Grid.Row="1"
-                  Margin="0,12,0,0">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="2.4*" />
-                    <ColumnDefinition Width="1.02*" />
-                </Grid.ColumnDefinitions>
+                <!-- 蹂몃Ц ?곸뿭:
+                 ?쇱そ 移대찓???붾㈃, ?ㅻⅨ履??쒖뒪???꾪솴/?곹솴 遺꾩꽍/?쒖뒪??濡쒓렇 ?⑤꼸 -->
+                <Grid Grid.Row="1"
+                  Margin="0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="250" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="360" />
+                    </Grid.ColumnDefinitions>
 
-                <!-- 카메라 패널:
-                     EO 주 화면, IR 인셋 화면, 모터 조작 버튼, 전자 줌 UI를 포함함. -->
-                <Border x:Name="CameraPanel"
-                        Grid.Column="0"
-                        Margin="0,0,12,0"
+                    <Grid Grid.Column="0"
+                      Margin="0,0,12,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="74" />
+                            <RowDefinition Height="150" />
+                            <RowDefinition Height="128" />
+                            <RowDefinition Height="138" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+
+                        <Button Grid.Row="0"
+                            Margin="0,0,0,12"
+                            Command="{Binding TogglePowerCommand}"
+                            Style="{StaticResource TopBarButton}">
+                            <StackPanel Orientation="Horizontal"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center">
+                                <TextBlock Text="{Binding PowerButtonText}" />
+                                <Ellipse Width="10"
+                                     Height="10"
+                                     Margin="8,1,0,0"
+                                     VerticalAlignment="Center"
+                                     Fill="{Binding CurrentThreatBrush}" />
+                            </StackPanel>
+                        </Button>
+
+                        <Border Grid.Row="1"
+                            Margin="0,0,0,12"
+                            Style="{StaticResource GlassCardBorder}"
+                            Background="#FF05070A">
+                            <Grid Margin="12">
+                                <Border Width="108"
+                                    Height="25"
+                                    HorizontalAlignment="Left"
+                                    VerticalAlignment="Top"
+                                    Style="{StaticResource OverlayCardBorder}"
+                                    BorderThickness="0"
+                                    Padding="7,3">
+                                    <DockPanel LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                               Text="CAM 1"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="12"
+                                               FontWeight="Bold" />
+                                        <Button DockPanel.Dock="Right"
+                                            Margin="8,0,0,0"
+                                            Tag="CAM 1"
+                                            Click="RotateAuxCameraButton_OnClick"
+                                            Style="{StaticResource InlineRotateButton}">
+                                            <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
+                                        </Button>
+                                    </DockPanel>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="2"
+                            Style="{StaticResource GlassCardBorder}">
+                            <Grid Margin="10,8">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Center"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           FontSize="17"
+                                           FontWeight="Bold"
+                                           Text="{Binding Text[MotorPosition]}" />
+                                    <Button Grid.Column="1"
+                                        Width="58"
+                                        Height="23"
+                                        Padding="6,1"
+                                        FontSize="10"
+                                        FontWeight="SemiBold"
+                                        Command="{Binding ToggleMotorDetailsCommand}"
+                                        Style="{StaticResource TopBarSmallButton}"
+                                        Content="{Binding Text[Details]}" />
+                                </Grid>
+                                <Grid Grid.Row="1" Margin="0,8,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0"
+                                        Margin="0,0,4,0"
+                                        Padding="7,5"
+                                        Background="{DynamicResource OverlayPanelBrush}"
+                                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="2">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   FontSize="15"
+                                                   FontWeight="Bold"
+                                                   TextAlignment="Center"
+                                                   Text="Pan" />
+                                            <TextBlock Grid.Row="1"
+                                                   HorizontalAlignment="Stretch"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   FontSize="26"
+                                                   FontWeight="Bold"
+                                                   TextAlignment="Center"
+                                                   Text="{Binding PanMotorPositionText}" />
+                                        </Grid>
+                                    </Border>
+
+                                    <Border Grid.Column="1"
+                                        Margin="4,0,0,0"
+                                        Padding="7,5"
+                                        Background="{DynamicResource OverlayPanelBrush}"
+                                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="2">
+                                        <Grid>
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="Auto" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+                                            <TextBlock HorizontalAlignment="Center"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   FontSize="15"
+                                                   FontWeight="Bold"
+                                                   TextAlignment="Center"
+                                                   Text="Tilt" />
+                                            <TextBlock Grid.Row="1"
+                                                   HorizontalAlignment="Stretch"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   FontSize="26"
+                                                   FontWeight="Bold"
+                                                   TextAlignment="Center"
+                                                   Text="{Binding TiltMotorPositionText}" />
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="3"
+                            Margin="0,12,0,0"
+                            Style="{StaticResource GlassCardBorder}">
+                            <Grid Margin="10"
+                              IsEnabled="{Binding CanUseMotorTargetControls}">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Text="{Binding Text[MotorTarget]}" />
+                                <Grid Grid.Row="1" Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="34" />
+                                        <ColumnDefinition Width="62" />
+                                        <ColumnDefinition Width="14" />
+                                        <ColumnDefinition Width="34" />
+                                        <ColumnDefinition Width="62" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           FontSize="15"
+                                           FontWeight="Bold"
+                                           Text="Pan" />
+                                    <TextBox Grid.Column="1"
+                                         Height="29"
+                                         Padding="5,3"
+                                         FontSize="12"
+                                         Foreground="{DynamicResource PrimaryTextBrush}"
+                                         Background="{DynamicResource OverlayPanelBrush}"
+                                         BorderBrush="{DynamicResource PanelBorderBrush}"
+                                         Text="{Binding MotorTargetPanText, UpdateSourceTrigger=PropertyChanged}" />
+                                    <TextBlock Grid.Column="3"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           FontSize="15"
+                                           FontWeight="Bold"
+                                           Text="Tilt" />
+                                    <TextBox Grid.Column="4"
+                                         Height="29"
+                                         Padding="5,3"
+                                         FontSize="12"
+                                         Foreground="{DynamicResource PrimaryTextBrush}"
+                                         Background="{DynamicResource OverlayPanelBrush}"
+                                         BorderBrush="{DynamicResource PanelBorderBrush}"
+                                         Text="{Binding MotorTargetTiltText, UpdateSourceTrigger=PropertyChanged}" />
+                                </Grid>
+                                <Button Grid.Row="2"
+                                    Height="29"
+                                    Margin="0,12,0,0"
+                                    Command="{Binding SendMotorTargetCommand}"
+                                    Style="{StaticResource TopBarSmallButton}"
+                                    Content="Enter" Click="Button_Click_2" />
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Row="4"
+                            Margin="0,12,0,0"
+                            Style="{StaticResource GlassCardBorder}">
+                            <Grid Margin="10"
+                              VerticalAlignment="Top">
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                       FontSize="16"
+                                       FontWeight="Bold"
+                                       Text="Step Size (+/-)" />
+                                <Grid Grid.Row="1" Margin="0,10,0,0">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Button Height="24" Padding="6,1" FontSize="12" FontWeight="Bold" HorizontalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Pan:Reset" Style="{StaticResource TopBarSmallButton}" Content="Auto Pan" />
+                                        <Grid Grid.Row="1" Margin="0,6,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="7" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="7" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button Grid.Column="0" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Pan:-1" Style="{StaticResource TopBarButton}" Content="-" />
+                                            <Border Grid.Column="2" Height="33" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
+                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="20" FontWeight="Bold" Text="{Binding AutoPanMotorStepSizeText}" />
+                                            </Border>
+                                            <Button Grid.Column="4" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Pan:1" Style="{StaticResource TopBarButton}" Content="+" />
+                                        </Grid>
+                                        <Button Grid.Row="2" Margin="0,8,0,0" Height="24" Padding="6,1" FontSize="12" FontWeight="Bold" HorizontalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Tilt:Reset" Style="{StaticResource TopBarSmallButton}" Content="Auto Tilt" />
+                                        <Grid Grid.Row="3" Margin="0,6,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="7" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="7" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button Grid.Column="0" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Tilt:-1" Style="{StaticResource TopBarButton}" Content="-" />
+                                            <Border Grid.Column="2" Height="33" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
+                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="20" FontWeight="Bold" Text="{Binding AutoTiltMotorStepSizeText}" />
+                                            </Border>
+                                            <Button Grid.Column="4" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Tilt:1" Style="{StaticResource TopBarButton}" Content="+" />
+                                        </Grid>
+                                    </Grid>
+
+                                    <Grid Grid.Row="1" Margin="0,14,0,0">
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
+                                        </Grid.RowDefinitions>
+                                        <Button Height="24" Padding="6,1" FontSize="12" FontWeight="Bold" HorizontalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Pan:Reset" Style="{StaticResource TopBarSmallButton}" Content="Manual Pan" />
+                                        <Grid Grid.Row="1" Margin="0,6,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="7" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="7" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button Grid.Column="0" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Pan:-1" Style="{StaticResource TopBarButton}" Content="-" />
+                                            <Border Grid.Column="2" Height="33" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
+                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="20" FontWeight="Bold" Text="{Binding ManualPanMotorStepSizeText}" />
+                                            </Border>
+                                            <Button Grid.Column="4" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Pan:1" Style="{StaticResource TopBarButton}" Content="+" />
+                                        </Grid>
+                                        <Button Grid.Row="2" Margin="0,8,0,0" Height="24" Padding="6,1" FontSize="12" FontWeight="Bold" HorizontalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Tilt:Reset" Style="{StaticResource TopBarSmallButton}" Content="Manual Tilt" />
+                                        <Grid Grid.Row="3" Margin="0,6,0,0">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="7" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="7" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button Grid.Column="0" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Tilt:-1" Style="{StaticResource TopBarButton}" Content="-" />
+                                            <Border Grid.Column="2" Height="33" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
+                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="20" FontWeight="Bold" Text="{Binding ManualTiltMotorStepSizeText}" />
+                                            </Border>
+                                            <Button Grid.Column="4" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Tilt:1" Style="{StaticResource TopBarButton}" Content="+" />
+                                        </Grid>
+                                    </Grid>
+                                </Grid>
+                                <TextBlock Grid.Row="2"
+                                       Margin="0,4,0,3"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                       FontSize="13"
+                                       FontWeight="SemiBold"
+                                       ><Run Text="A"/><Run Text="uto"/><Run Text=" "/><Run Text=": + / -&#xA;"/><Run Language="ko-kr" Text="M"/><Run Text="anual"/><Run Text=" "/><Run Text=": Ctrl + / -"/></TextBlock>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <!-- 移대찓???⑤꼸:
+                     EO 二??붾㈃, IR ?몄뀑 ?붾㈃, 紐⑦꽣 議곗옉 踰꾪듉, ?꾩옄 以?UI瑜??ы븿?? -->
+                    <Grid Grid.Column="1"
+                      Margin="0,0,12,0">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="*" />
+                            <RowDefinition Height="150" />
+                        </Grid.RowDefinitions>
+
+                        <Border x:Name="CameraPanel"
+                        Grid.Row="0"
+                        Margin="0,0,0,8"
                         Style="{StaticResource GlassCardBorder}"
                         BorderBrush="#00000000"
                         CornerRadius="2">
-                    <Grid x:Name="CameraViewport"
+                            <Grid x:Name="CameraViewport"
                           ClipToBounds="True"
                           SizeChanged="CameraViewport_OnSizeChanged"
                           MouseLeftButtonDown="CameraViewport_OnMouseLeftButtonDown"
                           MouseWheel="CameraViewport_OnMouseWheel"
                           MouseMove="CameraViewport_OnMouseMove"
                           MouseLeftButtonUp="CameraViewport_OnMouseLeftButtonUp">
-                        <Rectangle Fill="{DynamicResource SurfaceAltBrush}" />
+                                <Rectangle Fill="{DynamicResource SurfaceAltBrush}" />
 
-                        <!-- LargeFeedImage는 크게 보여줄 카메라 영상 바인딩임.
-                             EO/IR 스왑 상태에 따라 표시 영상이 달라짐. -->
-                        <Image Source="{Binding LargeFeedImage}"
+                                <!-- LargeFeedImage???ш쾶 蹂댁뿬以?移대찓???곸긽 諛붿씤?⑹엫.
+                             EO/IR ?ㅼ솑 ?곹깭???곕씪 ?쒖떆 ?곸긽???щ씪吏? -->
+                                <Image Source="{Binding LargeFeedImage}"
                                Margin="0"
-                               Stretch="UniformToFill"
+                               Stretch="{Binding LargeFeedStretch}"
+                               RenderOptions.BitmapScalingMode="HighQuality"
                                HorizontalAlignment="Center"
                                VerticalAlignment="Center"
                                RenderTransformOrigin="0.5,0.5">
-                            <Image.RenderTransform>
-                                <TransformGroup>
-                                    <ScaleTransform ScaleX="{Binding LargeFeedScale}"
+                                    <Image.RenderTransform>
+                                        <TransformGroup>
+                                            <RotateTransform Angle="{Binding LargeFeedRotationAngle}" />
+                                            <ScaleTransform ScaleX="{Binding LargeFeedScale}"
                                                     ScaleY="{Binding LargeFeedScale}" />
-                                    <TranslateTransform X="{Binding ZoomTransformX}"
+                                            <TranslateTransform X="{Binding ZoomTransformX}"
                                                         Y="{Binding ZoomTransformY}" />
-                                </TransformGroup>
-                            </Image.RenderTransform>
-                        </Image>
+                                        </TransformGroup>
+                                    </Image.RenderTransform>
+                                </Image>
 
-                        <!-- 좌상단 라벨은 현재 큰 화면의 카메라 종류 표시임. -->
-                        <Border Margin="16,12,0,0"
+                                <!-- 醫뚯긽???쇰꺼? ?꾩옱 ???붾㈃??移대찓??醫낅쪟 ?쒖떆?? -->
+                                <Border Margin="16,12,0,0"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Top"
                                 Style="{StaticResource OverlayCardBorder}"
                                 BorderThickness="0"
                                 CornerRadius="2"
                                 Padding="8,4">
-                            <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
-                                       FontSize="17"
-                                       FontWeight="Bold"
-                                       Text="{Binding LargeFeedTitle}" />
-                        </Border>
+                                    <DockPanel LastChildFill="False">
+                                        <TextBlock DockPanel.Dock="Left"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           FontSize="17"
+                                           FontWeight="Bold"
+                                           Text="{Binding LargeFeedTitle}" />
+                                        <Button DockPanel.Dock="Right"
+                                        Margin="10,0,0,0"
+                                        Click="RotateLargeFeedButton_OnClick"
+                                        Style="{StaticResource InlineRotateButton}">
+                                            <materialDesign:PackIcon Kind="RotateRight" Width="14" Height="14" />
+                                        </Button>
+                                    </DockPanel>
+                                </Border>
 
-                        <!-- 전자 줌 미니맵:
-                             확대 중 전체 화면 대비 현재 보고 있는 영역을 작은 지도처럼 표시함. -->
-                        <Border Width="152"
+                                <!-- ?꾩옄 以?誘몃땲留?
+                             ?뺣? 以??꾩껜 ?붾㈃ ?鍮??꾩옱 蹂닿퀬 ?덈뒗 ?곸뿭???묒? 吏?꾩쿂???쒖떆?? -->
+                                <Border Width="152"
                                 Height="108"
                                 Margin="18,0,0,20"
                                 HorizontalAlignment="Left"
@@ -347,32 +754,32 @@
                                 Style="{StaticResource OverlayCardBorder}"
                                 CornerRadius="2"
                                 Visibility="{Binding ShowZoomMiniMap, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <Grid Margin="10">
-                                <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
+                                    <Grid Margin="10">
+                                        <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
                                            FontSize="11"
-                                           Text="Zoom 미니맵" />
-                                <Canvas Width="130"
+                                           Text="{Binding Text[ZoomMiniMap]}" />
+                                        <Canvas Width="130"
                                         Height="74"
                                         Margin="0,18,0,0"
                                         HorizontalAlignment="Center"
                                         VerticalAlignment="Top">
-                                    <Rectangle Width="130"
+                                            <Rectangle Width="130"
                                                Height="74"
                                                Fill="#55333F4D"
                                                Stroke="#FF64748B"
                                                StrokeThickness="1" />
-                                    <Rectangle Width="{Binding MiniMapViewportWidth}"
+                                            <Rectangle Width="{Binding MiniMapViewportWidth}"
                                                Height="{Binding MiniMapViewportHeight}"
                                                Canvas.Left="{Binding MiniMapViewportLeft}"
                                                Canvas.Top="{Binding MiniMapViewportTop}"
                                                Fill="#3300FFAA"
                                                Stroke="{DynamicResource AccentBrush}"
                                                StrokeThickness="1.5" />
-                                </Canvas>
-                            </Grid>
-                        </Border>
+                                        </Canvas>
+                                    </Grid>
+                                </Border>
 
-                        <Canvas x:Name="DetectionOverlayCanvas"
+                                <Canvas x:Name="DetectionOverlayCanvas"
                                 Width="{Binding ElementName=CameraViewport, Path=ActualWidth}"
                                 Height="{Binding ElementName=CameraViewport, Path=ActualHeight}"
                                 HorizontalAlignment="Stretch"
@@ -381,20 +788,20 @@
                                 ClipToBounds="True"
                                 RenderTransformOrigin="0.5,0.5"
                                 IsHitTestVisible="False">
-                            <Canvas.RenderTransform>
-                                <TransformGroup>
-                                    <ScaleTransform ScaleX="{Binding LargeFeedScale}"
+                                    <Canvas.RenderTransform>
+                                        <TransformGroup>
+                                            <ScaleTransform ScaleX="{Binding LargeFeedScale}"
                                                     ScaleY="{Binding LargeFeedScale}" />
-                                    <TranslateTransform X="{Binding ZoomTransformX}"
+                                            <TranslateTransform X="{Binding ZoomTransformX}"
                                                         Y="{Binding ZoomTransformY}" />
-                                </TransformGroup>
-                            </Canvas.RenderTransform>
-                        </Canvas>
+                                        </TransformGroup>
+                                    </Canvas.RenderTransform>
+                                </Canvas>
 
-                        <!-- IR/EO 인셋 화면:
-                             작은 화면 클릭 시 큰 화면과 스왑되는 입력 영역임. -->
-                        <Button Width="168"
-                                Height="126"
+                                <!-- IR/EO ?몄뀑 ?붾㈃:
+                             ?묒? ?붾㈃ ?대┃ ?????붾㈃怨??ㅼ솑?섎뒗 ?낅젰 ?곸뿭?? -->
+                                <Button Width="168"
+                                Height="124"
                                 Margin="0,8,26,0"
                                 HorizontalAlignment="Right"
                                 VerticalAlignment="Top"
@@ -402,106 +809,162 @@
                                 Background="Transparent"
                                 BorderThickness="0"
                                 Padding="0">
-                            <!-- IR 인셋은 영상만 보이도록 내부 배경과 테두리를 제거함. -->
-                            <Border Background="Transparent"
+                                    <!-- IR ?몄뀑? ?곸긽留?蹂댁씠?꾨줉 ?대? 諛곌꼍怨??뚮몢由щ? ?쒓굅?? -->
+                                    <Border Background="Transparent"
                                     BorderBrush="Transparent"
                                     BorderThickness="0"
                                     CornerRadius="1">
-                                <Grid ClipToBounds="True">
-                                    <Image Source="{Binding InsetFeedImage}"
-                                           Stretch="UniformToFill" />
-                                    <Border Margin="10,10,0,0"
+                                        <Grid ClipToBounds="True">
+                                            <Image Source="{Binding InsetFeedImage}"
+                                           Stretch="{Binding InsetFeedStretch}"
+                                           RenderOptions.BitmapScalingMode="HighQuality"
+                                           HorizontalAlignment="Center"
+                                           VerticalAlignment="Center"
+                                           RenderTransformOrigin="0.5,0.5">
+                                                <Image.RenderTransform>
+                                                    <RotateTransform Angle="{Binding InsetFeedRotationAngle}" />
+                                                </Image.RenderTransform>
+                                            </Image>
+                                            <Border Margin="10,10,0,0"
                                              HorizontalAlignment="Left"
                                              VerticalAlignment="Top"
                                              Style="{StaticResource OverlayCardBorder}"
                                              BorderThickness="0"
                                              CornerRadius="2"
                                              Padding="7,3">
-                                        <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
-                                                   FontSize="13"
-                                                   FontWeight="Bold"
-                                                   Text="{Binding InsetFeedTitle}" />
+                                                <DockPanel LastChildFill="False">
+                                                    <TextBlock DockPanel.Dock="Left"
+                                                       Foreground="{DynamicResource PrimaryTextBrush}"
+                                                       FontSize="13"
+                                                       FontWeight="Bold"
+                                                       Text="{Binding InsetFeedTitle}" />
+                                                    <Button DockPanel.Dock="Right"
+                                                    Margin="8,0,0,0"
+                                                    Click="RotateInsetFeedButton_OnClick"
+                                                    Style="{StaticResource InlineRotateButton}">
+                                                        <materialDesign:PackIcon Kind="RotateRight" Width="12" Height="12" />
+                                                    </Button>
+                                                </DockPanel>
+                                            </Border>
+                                        </Grid>
                                     </Border>
-                                </Grid>
-                            </Border>
-                        </Button>
+                                </Button>
 
-                        <!-- 모터 방향 버튼:
-                             수동 모드에서만 표시되며 이후 실제 모터 제어 명령과 연결할 위치임. -->
-                        <Grid Margin="0,0,24,26"
+                                <!-- 紐⑦꽣 諛⑺뼢 踰꾪듉:
+                             ?섎룞 紐⑤뱶?먯꽌留??쒖떆?섎ŉ ?댄썑 ?ㅼ젣 紐⑦꽣 ?쒖뼱 紐낅졊怨??곌껐???꾩튂?? -->
+                                <Grid Margin="0,0,24,26"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom"
-                              Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="Auto" />
-                            </Grid.RowDefinitions>
-                            <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                                <ColumnDefinition Width="Auto" />
-                            </Grid.ColumnDefinitions>
+                              Visibility="Collapsed">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <Border Grid.Row="0"
+                                    Grid.Column="0"
+                                    Grid.ColumnSpan="3"
+                                    Margin="0,0,0,8"
+                                    Padding="12,5"
+                                    Background="#DD05070A"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="2">
+                                        <TextBlock HorizontalAlignment="Center"
+                                           Foreground="{DynamicResource PrimaryTextBrush}"
+                                           FontSize="16"
+                                           FontWeight="Bold"
+                                           Text="{Binding Text[MotorControl]}" />
+                                    </Border>
 
-                            <Button Grid.Row="0"
+                                    <Button Grid.Row="1"
                                     Grid.Column="1"
-                                    Command="{Binding MoveMotorCommand}"
-                                    CommandParameter="Up"
+                                    Tag="Up"
                                     IsEnabled="{Binding CanUseMotorControls}"
+                                    PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                    PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                    MouseLeave="MotorButton_OnMouseLeave"
                                     Style="{StaticResource ArrowButton}">
-                                <materialDesign:PackIcon Kind="ArrowUpBold" Width="20" Height="20" />
-                            </Button>
-                            <Button Grid.Row="1"
+                                        <materialDesign:PackIcon Kind="ArrowUpBold" Width="20" Height="20" />
+                                    </Button>
+                                    <Button Grid.Row="2"
                                     Grid.Column="0"
                                     Margin="0,6,6,6"
-                                    Command="{Binding MoveMotorCommand}"
-                                    CommandParameter="Left"
+                                    Tag="Left"
                                     IsEnabled="{Binding CanUseMotorControls}"
+                                    PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                    PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                    MouseLeave="MotorButton_OnMouseLeave"
                                     Style="{StaticResource ArrowButton}">
-                                <materialDesign:PackIcon Kind="ArrowLeftBold" Width="20" Height="20" />
-                            </Button>
-                            <Button Grid.Row="1"
+                                        <materialDesign:PackIcon Kind="ArrowLeftBold" Width="20" Height="20" />
+                                    </Button>
+                                    <Button Grid.Row="2"
+                                    Grid.Column="1"
+                                    Margin="0,6,0,6"
+                                    Tag="Center"
+                                    IsEnabled="{Binding CanUseMotorControls}"
+                                    PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                    PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                    MouseLeave="MotorButton_OnMouseLeave"
+                                    Style="{StaticResource ArrowButton}">
+                                        <Ellipse Width="16"
+                                         Height="16"
+                                         Stroke="{DynamicResource PrimaryTextBrush}"
+                                         StrokeThickness="2"
+                                         Fill="Transparent" />
+                                    </Button>
+                                    <Button Grid.Row="2"
                                     Grid.Column="2"
                                     Margin="6,6,0,6"
-                                    Command="{Binding MoveMotorCommand}"
-                                    CommandParameter="Right"
+                                    Tag="Right"
                                     IsEnabled="{Binding CanUseMotorControls}"
+                                    PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                    PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                    MouseLeave="MotorButton_OnMouseLeave"
                                     Style="{StaticResource ArrowButton}">
-                                <materialDesign:PackIcon Kind="ArrowRightBold" Width="20" Height="20" />
-                            </Button>
-                            <Button Grid.Row="2"
+                                        <materialDesign:PackIcon Kind="ArrowRightBold" Width="20" Height="20" />
+                                    </Button>
+                                    <Button Grid.Row="3"
                                     Grid.Column="1"
-                                    Command="{Binding MoveMotorCommand}"
-                                    CommandParameter="Down"
+                                    Tag="Down"
                                     IsEnabled="{Binding CanUseMotorControls}"
+                                    PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown"
+                                    PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp"
+                                    MouseLeave="MotorButton_OnMouseLeave"
                                     Style="{StaticResource ArrowButton}">
-                                <materialDesign:PackIcon Kind="ArrowDownBold" Width="20" Height="20" />
-                            </Button>
-                        </Grid>
+                                        <materialDesign:PackIcon Kind="ArrowDownBold" Width="20" Height="20" />
+                                    </Button>
+                                </Grid>
 
-                        <!-- 전자 줌 패널은 배경이 과하게 길어 보이지 않도록 고정 폭으로 묶음. -->
-                        <!-- 전자 줌 패널:
-                             줌 리셋 버튼, 배율 슬라이더, 현재 배율 텍스트를 한 묶음으로 표시함. -->
-                        <Border Margin="182,0,220,18"
+                                <!-- ?꾩옄 以??⑤꼸? 諛곌꼍??怨쇳븯寃?湲몄뼱 蹂댁씠吏 ?딅룄濡?怨좎젙 ??쑝濡?臾띠쓬. -->
+                                <!-- ?꾩옄 以??⑤꼸:
+                             以?由ъ뀑 踰꾪듉, 諛곗쑉 ?щ씪?대뜑, ?꾩옱 諛곗쑉 ?띿뒪?몃? ??臾띠쓬?쇰줈 ?쒖떆?? -->
+                                <Border Margin="182,0,220,18"
                                 Padding="10,7"
                                 Width="340"
                                 HorizontalAlignment="Center"
                                 VerticalAlignment="Bottom"
                                 Style="{StaticResource OverlayCardBorder}"
                                 CornerRadius="2"
-                                Visibility="{Binding IsManualMode, Converter={StaticResource BoolToVisibilityConverter}}">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto" />
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <!-- 전자 줌 라벨은 작은 리셋 버튼임. 클릭 시 x1.0 기본 배율로 복귀함. -->
-                                <Button VerticalAlignment="Center"
+                                Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <!-- ?꾩옄 以??쇰꺼? ?묒? 由ъ뀑 踰꾪듉?? ?대┃ ??x1.0 湲곕낯 諛곗쑉濡?蹂듦??? -->
+                                        <Button VerticalAlignment="Center"
                                         Command="{Binding ResetZoomCommand}"
                                         Style="{StaticResource TopBarSmallButton}"
-                                        Content="전자 ZOOM" />
-                                <Slider Grid.Column="1"
+                                        Content="{Binding Text[CamZoom]}" />
+                                        <Slider Grid.Column="1"
                                         Margin="12,0"
                                         Minimum="1"
                                         Maximum="4"
@@ -510,159 +973,876 @@
                                         Value="{Binding ZoomLevel, UpdateSourceTrigger=PropertyChanged}"
                                         IsEnabled="{Binding CanUseZoomControls}"
                                         Style="{StaticResource ZoomSliderStyle}" />
-                                <TextBlock Grid.Column="2"
+                                        <TextBlock Grid.Column="2"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
                                            FontSize="13"
                                            Text="{Binding ZoomLevelText}" />
+                                    </Grid>
+                                </Border>
+
+                                <Border Margin="14,0,14,14"
+                                Padding="12"
+                                HorizontalAlignment="Stretch"
+                                VerticalAlignment="Bottom"
+                                Background="#CC1B2431"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="2"
+                                Panel.ZIndex="8"
+                                Visibility="Collapsed">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="44" />
+                                            <RowDefinition Height="44" />
+                                        </Grid.RowDefinitions>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="2.2*" />
+                                            <ColumnDefinition Width="1.05*" />
+                                            <ColumnDefinition Width="1.05*" />
+                                            <ColumnDefinition Width="1.2*" />
+                                            <ColumnDefinition Width="1.2*" />
+                                        </Grid.ColumnDefinitions>
+
+                                        <StackPanel Grid.Row="0"
+                                            Grid.Column="0"
+                                            Margin="0,0,12,0"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                            <Button Width="88"
+                                            Margin="0,0,10,0"
+                                            Command="{Binding ResetZoomCommand}"
+                                            Style="{StaticResource TopBarSmallButton}"
+                                        Content="{Binding Text[CamZoom]}" />
+                                            <Slider Width="210"
+                                            Minimum="1"
+                                            Maximum="4"
+                                            TickFrequency="0.1"
+                                            IsSnapToTickEnabled="False"
+                                            Value="{Binding ZoomLevel, UpdateSourceTrigger=PropertyChanged}"
+                                            IsEnabled="{Binding CanUseZoomControls}" />
+                                            <TextBlock Margin="8,0,0,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource SecondaryTextBrush}"
+                                               FontSize="12"
+                                               Text="{Binding ZoomLevelText}" />
+                                        </StackPanel>
+
+                                        <Button Grid.Row="0"
+                                        Grid.Column="1"
+                                        Margin="4,0"
+                                        Command="{Binding SetModeCommand}"
+                                        CommandParameter="&#xC790;&#xB3D9;"
+                                        IsHitTestVisible="{Binding CanSelectAutoMode}"
+                                        Opacity="{Binding AutoModeOpacity}"
+                                        Style="{StaticResource TopBarButton}"
+                                        Content="{Binding Text[AutoMode]}" />
+                                        <Button Grid.Row="0"
+                                        Grid.Column="2"
+                                        Margin="4,0"
+                                        Command="{Binding SetModeCommand}"
+                                        CommandParameter="&#xC218;&#xB3D9;"
+                                        IsHitTestVisible="{Binding CanSelectManualMode}"
+                                        Opacity="{Binding ManualModeOpacity}"
+                                        Style="{StaticResource TopBarButton}"
+                                        Content="{Binding Text[ManualMode]}" />
+
+                                        <StackPanel Grid.Row="1"
+                                            Grid.Column="0"
+                                            Margin="0,0,12,0"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                            <Button Width="88"
+                                            Margin="0,0,10,0"
+                                            Command="{Binding ResetBrightnessCommand}"
+                                            Style="{StaticResource TopBarSmallButton}"
+                                            Content="{Binding BrightnessText}" />
+                                            <Slider Width="180"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Value="{Binding Brightness, UpdateSourceTrigger=PropertyChanged}"
+                                            IsEnabled="{Binding IsSystemPoweredOn}" />
+                                        </StackPanel>
+
+                                        <StackPanel Grid.Row="1"
+                                            Grid.Column="1"
+                                            Grid.ColumnSpan="2"
+                                            Margin="4,0,10,0"
+                                            Orientation="Horizontal"
+                                            VerticalAlignment="Center">
+                                            <Button Width="88"
+                                            Margin="0,0,10,0"
+                                            Command="{Binding ResetContrastCommand}"
+                                            Style="{StaticResource TopBarSmallButton}"
+                                            Content="{Binding ContrastText}" />
+                                            <Slider Width="145"
+                                            Minimum="0"
+                                            Maximum="100"
+                                            Value="{Binding Contrast, UpdateSourceTrigger=PropertyChanged}"
+                                            IsEnabled="{Binding IsSystemPoweredOn}" />
+                                        </StackPanel>
+
+                                        <Button Grid.Row="1"
+                                        Grid.Column="3"
+                                        Margin="4,0"
+                                        Command="{Binding ToggleManualRecordingCommand}"
+                                        Opacity="{Binding ManualRecordingButtonOpacity}"
+                                        IsEnabled="{Binding IsManualMode}"
+                                        Style="{StaticResource TopBarButton}"
+                                        Content="{Binding ManualRecordingButtonText}" />
+
+                                        <StackPanel Grid.Row="0"
+                                            Grid.RowSpan="2"
+                                            Grid.Column="4"
+                                            Margin="8,0,0,0"
+                                            VerticalAlignment="Center"
+                                            Orientation="Horizontal"
+                                            Opacity="{Binding RecordingIndicatorOpacity}">
+                                            <Ellipse Width="12"
+                                             Height="12"
+                                             Margin="0,0,8,0"
+                                             Fill="{Binding RecordingIndicatorBrush}" />
+                                            <TextBlock VerticalAlignment="Center"
+                                               Foreground="{Binding RecordingTextBrush}"
+                                               FontSize="13"
+                                               FontWeight="SemiBold"
+                                               Text="{Binding Text[RecordingStatus]}" />
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <!-- ?곗륫 ?뺣낫 ?⑤꼸:
+                     ?쒖뒪???꾪솴, ?곹솴 遺꾩꽍, ?쒖뒪??濡쒓렇瑜??몃줈濡?諛곗튂?? -->
+                        <Border Grid.Row="1"
+                            Padding="14,12"
+                            Style="{StaticResource GlassCardBorder}"
+                            CornerRadius="2">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="2.15*" />
+                                    <ColumnDefinition Width="1.05*" />
+                                    <ColumnDefinition Width="1.05*" />
+                                    <ColumnDefinition Width="1.25*" />
+                                    <ColumnDefinition Width="1.25*" />
+                                </Grid.ColumnDefinitions>
+
+                                <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,6,0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Width="92" Margin="0,0,10,0" Command="{Binding ResetContrastCommand}" Style="{StaticResource TopBarSmallButton}" Content="{Binding ContrastText}" />
+                                    <Slider Width="220" Minimum="0" Maximum="100" Value="{Binding Contrast, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsSystemPoweredOn}" Style="{StaticResource TopBarCompactSlider}" />
+                                </StackPanel>
+
+                                <Button Grid.Row="0" Grid.Column="1" Margin="6,0" Command="{Binding SetModeCommand}" CommandParameter="&#xC790;&#xB3D9;" IsHitTestVisible="{Binding CanSelectAutoMode}" Opacity="{Binding AutoModeOpacity}" Style="{StaticResource TopBarButton}" Content="{Binding Text[AutoMode]}" />
+                                <Button Grid.Row="0" Grid.Column="2" Margin="6,0" Command="{Binding SetModeCommand}" CommandParameter="&#xC218;&#xB3D9;" IsHitTestVisible="{Binding CanSelectManualMode}" Opacity="{Binding ManualModeOpacity}" Style="{StaticResource TopBarButton}" Content="{Binding Text[ManualMode]}" Click="Button_Click" />
+
+                                <StackPanel Grid.Row="1" Grid.Column="0" Margin="0,0,6,0" Orientation="Horizontal" VerticalAlignment="Center">
+                                    <Button Width="92" Margin="0,0,10,0" Command="{Binding ResetBrightnessCommand}" Style="{StaticResource TopBarSmallButton}" Content="{Binding BrightnessText}" />
+                                    <Slider Width="220" Minimum="0" Maximum="100" Value="{Binding Brightness, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding IsSystemPoweredOn}" Style="{StaticResource TopBarCompactSlider}" />
+                                </StackPanel>
+
+                                <Grid Grid.Row="2" Grid.Column="0" Margin="0,0,6,0" VerticalAlignment="Center">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="92" />
+                                        <ColumnDefinition Width="10" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="10" />
+                                        <ColumnDefinition Width="44" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0" Command="{Binding ResetZoomCommand}" Style="{StaticResource TopBarSmallButton}" Content="{Binding Text[CamZoom]}" />
+                                    <Slider Grid.Column="2" Minimum="1" Maximum="4" TickFrequency="0.1" IsSnapToTickEnabled="False" Value="{Binding ZoomLevel, UpdateSourceTrigger=PropertyChanged}" IsEnabled="{Binding CanUseZoomControls}" Style="{StaticResource TopBarCompactSlider}" />
+                                    <TextBlock Grid.Column="3" VerticalAlignment="Center" Foreground="{DynamicResource SecondaryTextBrush}" FontSize="13" FontWeight="SemiBold" TextAlignment="Right" Text="{Binding ZoomLevelText}" Grid.ColumnSpan="2" Margin="3,0,7,0" />
+                                </Grid>
+
+                                <Button Grid.Row="1"
+                                    Grid.RowSpan="2"
+                                    Grid.Column="1"
+                                    Grid.ColumnSpan="2"
+                                    Margin="6,4"
+                                    Command="{Binding ToggleTrackingModeCommand}"
+                                    Opacity="{Binding TrackingModeOpacity}"
+                                    Style="{StaticResource TopBarButton}"
+                                    Content="{Binding TrackingModeText}" />
+
+                                <Border Grid.Row="0"
+                                    Grid.RowSpan="3"
+                                    Grid.Column="3"
+                                    Margin="6,0"
+                                    Padding="8,6"
+                                    Background="{DynamicResource OverlayPanelBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="2"
+                                    Opacity="{Binding MotorControlsOpacity}"
+                                    IsEnabled="{Binding CanUseMotorControls}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="11"
+                                               FontWeight="Bold"
+                                               Text="{Binding Text[MotorControl]}" />
+                                        <Grid Grid.Row="1"
+                                          Width="112"
+                                          Height="98"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="30" />
+                                                <RowDefinition Height="34" />
+                                                <RowDefinition Height="30" />
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="38" />
+                                                <ColumnDefinition Width="36" />
+                                                <ColumnDefinition Width="38" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="MotorPadUpButton" Grid.Row="0" Grid.Column="1" Tag="Up" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                                <materialDesign:PackIcon Kind="ArrowUpBold" Width="14" Height="14" />
+                                            </Button>
+                                            <Button x:Name="MotorPadLeftButton" Grid.Row="1" Grid.Column="0" Tag="Left" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                                <materialDesign:PackIcon Kind="ArrowLeftBold" Width="14" Height="14" />
+                                            </Button>
+                                            <Button x:Name="MotorPadCenterButton" Grid.Row="1" Grid.Column="1" Tag="Center" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                                <Ellipse Width="11" Height="11" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="1.6" Fill="Transparent" />
+                                            </Button>
+                                            <Button x:Name="MotorPadRightButton" Grid.Row="1" Grid.Column="2" Tag="Right" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                                <materialDesign:PackIcon Kind="ArrowRightBold" Width="14" Height="14" />
+                                            </Button>
+                                            <Button x:Name="MotorPadDownButton" Grid.Row="2" Grid.Column="1" Tag="Down" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                                <materialDesign:PackIcon Kind="ArrowDownBold" Width="14" Height="14" />
+                                            </Button>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
+
+                                <Border Grid.Row="0" Grid.RowSpan="3" Grid.Column="4" Margin="6,0,0,0" Padding="10,8" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
+                                    <StackPanel VerticalAlignment="Center">
+                                        <TextBlock Foreground="{DynamicResource PrimaryTextBrush}" FontSize="16" FontWeight="Bold" Text="{Binding Text[SystemStatus]}" />
+                                        <StackPanel Margin="0,8,0,0" Orientation="Horizontal">
+                                            <TextBlock Foreground="{DynamicResource PrimaryTextBrush}" FontSize="16" FontWeight="Bold" Text="{Binding CurrentThreatText}" />
+                                            <Ellipse Width="13" Height="13" Margin="7,3,0,0" VerticalAlignment="Top" Fill="{Binding CurrentThreatBrush}" />
+                                        </StackPanel>
+                                        <TextBlock Margin="0,5,0,0" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="16" FontWeight="Bold" Text="{Binding PrimaryTargetShortText}" />
+                                    </StackPanel>
+                                </Border>
                             </Grid>
                         </Border>
                     </Grid>
-                </Border>
 
-                <!-- 우측 정보 패널:
-                     시스템 현황, 상황 분석, 시스템 로그를 세로로 배치함. -->
-                <Grid Grid.Column="1">
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="0.68*" />
-                        <RowDefinition Height="1.44*" />
-                        <RowDefinition Height="1.56*" />
-                    </Grid.RowDefinitions>
+                    <Grid Grid.Column="2">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="58" />
+                            <RowDefinition Height="1.44*" />
+                            <RowDefinition Height="1.56*" />
+                        </Grid.RowDefinitions>
 
-                    <!-- 시스템 현황 패널:
-                         위험 등급과 주 탐지체처럼 즉시 필요한 상태만 표시함. -->
-                    <Border Grid.Row="0"
+                        <Grid Grid.Row="0"
+                          Margin="0,0,0,12">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="142" />
+                                <ColumnDefinition Width="6" />
+                                <ColumnDefinition Width="152" />
+                                <ColumnDefinition Width="6" />
+                                <ColumnDefinition Width="54" />
+                            </Grid.ColumnDefinitions>
+                            <StackPanel Grid.Column="0"
+                                    HorizontalAlignment="Center"
+                                    VerticalAlignment="Center"
+                                    Orientation="Horizontal"
+                                    Opacity="{Binding RecordingIndicatorOpacity}">
+                                <Ellipse Width="12"
+                                     Height="12"
+                                     Margin="0,0,7,0"
+                                     VerticalAlignment="Center"
+                                     Fill="{Binding RecordingIndicatorBrush}" />
+                                <TextBlock
+                                       Foreground="{Binding RecordingTextBrush}"
+                                       FontSize="18"
+                                       FontWeight="Bold"
+                                       Text="{Binding Text[RecordingOn]}" />
+                            </StackPanel>
+                            <Button Grid.Column="2"
+                                Click="OpenRecordedVideosButton_OnClick"
+                                Style="{StaticResource TopBarButton}"
+                                Content="{Binding Text[RecordedData]}" />
+                            <Button Grid.Column="4"
+                                Command="{Binding ToggleSettingsCommand}"
+                                Style="{StaticResource TopBarButton}"
+                                Padding="0" Click="Button_Click_1">
+                                <materialDesign:PackIcon Kind="Cog" Width="22" Height="22" />
+                            </Button>
+                        </Grid>
+
+                        <!-- ?쒖뒪???꾪솴 ?⑤꼸:
+                         ?꾪뿕 ?깃툒怨?二??먯?泥댁쿂??利됱떆 ?꾩슂???곹깭留??쒖떆?? -->
+                        <Border Grid.Row="1"
                             Margin="0,0,0,12"
                             Style="{StaticResource GlassCardBorder}"
                             CornerRadius="2"
-                            Padding="18,12,18,12">
-                        <StackPanel>
-                            <TextBlock Style="{StaticResource PanelTitle}" Text="시스템 현황" />
-                            <StackPanel Margin="0,10,0,5"
+                            Padding="18,12,18,12"
+                            Visibility="Collapsed">
+                            <StackPanel>
+                                <TextBlock Style="{StaticResource PanelTitle}" Text="{Binding Text[SystemStatus]}" />
+                                <StackPanel Margin="0,10,0,5"
                                         Orientation="Horizontal">
-                                <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                    <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                        FontSize="18"
                                        FontWeight="Bold"
-                                       Text="{Binding CurrentThreatText}" />                
-                                <Ellipse Width="14"
+                                       Text="{Binding CurrentThreatText}" />
+                                    <Ellipse Width="14"
                                         Height="14"
                                         Margin="5,5,10,0"
                                         VerticalAlignment="Top"
                                         Fill="{Binding CurrentThreatBrush}" />
 
-                            </StackPanel>
-                            <TextBlock Margin="0,5,0,5"
+                                </StackPanel>
+                                <TextBlock Margin="0,5,0,5"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        FontSize="18"
                                        FontWeight="Bold"
                                        TextWrapping="Wrap"
-                                       Text="{Binding PrimaryTargetText}" />
-                        </StackPanel>
-                    </Border>
+                                       Text="{Binding PrimaryTargetShortText}" />
+                            </StackPanel>
+                        </Border>
 
-                    <!-- 상황 분석 패널:
-                         향후 VLM 분석 문장을 실시간으로 누적 표시할 영역임. -->
-                    <Border Grid.Row="1"
+                        <!-- ?곹솴 遺꾩꽍 ?⑤꼸:
+                         ?ν썑 VLM 遺꾩꽍 臾몄옣???ㅼ떆媛꾩쑝濡??꾩쟻 ?쒖떆???곸뿭?? -->
+                        <Border Grid.Row="1"
                             Margin="0,0,0,12"
                             Style="{StaticResource GlassCardBorder}"
                             CornerRadius="2"
                             Padding="18,14,18,14">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
-                            <TextBlock Style="{StaticResource PanelTitle}" Text="상황 분석" />
-                            <ListBox Grid.Row="1"
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource PanelTitle}" Text="{Binding Text[AnalysisPanel]}" />
+                                    <Button Grid.Column="1"
+                                        Padding="10,4"
+                                        FontSize="11"
+                                        FontWeight="SemiBold"
+                                        Style="{StaticResource TopBarSmallButton}"
+                                        Command="{Binding SaveAnalysisLogsCommand}"
+                                        Content="{Binding Text[Save]}" />
+                                </Grid>
+                                <ListBox Grid.Row="1"
                                      Margin="0,10,0,0"
                                      ItemsSource="{Binding AnalysisItems}"
                                      Background="Transparent"
                                      BorderThickness="0">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Margin="0,0,0,10"
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,10"
                                                 Padding="12"
                                                 Background="{DynamicResource DrawerItemBrush}"
                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="1">
-                                            <StackPanel>
-                                                <TextBlock Foreground="{DynamicResource WarningBrush}"
+                                                <StackPanel>
+                                                    <TextBlock Foreground="{DynamicResource WarningBrush}"
                                                            FontSize="11"
                                                            Text="{Binding Time}" />
-                                                <TextBlock Margin="0,6,0,0"
+                                                    <TextBlock Margin="0,6,0,0"
                                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                                            FontSize="14"
                                                            TextWrapping="Wrap"
                                                            Text="{Binding Message}" />
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Grid>
-                    </Border>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+                        </Border>
 
-                    <!-- 시스템 로그 패널:
-                         중요한 모드 변경, 저장, 경고 이벤트만 남기는 운영 로그 영역임. -->
-                    <Border Grid.Row="2"
+                        <!-- ?쒖뒪??濡쒓렇 ?⑤꼸:
+                         以묒슂??紐⑤뱶 蹂寃? ??? 寃쎄퀬 ?대깽?몃쭔 ?④린???댁쁺 濡쒓렇 ?곸뿭?? -->
+                        <Border Grid.Row="2"
                             Style="{StaticResource GlassCardBorder}"
                             CornerRadius="2"
                             Padding="18,14,18,14">
-                        <Grid>
-                            <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
-                                <RowDefinition Height="*" />
-                            </Grid.RowDefinitions>
                             <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="Auto" />
-                                </Grid.ColumnDefinitions>
-                                <TextBlock Style="{StaticResource PanelTitle}" Text="시스템 로그" />
-                                <Button Grid.Column="1"
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Style="{StaticResource PanelTitle}" Text="{Binding Text[SystemLog]}" />
+                                    <Button Grid.Column="1"
                                         Padding="10,4"
                                         FontSize="11"
                                         FontWeight="SemiBold"
                                         Style="{StaticResource TopBarSmallButton}"
                                         Command="{Binding SaveSystemLogsCommand}"
-                                        Content="저장" />
-                            </Grid>
-                            <ListBox Grid.Row="1"
+                                        Content="{Binding Text[Save]}" />
+                                </Grid>
+                                <ListBox Grid.Row="1"
                                      Margin="0,10,0,0"
                                      ItemsSource="{Binding SystemLogs}"
                                      Background="Transparent"
                                      BorderThickness="0">
-                                <ListBox.ItemTemplate>
-                                    <DataTemplate>
-                                        <Border Margin="0,0,0,10"
+                                    <ListBox.ItemTemplate>
+                                        <DataTemplate>
+                                            <Border Margin="0,0,0,10"
                                                 Padding="12"
                                                 Background="{DynamicResource DrawerItemBrush}"
                                                 BorderBrush="{DynamicResource PanelBorderBrush}"
                                                 BorderThickness="1"
                                                 CornerRadius="1">
-                                            <StackPanel>
-                                                <TextBlock Foreground="{DynamicResource WarningBrush}"
+                                                <StackPanel>
+                                                    <TextBlock Foreground="{DynamicResource WarningBrush}"
                                                            FontSize="11"
                                                            Text="{Binding Time}" />
-                                                <TextBlock Margin="0,6,0,0"
+                                                    <TextBlock Margin="0,6,0,0"
                                                            Foreground="{DynamicResource PrimaryTextBrush}"
                                                            FontSize="14"
                                                            TextWrapping="Wrap"
                                                            Text="{Binding Message}" />
-                                            </StackPanel>
-                                        </Border>
-                                    </DataTemplate>
-                                </ListBox.ItemTemplate>
-                            </ListBox>
-                        </Grid>
-                    </Border>
+                                                </StackPanel>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ListBox.ItemTemplate>
+                                </ListBox>
+                            </Grid>
+                        </Border>
+                    </Grid>
                 </Grid>
             </Grid>
-        </Grid>
 
-        <!-- SettingsBackdrop은 설정창 뒤 배경을 어둡게 깔고 바깥 클릭 시 닫는 오버레이임. -->
-        <Rectangle x:Name="SettingsBackdrop"
+            <Border x:Name="RecordedVideosPanel"
+                Margin="64"
+                Padding="18"
+                Background="{DynamicResource DrawerBrush}"
+                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="2"
+                Visibility="Collapsed"
+                Panel.ZIndex="18">
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+                    <Grid Grid.Row="0" Margin="0,0,0,14">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="8" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                            <TextBlock Foreground="{DynamicResource DrawerTextBrush}"
+                                   FontSize="24"
+                                   FontWeight="Bold"
+                                   Text="{Binding Text[RecordedVideos]}" />
+                            <TextBlock x:Name="RecordedVideosStatusText"
+                                   Margin="16,5,0,0"
+                                   Foreground="{DynamicResource SecondaryTextBrush}"
+                                   FontSize="13"
+                                   Text="" />
+                        </StackPanel>
+                        <Button Grid.Column="1"
+                            Width="82"
+                            Padding="6,4"
+                            FontSize="12"
+                            Click="RefreshRecordedVideosButton_OnClick"
+                            Style="{StaticResource TopBarButton}"
+                            Content="{Binding Text[Refresh]}" />
+                        <Button Grid.Column="3"
+                            Width="70"
+                            Padding="6,4"
+                            FontSize="12"
+                            Click="CloseRecordedVideosButton_OnClick"
+                            Style="{StaticResource TopBarButton}"
+                            Content="{Binding Text[Close]}" />
+                    </Grid>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="300" />
+                            <ColumnDefinition Width="14" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0"
+                            Padding="12"
+                            Background="{DynamicResource OverlayPanelBrush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="2">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
+                                </Grid.RowDefinitions>
+                                <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                       FontSize="17"
+                                       FontWeight="Bold"
+                                       Text="{Binding Text[SavedVideos]}" />
+                                <ListBox x:Name="RecordedVideoList"
+                                      Grid.Row="1"
+                                      Margin="0,10,0,0"
+                                      DisplayMemberPath="DisplayName"
+                                     SelectionChanged="RecordedVideoList_OnSelectionChanged"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{DynamicResource PrimaryTextBrush}" />
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="2"
+                            Padding="12"
+                            Background="{DynamicResource OverlayPanelBrush}"
+                            BorderBrush="{DynamicResource PanelBorderBrush}"
+                            BorderThickness="1"
+                            CornerRadius="2">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*" />
+                                    <RowDefinition Height="34" />
+                                    <RowDefinition Height="52" />
+                                </Grid.RowDefinitions>
+                                <Grid x:Name="RecordedVideoViewport"
+                                  Grid.Row="0"
+                                  Background="#FF000000"
+                                  ClipToBounds="True"
+                                  MouseWheel="RecordedVideoViewport_OnMouseWheel"
+                                  MouseLeftButtonDown="RecordedVideoViewport_OnMouseLeftButtonDown"
+                                  MouseMove="RecordedVideoViewport_OnMouseMove"
+                                  MouseLeftButtonUp="RecordedVideoViewport_OnMouseLeftButtonUp">
+                                    <MediaElement x:Name="RecordedVideoPlayer"
+                                              LoadedBehavior="Manual"
+                                              UnloadedBehavior="Manual"
+                                              Stretch="Uniform"
+                                              ScrubbingEnabled="True"
+                                              RenderTransformOrigin="0.5,0.5"
+                                              MediaOpened="RecordedVideoPlayer_OnMediaOpened"
+                                              MediaEnded="RecordedVideoPlayer_OnMediaEnded"
+                                              MediaFailed="RecordedVideoPlayer_OnMediaFailed"
+                                              Volume="0.9">
+                                        <MediaElement.RenderTransform>
+                                            <TransformGroup>
+                                                <ScaleTransform x:Name="RecordedVideoScaleTransform" ScaleX="1" ScaleY="1" />
+                                                <TranslateTransform x:Name="RecordedVideoTranslateTransform" X="0" Y="0" />
+                                            </TransformGroup>
+                                        </MediaElement.RenderTransform>
+                                    </MediaElement>
+
+                                    <Border x:Name="RecordedVideoZoomMiniMap"
+                                        Width="142"
+                                        Height="92"
+                                        Margin="12"
+                                        HorizontalAlignment="Left"
+                                        VerticalAlignment="Bottom"
+                                        Background="#CC111827"
+                                        BorderBrush="{DynamicResource PanelBorderBrush}"
+                                        BorderThickness="1"
+                                        CornerRadius="2"
+                                        Visibility="Collapsed">
+                                        <Grid Margin="10">
+                                            <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
+                                                   FontSize="11"
+                                                   Text="Zoom" />
+                                            <Canvas Width="120"
+                                                Height="62"
+                                                Margin="0,18,0,0"
+                                                HorizontalAlignment="Center"
+                                                VerticalAlignment="Top">
+                                                <Rectangle Width="120"
+                                                       Height="62"
+                                                       Fill="#55333F4D"
+                                                       Stroke="#FF64748B"
+                                                       StrokeThickness="1" />
+                                                <Rectangle x:Name="RecordedVideoMiniMapViewport"
+                                                       Width="120"
+                                                       Height="62"
+                                                       Fill="#2200FFAA"
+                                                       Stroke="{DynamicResource AccentBrush}"
+                                                       StrokeThickness="1.5" />
+                                            </Canvas>
+                                        </Grid>
+                                    </Border>
+                                </Grid>
+                                <Grid Grid.Row="1" Margin="0,10,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="58" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="58" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock x:Name="RecordedVideoCurrentTimeText"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           FontSize="12"
+                                           Text="00:00" />
+                                    <Slider x:Name="RecordedVideoPositionSlider"
+                                        Grid.Column="1"
+                                        Margin="10,0"
+                                        Height="22"
+                                        Minimum="0"
+                                        Maximum="1"
+                                        Style="{x:Null}"
+                                        ValueChanged="RecordedVideoPositionSlider_OnValueChanged"
+                                        PreviewMouseLeftButtonDown="RecordedVideoPositionSlider_OnPreviewMouseLeftButtonDown"
+                                        PreviewMouseLeftButtonUp="RecordedVideoPositionSlider_OnPreviewMouseLeftButtonUp" />
+                                    <TextBlock x:Name="RecordedVideoDurationText"
+                                           Grid.Column="2"
+                                           HorizontalAlignment="Right"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource SecondaryTextBrush}"
+                                           FontSize="12"
+                                           Text="00:00" />
+                                </Grid>
+                                <Grid Grid.Row="2" Margin="0,12,0,0">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="42" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="42" />
+                                        <ColumnDefinition Width="8" />
+                                        <ColumnDefinition Width="42" />
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="138" />
+                                    </Grid.ColumnDefinitions>
+                                    <Button Grid.Column="0"
+                                        Click="RecordedVideoPlayButton_OnClick"
+                                        Style="{StaticResource PlaybackIconButton}">
+                                        <materialDesign:PackIcon Kind="Play" Width="22" Height="22" />
+                                    </Button>
+                                    <Button Grid.Column="2"
+                                        Click="RecordedVideoPauseButton_OnClick"
+                                        Style="{StaticResource PlaybackIconButton}">
+                                        <materialDesign:PackIcon Kind="Pause" Width="22" Height="22" />
+                                    </Button>
+                                    <Button Grid.Column="4"
+                                        Click="RecordedVideoStopButton_OnClick"
+                                        Style="{StaticResource PlaybackIconButton}">
+                                        <materialDesign:PackIcon Kind="Stop" Width="22" Height="22" />
+                                    </Button>
+                                    <StackPanel Grid.Column="5"
+                                            Margin="12,0"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,8,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                   Text="Zoom" />
+                                        <Button x:Name="RecordedVideoZoomResetButton"
+                                            Width="58"
+                                            Height="28"
+                                            Padding="4,0"
+                                            Click="RecordedVideoZoomResetButton_OnClick"
+                                            Style="{StaticResource TopBarSmallButton}"
+                                            Content="x1.00" />
+                                        <Slider x:Name="RecordedVideoZoomSlider"
+                                            Width="120"
+                                            Margin="8,0,0,0"
+                                            Minimum="1"
+                                            Maximum="4"
+                                            Value="1"
+                                            TickFrequency="0.1"
+                                            Style="{x:Null}"
+                                            ValueChanged="RecordedVideoZoomSlider_OnValueChanged" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="6"
+                                            HorizontalAlignment="Right"
+                                            VerticalAlignment="Center"
+                                            Orientation="Horizontal">
+                                        <TextBlock Margin="0,0,8,0"
+                                               VerticalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                   Text="Speed" />
+                                        <ComboBox x:Name="PlaybackSpeedCombo"
+                                              Width="82"
+                                              SelectedIndex="3"
+                                              SelectionChanged="PlaybackSpeedCombo_OnSelectionChanged"
+                                              VerticalAlignment="Center"
+                                              Height="34"
+                                              Padding="8,3"
+                                              Foreground="White"
+                                              Background="#22313A46"
+                                              BorderBrush="{DynamicResource PanelBorderBrush}">
+                                            <ComboBox.Resources>
+                                                <Style TargetType="{x:Type ComboBoxItem}">
+                                                    <Setter Property="Foreground" Value="White" />
+                                                    <Setter Property="Background" Value="#FF1F2937" />
+                                                    <Setter Property="Padding" Value="8,4" />
+                                                </Style>
+                                            </ComboBox.Resources>
+                                            <ComboBoxItem Tag="0.25" Content="0.25x" />
+                                            <ComboBoxItem Tag="0.5" Content="0.5x" />
+                                            <ComboBoxItem Tag="0.75" Content="0.75x" />
+                                            <ComboBoxItem Tag="1" Content="1.0x" />
+                                            <ComboBoxItem Tag="1.5" Content="1.5x" />
+                                            <ComboBoxItem Tag="2" Content="2.0x" />
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Border>
+
+            <Grid Visibility="{Binding IsMotorDetailsOpen, Converter={StaticResource BoolToVisibilityConverter}}"
+              Panel.ZIndex="19">
+                <Rectangle Fill="#66000000"
+                           HorizontalAlignment="Stretch"
+                           VerticalAlignment="Stretch"
+                           IsHitTestVisible="True"
+                           MouseLeftButtonDown="MotorDetailsBackdrop_OnMouseLeftButtonDown" />
+                <Border Width="720"
+                    MaxHeight="680"
+                    HorizontalAlignment="Center"
+                    VerticalAlignment="Center"
+                    Padding="22"
+                    Background="{DynamicResource DrawerBrush}"
+                    BorderBrush="{DynamicResource DrawerBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="2"
+                    Effect="{StaticResource DrawerShadow}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" />
+                        </Grid.RowDefinitions>
+                        <Grid Grid.Row="0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="Auto" />
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Foreground="{DynamicResource DrawerTextBrush}"
+                                   FontSize="24"
+                                   FontWeight="Bold"
+                                   Text="{Binding Text[MotorPosition]}" />
+                            <Button Grid.Column="1"
+                                Width="34"
+                                Height="30"
+                                Command="{Binding CloseMotorDetailsCommand}"
+                                Style="{StaticResource PlaybackIconButton}">
+                                <materialDesign:PackIcon Kind="Close" Width="18" Height="18" />
+                            </Button>
+                        </Grid>
+                        <Grid Grid.Row="1" Margin="0,18,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="18" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <Border Grid.Column="0"
+                                Padding="12"
+                                Background="{DynamicResource OverlayPanelBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="2">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Text="Pan Motor" />
+                                    <ScrollViewer Grid.Row="1" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding PanMotorStatusItems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
+                                                               FontSize="13"
+                                                               FontWeight="Bold"
+                                                               Text="{Binding Name}"
+                                                               TextWrapping="Wrap" />
+                                                        <TextBlock Grid.Column="1"
+                                                               Margin="12,0,0,0"
+                                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                                               FontSize="14"
+                                                               FontWeight="Bold"
+                                                               Text="{Binding Value}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+
+                            <Border Grid.Column="2"
+                                Padding="12"
+                                Background="{DynamicResource OverlayPanelBrush}"
+                                BorderBrush="{DynamicResource PanelBorderBrush}"
+                                BorderThickness="1"
+                                CornerRadius="2">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="*" />
+                                    </Grid.RowDefinitions>
+                                    <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
+                                           FontSize="18"
+                                           FontWeight="Bold"
+                                           Text="Tilt Motor" />
+                                    <ScrollViewer Grid.Row="1" Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                                        <ItemsControl ItemsSource="{Binding TiltMotorStatusItems}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <Grid Margin="0,0,0,8">
+                                                        <Grid.ColumnDefinitions>
+                                                            <ColumnDefinition Width="*" />
+                                                            <ColumnDefinition Width="Auto" />
+                                                        </Grid.ColumnDefinitions>
+                                                        <TextBlock Foreground="{DynamicResource SecondaryTextBrush}"
+                                                               FontSize="13"
+                                                               FontWeight="Bold"
+                                                               Text="{Binding Name}"
+                                                               TextWrapping="Wrap" />
+                                                        <TextBlock Grid.Column="1"
+                                                               Margin="12,0,0,0"
+                                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                                               FontSize="14"
+                                                               FontWeight="Bold"
+                                                               Text="{Binding Value}" />
+                                                    </Grid>
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                </Grid>
+                            </Border>
+                        </Grid>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- SettingsBackdrop? ?ㅼ젙李???諛곌꼍???대몼寃?源붽퀬 諛붽묑 ?대┃ ???ル뒗 ?ㅻ쾭?덉씠?? -->
+            <Rectangle x:Name="SettingsBackdrop"
                    Fill="#22000000"
                    Opacity="0"
                    Visibility="Collapsed"
@@ -670,9 +1850,9 @@
                    Panel.ZIndex="20"
                    MouseLeftButtonDown="SettingsBackdrop_OnMouseLeftButtonDown" />
 
-        <!-- 설정 드로어:
-             우측 슬라이드 패널이며 주 탐지체와 테마 변경 기능을 담음. -->
-        <Border x:Name="SettingsDrawer"
+            <!-- ?ㅼ젙 ?쒕줈??
+             ?곗륫 ?щ씪?대뱶 ?⑤꼸?대ŉ 二??먯?泥댁? ?뚮쭏 蹂寃?湲곕뒫???댁쓬. -->
+            <Border x:Name="SettingsDrawer"
                 Width="280"
                 Margin="0,12,12,12"
                 HorizontalAlignment="Right"
@@ -687,101 +1867,135 @@
                 Opacity="0"
                 Visibility="Collapsed"
                 Panel.ZIndex="21">
-            <Border.RenderTransform>
-                <!-- 기본 위치는 화면 오른쪽 바깥임. 열릴 때 안쪽으로 부드럽게 이동함. -->
-                <TranslateTransform x:Name="SettingsDrawerTransform" X="320" />
-            </Border.RenderTransform>
-            <Border.CacheMode>
-                <BitmapCache RenderAtScale="1" />
-            </Border.CacheMode>
-            <Grid>
-                <Grid.RowDefinitions>
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="*" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                    <RowDefinition Height="Auto" />
-                </Grid.RowDefinitions>
+                <Border.RenderTransform>
+                    <!-- 湲곕낯 ?꾩튂???붾㈃ ?ㅻⅨ履?諛붽묑?? ?대┫ ???덉そ?쇰줈 遺?쒕읇寃??대룞?? -->
+                    <TranslateTransform x:Name="SettingsDrawerTransform" X="320" />
+                </Border.RenderTransform>
+                <Border.CacheMode>
+                    <BitmapCache RenderAtScale="1" />
+                </Border.CacheMode>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                    </Grid.RowDefinitions>
 
-                <TextBlock Text="설정창"
+                    <TextBlock Text="{Binding Text[Settings]}"
                            FontSize="24"
                            FontWeight="Bold"
                            Foreground="{DynamicResource DrawerTextBrush}" />
 
-                <Border Grid.Row="1"
+                    <Border Grid.Row="1"
                         Margin="0,18,0,14"
                         BorderBrush="{DynamicResource DrawerBorderBrush}"
                         BorderThickness="0,0,0,3">
-                    <TextBlock Margin="0,0,0,10"
-                               Text="주 탐지체 변경"
+                        <TextBlock Margin="0,0,0,10"
+                               Text="{Binding Text[PrimaryTargetChange]}"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource DrawerTextBrush}" />
-                </Border>
+                    </Border>
 
-                <ItemsControl Grid.Row="2"
+                    <ItemsControl Grid.Row="2"
                               ItemsSource="{Binding PrimaryTargets}">
-                    <ItemsControl.ItemTemplate>
-                        <DataTemplate>
-                            <Button Margin="0,0,0,10"
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Button Margin="0,0,0,10"
                                     Command="{Binding DataContext.SelectPrimaryTargetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    CommandParameter="{Binding}"
+                                    CommandParameter="{Binding Value}"
                                     Style="{StaticResource SettingsActionButton}"
-                                    Content="{Binding}" />
-                        </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                </ItemsControl>
+                                    Content="{Binding DisplayName}" />
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
 
-                <Border Grid.Row="3"
+                    <Border Grid.Row="3"
                         Margin="0,8,0,12"
                         BorderBrush="{DynamicResource DrawerBorderBrush}"
                         BorderThickness="0,1,0,0">
-                    <TextBlock Margin="0,12,0,0"
-                               Text="테마 변경"
+                        <TextBlock Margin="0,12,0,0"
+                               Text="{Binding Text[ThemeChange]}"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource DrawerTextBrush}" />
-                </Border>
+                    </Border>
 
-                <Grid Grid.Row="4">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="*" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Button Grid.Column="0"
+                    <Grid Grid.Row="4">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
                             Margin="0,0,8,0"
                             Command="{Binding SetThemeCommand}"
                             CommandParameter="Dark"
                             Opacity="{Binding DarkThemeButtonOpacity}"
                             Style="{StaticResource SettingsActionButton}"
-                            Content="어두운 테마" />
-                    <Button Grid.Column="1"
+                            Content="{Binding Text[DarkTheme]}" />
+                        <Button Grid.Column="1"
                             Command="{Binding SetThemeCommand}"
                             CommandParameter="Light"
                             Opacity="{Binding LightThemeButtonOpacity}"
                             Style="{StaticResource SettingsActionButton}"
-                            Content="밝은 테마" />
-                </Grid>
+                            Content="{Binding Text[LightTheme]}" />
+                    </Grid>
 
-                <Border Grid.Row="5"
+                    <Border Grid.Row="5"
                         Margin="0,18,0,12"
                         BorderBrush="{DynamicResource DrawerBorderBrush}"
                         BorderThickness="0,1,0,0">
-                    <TextBlock Margin="0,12,0,0"
-                               Text="화면 모드"
+                        <TextBlock Margin="0,12,0,0"
+                               Text="{Binding Text[LanguageChange]}"
                                FontSize="18"
                                FontWeight="SemiBold"
                                Foreground="{DynamicResource DrawerTextBrush}" />
-                </Border>
+                    </Border>
 
-                <Button x:Name="WindowModeToggleButton"
-                        Grid.Row="6"
+                    <Grid Grid.Row="6">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Button Grid.Column="0"
+                            Margin="0,0,8,0"
+                            Command="{Binding SetLanguageCommand}"
+                            CommandParameter="English"
+                            Opacity="{Binding EnglishLanguageButtonOpacity}"
+                            Style="{StaticResource SettingsActionButton}"
+                            Content="{Binding Text[English]}" />
+                        <Button Grid.Column="1"
+                            Command="{Binding SetLanguageCommand}"
+                            CommandParameter="Korean"
+                            Opacity="{Binding KoreanLanguageButtonOpacity}"
+                            Style="{StaticResource SettingsActionButton}"
+                            Content="{Binding Text[Korean]}" />
+                    </Grid>
+
+                    <Border Grid.Row="7"
+                        Margin="0,18,0,12"
+                        BorderBrush="{DynamicResource DrawerBorderBrush}"
+                        BorderThickness="0,1,0,0">
+                        <TextBlock Margin="0,12,0,0"
+                               Text="{Binding Text[ScreenMode]}"
+                               FontSize="18"
+                               FontWeight="SemiBold"
+                               Foreground="{DynamicResource DrawerTextBrush}" />
+                    </Border>
+
+                    <Button x:Name="WindowModeToggleButton"
+                        Grid.Row="8"
                         Click="WindowModeToggleButton_OnClick"
                         Style="{StaticResource SettingsActionButton}"
-                        Content="창모드로 전환" />
-            </Grid>
-        </Border>
-    </Grid>
+                        Content="{Binding Text[WindowMode]}" />
+                </Grid>
+            </Border>
+        </Grid>
+    </Viewbox>
 </Window>
