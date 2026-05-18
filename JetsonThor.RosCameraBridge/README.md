@@ -22,7 +22,7 @@ PC 운용통제 GUI가 받을 수 있는 UDP 패킷으로 변환해 전송하는
 
 | 데이터 | 기본 토픽 | 메시지 타입 |
 | --- | --- | --- |
-| EO image | `/video/eo/preprocessed` | `sensor_msgs/msg/Image` |
+| EO image | `/camera/eo` | `sensor_msgs/msg/Image` |
 | IR image | `/camera/ir` | `sensor_msgs/msg/Image` |
 | EO track/detection | `/tracks/eo` | `sentinel_interfaces/msg/TrackedDetection2DArray` |
 | IR track/detection | `/tracks/ir` | `sentinel_interfaces/msg/TrackedDetection2DArray` |
@@ -52,7 +52,7 @@ GUI에서 별도 수신하는 UDP 포트:
 - 두 포트는 서로 다른 구간입니다.
 - VLM 결과는 영상 패킷에 묶지 않고 `6002/udp`로 분리해 GUI가 별도 스레드에서 받을 수 있게 둡니다.
 - 모터는 `8000/udp` 명령, `8001/udp` 상태 피드백을 사용합니다.
-- GUI -> Thor 모터 패킷은 9B이고, Thor -> GUI 모터 상태 패킷은 36B입니다.
+- GUI -> Thor 모터 패킷은 기존 9B 제어값 뒤에 yolo_object_id 4B를 붙인 13B이고, Thor -> GUI 모터 상태 패킷은 36B입니다.
 
 ## 파일 구성
 

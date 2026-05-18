@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Bridge ROS2 image and detection topics to the GUI UDP protocol."""
+"""Jetson ROS2 영상/탐지 토픽을 PC GUI가 이해하는 UDP 패킷으로 변환하는 bridge."""
 
 from __future__ import annotations
 
@@ -67,10 +67,12 @@ def getenv_bool(name: str, default: bool) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
 
 
+# 아래 환경변수들은 run_camera_udp_bridge.sh에서 주로 주입된다.
+# 현장 네트워크가 바뀌면 코드 수정 없이 GUI_HOST와 포트만 바꿔 실행할 수 있게 했다.
 GUI_HOST = os.getenv("GUI_HOST", "192.168.1.94")
 EO_GUI_PORT = getenv_int("EO_GUI_PORT", 6000)
 IR_GUI_PORT = getenv_int("IR_GUI_PORT", 6001)
-EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/video/eo/preprocessed")
+EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/camera/eo")
 IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
 EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/tracks/eo")
 IR_DETECTION_TOPIC = os.getenv("IR_DETECTION_TOPIC", "/tracks/ir")
@@ -212,6 +214,8 @@ def write_placeholder_video(path: Path, stream_name: str) -> None:
 def ensure_recording_segment(directory: Path, timestamp: str | None = None, create_placeholder_videos: bool = True) -> str:
     global LATEST_RECORDING_SEGMENT_NAME
 
+    # 녹화 폴더는 1분 단위 timestamp로 만들고, 영상이 아직 안 들어와도 로그/더미 파일을 먼저 생성한다.
+    # GUI에서 녹화 목록을 열었을 때 폴더 구조가 항상 보이도록 하기 위한 처리다.
     timestamp = safe_segment_name(timestamp) if timestamp else current_recording_segment_name()
     with LATEST_RECORDING_SEGMENT_LOCK:
         segment_directory = directory / timestamp
@@ -265,6 +269,8 @@ DETECTION_TOPIC_QOS = QoSProfile(
 
 
 def ros_image_to_bgr(message: Image) -> np.ndarray:
+    # ROS2 Image는 encoding에 따라 바이트 배열 해석 방법이 다르다.
+    # GUI 전송과 녹화를 단순하게 하기 위해 여기서 모두 OpenCV BGR 3채널 이미지로 통일한다.
     encoding = message.encoding.lower()
     height = int(message.height)
     width = int(message.width)
@@ -307,6 +313,8 @@ def build_image_packet(encoded_bytes: bytes, width: int, height: int, frame_inde
 
 
 def build_image_packets(encoded_bytes: bytes, width: int, height: int, frame_index: int, stamp_ns: int, packet_type: int) -> list[bytes]:
+    # 한 장의 JPEG가 UDP MTU보다 클 수 있으므로 여러 조각으로 나눈다.
+    # GUI는 frame_index와 fragment_index를 보고 다시 순서대로 합친다.
     fragment_payload_size = max(1024, MAX_UDP_PAYLOAD - SENTINEL_IMAGE_HEADER_SIZE)
     fragment_count = (len(encoded_bytes) + fragment_payload_size - 1) // fragment_payload_size
     if fragment_count > 65535:
@@ -335,6 +343,8 @@ def fixed_utf8(value: object, length: int = 16) -> bytes:
 
 
 def build_detection_packet(stamp_ns: int, frame_index: int, width: int, height: int, detections: list[dict]) -> bytes:
+    # detection은 SNTL type 0x10 패킷으로 보낸다.
+    # 현재 GUI는 track_id를 objectId로 사용하므로, 모터 추적용 객체 ID도 이 값과 동일하다.
     stamp_sec = max(0, stamp_ns) // 1_000_000_000
     stamp_nsec = max(0, stamp_ns) % 1_000_000_000
     packet = bytearray(
@@ -674,6 +684,8 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
 
 
 class StreamBridge:
+    # EO 또는 IR 한 스트림을 담당하는 객체다.
+    # ROS2 image topic을 JPEG UDP 패킷으로 바꾸고, 필요하면 같은 프레임을 녹화 파일에도 저장한다.
     def __init__(self, name: str, image_topic: str, detection_topic: str, host: str, port: int) -> None:
         self.name = name
         self.image_topic = image_topic
@@ -703,6 +715,8 @@ class StreamBridge:
                 ]
 
     def send_image(self, message: Image) -> None:
+        # ROS2에서 받은 원본 프레임을 GUI 전송용 크기/포맷으로 맞춘 뒤 JPEG 청크로 전송한다.
+        # stamp와 frame_index는 detection 패킷을 같은 프레임 위에 그리기 위한 기준으로 함께 보관한다.
         frame = ros_image_to_bgr(message)
         source_height, source_width = frame.shape[:2]
         stamp_ns = extract_stamp_ns(message.header)
@@ -746,6 +760,8 @@ class StreamBridge:
             self.sock.sendto(status_packet, (self.host, self.port))
 
     def send_detection(self, message) -> None:
+        # 현재 명세에서는 EO detection만 EO 영상 포트 6000으로 함께 전송한다.
+        # IR detection을 별도로 보내야 할 경우 이 early return을 제거하고 IR 포트 정책을 맞추면 된다.
         if self.name != "eo":
             return
 
@@ -804,6 +820,8 @@ class StreamBridge:
 class CameraUdpBridge(Node):
     def __init__(self) -> None:
         super().__init__("camera_udp_bridge")
+        # ROS2 topic 구독은 Jetson 컨테이너 내부에서 수행하고, PC GUI는 ROS2를 직접 보지 않는다.
+        # 이 노드가 topic 데이터를 GUI 전용 UDP 프로토콜로 변환하는 경계 역할을 한다.
         self._eo = StreamBridge("eo", EO_IMAGE_TOPIC, EO_DETECTION_TOPIC, GUI_HOST, EO_GUI_PORT)
         self._ir = StreamBridge("ir", IR_IMAGE_TOPIC, IR_DETECTION_TOPIC, GUI_HOST, IR_GUI_PORT)
         self._recording_http_server: ThreadingHTTPServer | None = None

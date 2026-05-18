@@ -4,6 +4,11 @@ using System.Net.Sockets;
 
 namespace BroadcastControl.App.Services;
 
+/// <summary>
+/// Thor에서 GUI로 보내는 모터 상태 패킷을 8001/udp에서 수신한다.
+/// 현재 명세의 36B 패킷은 pan 18B와 tilt 18B가 이어진 형태이며,
+/// 과거 실험용 32B/64B 패킷도 읽을 수 있게 남겨 두어 현장 테스트 중 버전 차이를 흡수한다.
+/// </summary>
 public sealed class UdpMotorStatusReceiverService : IDisposable
 {
     private const int DefaultPort = 8001;
@@ -35,6 +40,8 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
             return;
         }
 
+        // 모터 상태는 영상과 별도 스레드에서 받는다.
+        // 이렇게 해야 영상 수신량이 많아져도 pan/tilt 상태 표시가 늦게 갱신되는 일을 줄일 수 있다.
         _cancellationTokenSource = new CancellationTokenSource();
         _receiveTask = Task.Run(() => ReceiveLoopAsync(_cancellationTokenSource.Token));
     }
@@ -89,6 +96,8 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
             return false;
         }
 
+        // 최신 36B 패킷과 이전 32B 단일 모터 패킷을 모두 구분해서 파싱한다.
+        // 실제 화면에는 두 모터 값이 들어온 경우 pan/tilt를 나눠서 표시한다.
         var receivedAt = DateTime.Now;
         var isLegacyPacket = buffer.Length >= LegacySnapshotSize || buffer.Length == LegacyPacketSize;
         var packetSize = isLegacyPacket ? LegacyPacketSize : CurrentPacketSize;
@@ -109,6 +118,8 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
 
     private static MotorStatusPacket ParseCurrentPacket(ReadOnlySpan<byte> buffer, DateTime receivedAt)
     {
+        // 현재 패킷은 Dynamixel 원본 필드 순서를 거의 그대로 따른다.
+        // position/velocity는 4B, 전압/전류/PWM은 little-endian 정수로 읽는다.
         var presentPosition = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(10, 4));
         var presentVelocity = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(6, 4));
         return new MotorStatusPacket(

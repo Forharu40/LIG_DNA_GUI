@@ -3,43 +3,52 @@ using System.Globalization;
 
 namespace BroadcastControl.App.Services;
 
+/// <summary>
+/// GUI 실행 시 Jetson에 SSH로 접속해 gui_camera_bridge 컨테이너 실행을 요청하는 서비스다.
+/// SSH 키 로그인과 Docker 권한이 준비되어 있으면 사용자가 Jetson 터미널을 따로 열지 않아도 bridge를 시작할 수 있다.
+/// </summary>
 public sealed class JetsonBridgeSshService : IDisposable
 {
+    private readonly AppNetworkSettings _settings;
     private bool _startedByThisApp;
+
+    public JetsonBridgeSshService(AppNetworkSettings settings)
+    {
+        _settings = settings;
+    }
 
     public event Action<string>? MessageReady;
 
     public async Task<bool> StartAsync(CancellationToken cancellationToken = default)
     {
-        if (!GetBoolEnvironment("JETSON_AUTO_BRIDGE", true))
+        if (!_settings.AutoStartBridge)
         {
-            MessageReady?.Invoke("Jetson bridge auto-start is disabled. Set JETSON_AUTO_BRIDGE=true to enable it.");
+            MessageReady?.Invoke("Jetson bridge auto-start is disabled in LigDnaGui.config.json.");
             return false;
         }
 
-        var user = GetEnvironment("JETSON_SSH_USER", "lig");
-        var host = GetEnvironment("JETSON_SSH_HOST", "192.168.3.143");
+        var user = _settings.JetsonSshUser;
+        var host = _settings.JetsonHost;
         var target = $"{user}@{host}";
-        var projectDir = GetEnvironment("JETSON_BRIDGE_DIR", "~/LIG_DNA_GUI/JetsonThor.RosCameraBridge");
-        var guiHost = GetEnvironment("JETSON_GUI_HOST", "192.168.1.94");
-        var recordingDir = GetEnvironment("JETSON_RECORDING_DIR", "/home/lig/Desktop/video");
-        var segmentSeconds = GetEnvironment("RECORDING_SEGMENT_SECONDS", "60");
-        var httpPort = GetEnvironment("RECORDING_HTTP_PORT", "8090");
-        var buildArg = GetBoolEnvironment("JETSON_BRIDGE_BUILD", false) ? " --build" : string.Empty;
+        var buildArg = _settings.BuildBridgeOnStart ? " --build" : string.Empty;
 
+        // Jetson 쪽 run_camera_udp_bridge.sh에 필요한 환경변수를 넘기고 nohup으로 백그라운드 실행한다.
+        // 로그는 ~/lig_gui_camera_bridge.log에 남겨 GUI에서 자동 실행 실패 시 Jetson 터미널로 확인할 수 있게 한다.
         var remoteCommand =
-            $"cd {ShellQuote(projectDir)} && " +
-            $"GUI_HOST={ShellQuote(guiHost)} " +
-            $"JETSON_RECORDING_DIR={ShellQuote(recordingDir)} " +
-            $"RECORDING_SEGMENT_SECONDS={ShellQuote(segmentSeconds)} " +
-            $"RECORDING_HTTP_PORT={ShellQuote(httpPort)} " +
+            $"cd {ShellQuote(_settings.JetsonBridgeDir)} && " +
+            $"GUI_HOST={ShellQuote(_settings.PcGuiHost)} " +
+            $"EO_GUI_PORT={ShellQuote(_settings.EoUdpPort.ToString(CultureInfo.InvariantCulture))} " +
+            $"IR_GUI_PORT={ShellQuote(_settings.IrUdpPort.ToString(CultureInfo.InvariantCulture))} " +
+            $"JETSON_RECORDING_DIR={ShellQuote(_settings.JetsonRecordingDir)} " +
+            $"RECORDING_SEGMENT_SECONDS={ShellQuote(_settings.RecordingSegmentSeconds.ToString(CultureInfo.InvariantCulture))} " +
+            $"RECORDING_HTTP_PORT={ShellQuote(_settings.RecordingHttpPort.ToString(CultureInfo.InvariantCulture))} " +
             $"nohup bash ./run_camera_udp_bridge.sh{buildArg} > ~/lig_gui_camera_bridge.log 2>&1 < /dev/null &";
 
         var result = await RunSshAsync(target, remoteCommand, TimeSpan.FromSeconds(10), cancellationToken);
         if (result.ExitCode == 0)
         {
             _startedByThisApp = true;
-            MessageReady?.Invoke($"Jetson camera bridge start requested: {target}, GUI_HOST={guiHost}");
+            MessageReady?.Invoke($"Jetson camera bridge start requested: {target}, GUI_HOST={_settings.PcGuiHost}");
             return true;
         }
 
@@ -52,16 +61,13 @@ public sealed class JetsonBridgeSshService : IDisposable
 
     public async Task StopAsync(CancellationToken cancellationToken = default)
     {
-        if (!_startedByThisApp || !GetBoolEnvironment("JETSON_AUTO_BRIDGE", true))
+        if (!_startedByThisApp || !_settings.AutoStartBridge)
         {
             return;
         }
 
-        var user = GetEnvironment("JETSON_SSH_USER", "lig");
-        var host = GetEnvironment("JETSON_SSH_HOST", "192.168.3.143");
-        var target = $"{user}@{host}";
-        var containerName = GetEnvironment("JETSON_BRIDGE_CONTAINER", "gui_camera_bridge");
-        var remoteCommand = $"docker rm -f {ShellQuote(containerName)} >/dev/null 2>&1 || true";
+        var target = $"{_settings.JetsonSshUser}@{_settings.JetsonHost}";
+        var remoteCommand = "docker rm -f gui_camera_bridge >/dev/null 2>&1 || true";
 
         var result = await RunSshAsync(target, remoteCommand, TimeSpan.FromSeconds(8), cancellationToken);
         if (result.ExitCode == 0)
@@ -86,6 +92,8 @@ public sealed class JetsonBridgeSshService : IDisposable
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
+        // BatchMode=yes는 비밀번호 프롬프트를 띄우지 않기 위한 설정이다.
+        // 즉, 자동 실행을 쓰려면 Windows PC의 SSH 공개키가 Jetson authorized_keys에 등록되어 있어야 한다.
         using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
         timeoutCts.CancelAfter(timeout);
 
@@ -130,28 +138,6 @@ public sealed class JetsonBridgeSshService : IDisposable
         {
             return new CommandResult(-1, ex.Message);
         }
-    }
-
-    private static string GetEnvironment(string name, string fallback)
-    {
-        var value = Environment.GetEnvironmentVariable(name);
-        return string.IsNullOrWhiteSpace(value) ? fallback : value;
-    }
-
-    private static bool GetBoolEnvironment(string name, bool fallback)
-    {
-        var value = Environment.GetEnvironmentVariable(name);
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return fallback;
-        }
-
-        return value.Trim().ToLower(CultureInfo.InvariantCulture) switch
-        {
-            "1" or "true" or "yes" or "on" => true,
-            "0" or "false" or "no" or "off" => false,
-            _ => fallback
-        };
     }
 
     private static string ShellQuote(string value)

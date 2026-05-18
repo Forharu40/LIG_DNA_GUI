@@ -3,11 +3,16 @@ using System.Net.Sockets;
 
 namespace BroadcastControl.App.Services;
 
+/// <summary>
+/// GUI에서 Thor로 모터 제어 명령을 보내는 UDP 송신 서비스다.
+/// MainViewModel이 만든 모드/추적/방향/각도/step size/YOLO 객체 ID 값을
+/// Thor가 해석할 수 있는 13B little-endian 패킷으로 직렬화한다.
+/// </summary>
 public sealed class UdpMotorControlService : IDisposable
 {
     private const string DefaultHost = "192.168.3.143";
     private const int DefaultPort = 8000;
-    private const int MotorCommandPacketSize = 9;
+    private const int MotorCommandPacketSize = 13;
 
     private readonly UdpClient _udpClient = new();
 
@@ -29,8 +34,11 @@ public sealed class UdpMotorControlService : IDisposable
         ushort tiltPos,
         byte scanStep,
         byte manualStep,
+        int yoloObjectId,
         out string? error)
     {
+        // GUI -> Thor 모터 제어 패킷:
+        // 기존 9B 명령 뒤에 YOLO가 발행한 객체 ID(int32)를 붙여 모터가 어떤 객체를 따라갈지 알 수 있게 한다.
         var packet = new byte[MotorCommandPacketSize];
         packet[0] = mode;
         packet[1] = tracking;
@@ -39,6 +47,7 @@ public sealed class UdpMotorControlService : IDisposable
         BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(5, 2), tiltPos);
         packet[7] = EncodeStepSize(scanStep);
         packet[8] = EncodeStepSize(manualStep);
+        BinaryPrimitives.WriteInt32LittleEndian(packet.AsSpan(9, 4), yoloObjectId);
         return TrySendPacket(packet, out error);
     }
 

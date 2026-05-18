@@ -68,7 +68,7 @@ Jetson 내부에서는 ROS2 토픽으로 영상과 디텍션 정보가 오갑니
 | --- | --- | --- |
 | `/camera/eo` | `sensor_msgs/msg/Image` | EO 카메라 원본 영상 |
 | `/camera/ir` | `sensor_msgs/msg/Image` | IR 카메라 원본 영상 |
-| `/video/eo/preprocessed` | `sensor_msgs/msg/Image` | EO 전처리 영상. GUI의 EO 화면 기준 영상 |
+| `/video/eo/preprocessed` | `sensor_msgs/msg/Image` | EO 전처리 영상. 필요 시 `EO_IMAGE_TOPIC`으로 선택 가능 |
 | `/tracks/eo` | `sentinel_interfaces/msg/TrackedDetection2DArray` | EO 영상 기준 추적/디텍션 결과 |
 | `/tracks/ir` | `sentinel_interfaces/msg/TrackedDetection2DArray` | IR 영상 기준 추적/디텍션 결과 |
 
@@ -76,7 +76,7 @@ Jetson 내부에서는 ROS2 토픽으로 영상과 디텍션 정보가 오갑니
 
 | GUI 화면 | bridge가 구독하는 기본 토픽 |
 | --- | --- |
-| EO 화면 | `/video/eo/preprocessed` |
+| EO 화면 | `/camera/eo` |
 | IR 화면 | `/camera/ir` |
 | EO 바운딩 박스 | `/tracks/eo` |
 | IR 바운딩 박스 | `/tracks/ir` |
@@ -90,7 +90,7 @@ PC GUI와 Jetson Thor 사이의 UDP 포트는 기능별로 분리합니다. 이�
 | `6000/udp` | Jetson -> GUI | EO 영상 JPEG 청크 + EO 디텍션 |
 | `6001/udp` | Jetson -> GUI | IR 영상 JPEG 청크 |
 | `6002/udp` | 외부/VLM -> GUI | VLM 분석 결과 |
-| `8000/udp` | GUI -> Jetson | 모터 커맨드 9B |
+| `8000/udp` | GUI -> Jetson | 모터 커맨드 13B |
 | `8001/udp` | Jetson -> GUI | 모터 상태 36B |
 | `8088/tcp` | 모바일 브라우저 -> GUI | 모바일 위험 알림 웹앱 |
 | `8090/tcp` | GUI -> Jetson bridge | Jetson 저장 영상 목록/재생 HTTP 서버 |
@@ -188,7 +188,7 @@ GUI는 `track_id`를 객체 ID로 사용합니다. 이 값은 화면 표시와 �
 
 ### 8.1 GUI -> Thor 모터 명령
 
-GUI는 `8000/udp`로 9B 패킷을 보냅니다.
+GUI는 `8000/udp`로 13B 패킷을 보냅니다.
 
 | offset | 크기 | 필드 | 설명 |
 | --- | --- | --- | --- |
@@ -199,6 +199,7 @@ GUI는 `8000/udp`로 9B 패킷을 보냅니다.
 | `5` | 2B | `tilt_pos` | uint16 little-endian, Dynamixel 0~4095 |
 | `7` | 1B | `scan_step` | uint8, 1~10 |
 | `8` | 1B | `manual_step` | uint8, 1~10 |
+| `9` | 4B | `yolo_object_id` | int32 little-endian, GUI가 선택한 YOLO 객체 ID |
 
 `btn_mask` 비트:
 
@@ -210,6 +211,8 @@ GUI는 `8000/udp`로 9B 패킷을 보냅니다.
 | `0x08` | TILT -, 아래 |
 
 GUI의 pan/tilt 각도 입력값은 내부에서 Dynamixel 위치값 `0~4095`로 변환되어 전송됩니다.
+자동 추적 상태에서는 GUI가 현재 화면에서 가장 위험도가 높은 YOLO 객체 ID를 `yolo_object_id`로 전송합니다.
+사용자가 큰 영상 화면의 바운딩 박스 안을 클릭하면 해당 좌표에 있는 YOLO 객체 ID가 즉시 `yolo_object_id`로 전송되어 모터가 그 객체를 추적할 수 있습니다.
 
 ### 8.2 Thor -> GUI 모터 상태
 
@@ -250,6 +253,10 @@ VLM 결과는 영상 패킷과 섞지 않고 `6002/udp`로 따로 받습니다.
 | JSON 문자열 | `threatLevel`, `analysis`, `detectionSummary`, `frameId` 같은 필드 사용 가능 |
 | 일반 텍스트 | 전체 문자열을 VLM 분석 메시지로 표시 |
 | `VLMR` prefix + UTF-8 텍스트 | 앞 4B `VLMR`을 제거하고 본문 해석 |
+
+VLM이 객체별 위험도를 보낼 때는 `objectThreats`, `trackThreats`, `detections`, `tracks`, `objects` 배열 중 하나에
+`objectId`/`trackId`와 `threatLevel`/`riskLevel` 값을 넣을 수 있습니다. GUI는 객체별 위험도 중 가장 높은 값을 시스템 위험 등급으로 표시하고,
+바운딩 박스 색상은 낮음=초록, 중간=노랑, 높음=빨강으로 표시합니다.
 
 ## 10. 녹화와 저장 구조
 

@@ -64,7 +64,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private string _motorTargetTiltText = "0.0";
     private bool _hasTrackedTarget;
     private bool _isTrackingModeEnabled = true;
-    private int _trackedObjectId = -1;
+    private int _yoloObjectId = -1;
     private readonly UdpMotorControlService _motorControlService;
     private const double MotorPanLimitDegrees = 360;
     private const double MotorTiltLimitDegrees = 360;
@@ -656,19 +656,21 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
     {
-        // 자동 모드에서는 탐지 유무를 보고 스캔(0)과 추적(1) 모드 패킷을 전환한다.
+        // 자동 모드에서는 가장 위협적인 객체 ID를 Thor로 보내서 모터가 같은 대상을 계속 추적할 수 있게 한다.
+        // 이 메서드는 화면 표시용 detection 목록이 갱신될 때마다 호출되며, 선택 대상이 바뀐 경우에만 패킷을 다시 보낸다.
         var hasTrackedTarget = detections.Count > 0;
-        var trackedObjectId = detections
-            .OrderByDescending(detection => detection.Score)
+        var yoloObjectId = detections
+            .OrderByDescending(detection => GetThreatWeight(detection.ThreatLevel))
+            .ThenByDescending(detection => detection.Score)
             .Select(detection => detection.ObjectId)
             .FirstOrDefault(-1);
-        if (_hasTrackedTarget == hasTrackedTarget && _trackedObjectId == trackedObjectId)
+        if (_hasTrackedTarget == hasTrackedTarget && _yoloObjectId == yoloObjectId)
         {
             return;
         }
 
         _hasTrackedTarget = hasTrackedTarget;
-        _trackedObjectId = trackedObjectId;
+        _yoloObjectId = yoloObjectId;
 
         if (!TrySendMotorCommandPacket(out var modeError))
         {
@@ -678,8 +680,33 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     }
 
+    public void SelectYoloObject(int objectId)
+    {
+        // 사용자가 영상에서 특정 바운딩 박스를 클릭했을 때 호출된다.
+        // 자동/수동 여부와 관계없이 YOLO 객체 ID를 저장하고 다음 모터 패킷에 포함한다.
+        if (!IsSystemPoweredOn || objectId < 0)
+        {
+            return;
+        }
+
+        // 사용자가 영상에서 객체를 직접 찍으면 YOLO가 준 객체 ID를 모터 패킷에 실어 보낸다.
+        _hasTrackedTarget = true;
+        _yoloObjectId = objectId;
+        IsTrackingModeEnabled = true;
+
+        if (!TrySendMotorCommandPacket(out var error))
+        {
+            AppendImportantLog($"YOLO 객체 ID 전송에 실패했습니다: {error}");
+            return;
+        }
+
+        AppendImportantLog($"YOLO 객체 ID 전송: object {objectId}");
+    }
+
     public void ApplyVlmAnalysisResult(string threatLevel, string analysisMessage)
     {
+        // VLM 결과는 상황 분석 창과 시스템 위험도에 반영한다.
+        // 위험도가 높음으로 올라가면 자동 모드 녹화 latch가 켜져 사람이 끄기 전까지 녹화를 유지한다.
         var normalizedThreatLevel = NormalizeThreatLevel(threatLevel);
         var threatChanged = !string.Equals(CurrentThreatLevel, normalizedThreatLevel, StringComparison.Ordinal);
         CurrentThreatLevel = normalizedThreatLevel;
@@ -731,6 +758,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void UpdateMotorStatus(MotorStatusSnapshot snapshot)
     {
+        // Thor에서 들어온 36B 모터 상태 패킷을 화면 표시용 항목으로 변환한다.
+        // Dynamixel position(0~4095)은 사람이 읽기 쉬운 degree 값으로 함께 표시한다.
         UpdateMotorStatusItems(PanMotorStatusItems, snapshot.Pan);
         _panMotorPositionDegrees = DynamixelPositionToDegrees(snapshot.Pan.PresentPosition);
         OnPropertyChanged(nameof(PanMotorPositionText));
@@ -761,6 +790,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void UpdateManualButtonState(MotorButtonMask buttons)
     {
+        // 수동 방향키/버튼 입력은 UI 표시 각도를 먼저 갱신한 뒤 같은 상태를 UDP 패킷으로 보낸다.
+        // 실제 모터 제어는 Thor가 수행하므로 GUI는 mode, button mask, 목표 각도, step size만 전달한다.
         if (!IsManualMode)
         {
             return;
@@ -1672,6 +1703,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     private bool TrySendMotorCommandPacket(out string? error, MotorButtonMask buttons = MotorButtonMask.None)
     {
+        // GUI의 현재 제어 상태를 Thor가 기대하는 13B 모터 명령 패킷으로 변환한다.
+        // 마지막 4B는 YOLO 객체 ID로, 모터 추적 로직이 어느 객체를 따라갈지 판단하는 데 사용한다.
         return _motorControlService.TrySendMotorCommandPacket(
             mode: IsManualMode ? (byte)1 : (byte)0,
             tracking: IsTrackingModeEnabled ? (byte)1 : (byte)0,
@@ -1680,7 +1713,18 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             tiltPos: DegreesToDynamixelPosition(_motorTilt),
             scanStep: (byte)GetUnifiedStepSize(AutoPanMotorStepSize, AutoTiltMotorStepSize),
             manualStep: (byte)GetUnifiedStepSize(ManualPanMotorStepSize, ManualTiltMotorStepSize),
+            yoloObjectId: _yoloObjectId,
             out error);
+    }
+
+    private static int GetThreatWeight(string threatLevel)
+    {
+        return NormalizeThreatLevel(threatLevel) switch
+        {
+            "\uB192\uC74C" => 3,
+            "\uC911\uAC04" => 2,
+            _ => 1
+        };
     }
 
     private static int GetUnifiedStepSize(int panStepSize, int tiltStepSize)
@@ -1824,6 +1868,12 @@ public sealed class LocalizedTextProvider : INotifyPropertyChanged
         ["ScreenMode"] = ("Screen Mode", "\uD654\uBA74 \uBAA8\uB4DC"),
         ["WindowMode"] = ("Window Mode", "\uCC3D\uBAA8\uB4DC\uB85C \uC804\uD658"),
         ["FullscreenMode"] = ("Fullscreen", "\uC804\uCCB4\uD654\uBA74\uC73C\uB85C \uC804\uD658"),
+        ["NetworkSettings"] = ("Network Settings", "\uB124\uD2B8\uC6CC\uD06C \uC124\uC815"),
+        ["JetsonIp"] = ("Jetson IP", "Jetson IP"),
+        ["PcIp"] = ("PC IP", "PC IP"),
+        ["SshUser"] = ("SSH User", "SSH \uC0AC\uC6A9\uC790"),
+        ["RecordedVideoUrl"] = ("Video URL", "\uB179\uD654 URL"),
+        ["AutoStartBridge"] = ("Auto start bridge", "\uBE0C\uB9BF\uC9C0 \uC790\uB3D9 \uC2DC\uC791"),
         ["Details"] = ("Details", "\uC0C1\uC138"),
         ["MotorPosition"] = ("Motor Position", "\uBAA8\uD130 \uC704\uCE58"),
         ["MotorTarget"] = ("Motor Angle Setting", "\uBAA8\uD130 \uAC01\uB3C4 \uC124\uC815"),
@@ -1847,9 +1897,9 @@ public sealed class LocalizedTextProvider : INotifyPropertyChanged
         ["ThreatHigh"] = ("High", "\uB192\uC74C"),
         ["TargetComposite"] = ("Composite", "\uBCF5\uD569"),
         ["TargetPerson"] = ("Person", "\uC0AC\uB78C"),
-        ["TargetWeapon"] = ("Weapon System", "\uBB34\uAE30\uCCB4\uACC4"),
-        ["TargetComm"] = ("Communication Equipment", "\uD1B5\uC2E0 \uC7A5\uBE44"),
-        ["TargetCivil"] = ("Non-military Target", "\uBE44\uAD70\uC0AC \uD45C\uC801"),
+        ["TargetWeapon"] = ("Weapon", "\uBB34\uAE30\uCCB4\uACC4"),
+        ["TargetComm"] = ("Telecom", "\uD1B5\uC2E0 \uC7A5\uBE44"),
+        ["TargetCivil"] = ("Non-military", "\uBE44\uAD70\uC0AC \uD45C\uC801"),
         ["SystemStarted"] = ("System startup started.", "\uC2DC\uC2A4\uD15C \uAC00\uB3D9\uC744 \uC2DC\uC791\uD569\uB2C8\uB2E4."),
         ["LanguageChanged"] = ("Display language changed.", "\uD45C\uC2DC \uC5B8\uC5B4\uAC00 \uBCC0\uACBD\uB418\uC5C8\uC2B5\uB2C8\uB2E4."),
     };

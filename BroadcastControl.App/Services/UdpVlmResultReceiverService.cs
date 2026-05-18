@@ -5,6 +5,11 @@ using System.Text.Json;
 
 namespace BroadcastControl.App.Services;
 
+/// <summary>
+/// 외부 VLM 프로세스가 GUI로 보내는 분석 결과를 6002/udp에서 받는 서비스다.
+/// VLM은 영상보다 늦게 도착할 수 있으므로 영상 수신 포트와 분리하고,
+/// 전체 위험도와 객체별 위험도를 함께 읽어 MainWindow가 시스템 위험도와 박스 색상을 계산할 수 있게 한다.
+/// </summary>
 public sealed class UdpVlmResultReceiverService : IDisposable
 {
     private const int DefaultPort = 6002;
@@ -32,6 +37,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
             return;
         }
 
+        // VLM 결과 수신도 UI를 막지 않도록 백그라운드에서 계속 대기한다.
         _cancellationTokenSource = new CancellationTokenSource();
         _receiveTask = Task.Run(() => ReceiveLoopAsync(_cancellationTokenSource.Token));
     }
@@ -82,10 +88,12 @@ public sealed class UdpVlmResultReceiverService : IDisposable
 
     private static VlmResultPacket ParsePacket(byte[] buffer)
     {
+        // 현재는 JSON과 일반 텍스트를 모두 허용한다.
+        // 실험 중 VLM 송신 포맷이 바뀌어도 최소한 분석 문장은 화면에 표시되도록 하기 위해서다.
         var text = DecodeText(buffer);
         if (string.IsNullOrWhiteSpace(text))
         {
-            return new VlmResultPacket(string.Empty, string.Empty, string.Empty, null, DateTime.Now);
+            return new VlmResultPacket(string.Empty, string.Empty, string.Empty, null, EmptyThreatMap(), DateTime.Now);
         }
 
         if (text.StartsWith("{", StringComparison.Ordinal))
@@ -94,22 +102,24 @@ public sealed class UdpVlmResultReceiverService : IDisposable
             {
                 using var document = JsonDocument.Parse(text);
                 var root = document.RootElement;
+                // 필드 이름은 팀원 구현에 따라 조금씩 달라질 수 있어 여러 후보 이름을 허용한다.
                 var threatLevel = ReadString(root, "threatLevel", "riskLevel", "risk", "threat", "level") ?? string.Empty;
                 var analysisMessage =
                     ReadString(root, "analysisMessage", "vlmAnalysis", "analysis", "message", "result") ?? text;
                 var detectionSummary =
                     ReadString(root, "detectionSummary", "detections", "tracks", "objects") ?? string.Empty;
                 var frameId = ReadUInt(root, "frameId", "frame_id");
+                var objectThreatLevels = ReadObjectThreatLevels(root);
 
-                return new VlmResultPacket(threatLevel, analysisMessage, detectionSummary, frameId, DateTime.Now);
+                return new VlmResultPacket(threatLevel, analysisMessage, detectionSummary, frameId, objectThreatLevels, DateTime.Now);
             }
             catch (JsonException)
             {
-                return new VlmResultPacket(string.Empty, text, string.Empty, null, DateTime.Now);
+                return new VlmResultPacket(string.Empty, text, string.Empty, null, EmptyThreatMap(), DateTime.Now);
             }
         }
 
-        return new VlmResultPacket(string.Empty, text, string.Empty, null, DateTime.Now);
+        return new VlmResultPacket(string.Empty, text, string.Empty, null, EmptyThreatMap(), DateTime.Now);
     }
 
     private static string DecodeText(byte[] buffer)
@@ -117,6 +127,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
         var offset = 0;
         if (buffer.Length >= 4 && Encoding.ASCII.GetString(buffer, 0, 4) == "VLMR")
         {
+            // VLMR prefix는 바이너리 패킷임을 표시하기 위한 4B 식별자이므로 실제 메시지에서는 제외한다.
             offset = 4;
         }
 
@@ -166,6 +177,69 @@ public sealed class UdpVlmResultReceiverService : IDisposable
         return null;
     }
 
+    private static IReadOnlyDictionary<int, string> ReadObjectThreatLevels(JsonElement root)
+    {
+        // VLM 쪽 포맷이 조금 바뀌어도 받을 수 있도록 대표적인 키 이름들을 모두 허용한다.
+        foreach (var name in new[] { "objectThreats", "object_threats", "trackThreats", "track_threats", "detections", "tracks", "objects" })
+        {
+            if (!root.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Array)
+            {
+                continue;
+            }
+
+            var threats = new Dictionary<int, string>();
+            foreach (var item in value.EnumerateArray())
+            {
+                if (item.ValueKind != JsonValueKind.Object)
+                {
+                    continue;
+                }
+
+                var objectId = ReadInt(item, "objectId", "object_id", "trackId", "track_id", "id");
+                var threatLevel = ReadString(item, "threatLevel", "riskLevel", "risk", "threat", "level");
+                if (objectId is null || string.IsNullOrWhiteSpace(threatLevel))
+                {
+                    continue;
+                }
+
+                threats[objectId.Value] = threatLevel;
+            }
+
+            if (threats.Count > 0)
+            {
+                return threats;
+            }
+        }
+
+        return EmptyThreatMap();
+    }
+
+    private static int? ReadInt(JsonElement root, params string[] names)
+    {
+        foreach (var name in names)
+        {
+            if (!root.TryGetProperty(name, out var value))
+            {
+                continue;
+            }
+
+            if (value.ValueKind == JsonValueKind.Number && value.TryGetInt32(out var number))
+            {
+                return number;
+            }
+
+            if (value.ValueKind == JsonValueKind.String &&
+                int.TryParse(value.GetString(), out var parsedNumber))
+            {
+                return parsedNumber;
+            }
+        }
+
+        return null;
+    }
+
+    private static IReadOnlyDictionary<int, string> EmptyThreatMap() => new Dictionary<int, string>();
+
     private static int ResolvePort(int? port)
     {
         if (port is > 0 and <= 65535)
@@ -185,4 +259,5 @@ public readonly record struct VlmResultPacket(
     string AnalysisMessage,
     string DetectionSummary,
     uint? FrameId,
+    IReadOnlyDictionary<int, string> ObjectThreatLevels,
     DateTime ReceivedAt);

@@ -11,6 +11,11 @@ using OpenCvSharp;
 
 namespace BroadcastControl.App.Services;
 
+/// <summary>
+/// Jetson bridge가 GUI로 보내는 EO/IR UDP 패킷을 수신하는 서비스다.
+/// 영상은 여러 UDP 청크로 나뉘어 오기 때문에 frame_id 기준으로 조립한 뒤 JPEG를 디코딩하고,
+/// 같은 포트로 들어오는 detection/status 패킷은 별도 이벤트로 MainWindow에 전달한다.
+/// </summary>
 public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
     private const int DefaultPort = 6000;
@@ -93,6 +98,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
         try
         {
+            // Windows GUI는 EO/IR 포트를 각각 열고 Jetson bridge가 보내는 UDP 패킷을 기다린다.
+            // ReceiveBufferSize를 크게 잡아 짧은 시간에 여러 JPEG 청크가 몰려도 손실 가능성을 줄인다.
             ListeningPort = port;
             _udpClient = new UdpClient();
             _udpClient.Client.ExclusiveAddressUse = false;
@@ -225,6 +232,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
     private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
     {
+        // UDP 수신은 UI 스레드를 막으면 안 되므로 백그라운드 Task에서 계속 돌린다.
+        // 실제 UI 갱신은 Dispatcher를 통해 안전하게 메인 스레드로 넘긴다.
         while (!cancellationToken.IsCancellationRequested)
         {
             try
@@ -267,6 +276,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             PublishDiagnosticMessage($"MEVA UDP 첫 패킷을 수신했습니다. 송신지: {sourceText}, 패킷 크기: {packet.Length} bytes");
         }
 
+        // 패킷 종류는 magic/type으로 구분한다.
+        // 오래된 IMGF/DETS 포맷과 현재 SNTL 포맷을 함께 지원해 실험 중 포맷 변경에도 GUI가 바로 죽지 않게 한다.
         if (TryExtractMetadataPacket(packet, out var segmentInfo))
         {
             _metadataPacketCount++;
@@ -453,6 +464,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     {
         try
         {
+            // bridge는 대역폭을 줄이기 위해 프레임을 JPEG로 보내므로 OpenCV로 먼저 Mat로 복원한다.
             using var decoded = Cv2.ImDecode(encodedFrame, ImreadModes.Color);
             if (decoded.Empty())
             {
@@ -464,6 +476,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             {
             }
 
+            // IR 화면은 옵션에 따라 grayscale 원본을 false color로 바꿔 온도 차이가 더 잘 보이게 한다.
             using var falseColorFrame = _applyIrFalseColor ? CreateIrFalseColorFrame(decoded) : new Mat();
             var displaySource = _applyIrFalseColor ? falseColorFrame : decoded;
 
@@ -510,6 +523,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 declaredWidth > 0 ? declaredWidth : checked((ushort)decoded.Width),
                 declaredHeight > 0 ? declaredHeight : checked((ushort)decoded.Height),
                 bitmap);
+            // 수신 속도가 UI 갱신 속도보다 빠를 수 있으므로 가장 최신 프레임만 큐에 남긴다.
             QueueLatestFrame(receivedFrame);
             return true;
         }
@@ -1002,6 +1016,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     {
         fragment = default;
 
+        // SNTL 영상 패킷은 15B 헤더 뒤에 JPEG 조각이 붙는다.
+        // frame_id, chunk_idx, total_chunks를 이용해 한 장의 JPEG로 다시 합친다.
         if (!HasPacketMagic(packet, SentinelPacketMagic) || packet.Length < SentinelImageHeaderSize)
         {
             return false;
@@ -1046,6 +1062,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
         lock (_fragmentLock)
         {
+            // UDP는 순서 보장과 재전송이 없기 때문에 청크를 잠시 보관했다가 모두 모였을 때만 디코딩한다.
+            // 오래된 조각은 CleanupStaleImageFragments에서 제거해 메모리가 계속 늘어나는 것을 막는다.
             CleanupStaleImageFragments();
             var key = new FrameFragmentKey(fragment.StampNs, fragment.FrameIndex);
             if (!_imageFragments.TryGetValue(key, out var buffer) || !buffer.IsCompatibleWith(fragment))
@@ -1158,6 +1176,8 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     {
         detectionPacket = default;
 
+        // SNTL detection 패킷은 EO 영상 포트(6000)로 들어오며 type 0x10으로 영상 청크와 구분한다.
+        // TrackedDetection2D의 track_id는 GUI 내부에서 ObjectId로 보관하고, 모터 추적 대상 ID로도 사용한다.
         if (!HasPacketMagic(packet, SentinelPacketMagic) ||
             packet.Length < SentinelDetectionHeaderSize + 2 ||
             packet[4] != 0x10)
@@ -1461,7 +1481,8 @@ public readonly record struct DetectionInfo(
     float Y1,
     float X2,
     float Y2,
-    int ObjectId)
+    int ObjectId,
+    string ThreatLevel = "")
 {
     public string LabelText => $"{ClassName} object{ObjectId} ({Score:0.00})";
 }

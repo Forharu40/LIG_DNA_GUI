@@ -12,8 +12,6 @@ PC의 WPF GUI는 Jetson ROS2 토픽을 직접 구독하지 않고, Jetson에서 
 Zybo / Camera
   -> Jetson video_rx node
   -> /camera/eo, /camera/ir
-  -> EO/IR preprocessing node
-  -> /video/eo/preprocessed
   -> YOLO detector node
   -> /tracks/eo, /tracks/ir
   -> gui_camera_bridge
@@ -56,7 +54,7 @@ GUI는 Jetson ROS2 토픽을 직접 받는 것이 아니라, Jetson bridge가 �
 
 | 데이터 | 기본 토픽 |
 | --- | --- |
-| EO image | `/video/eo/preprocessed` |
+| EO image | `/camera/eo` |
 | IR image | `/camera/ir` |
 | EO track/detection | `/tracks/eo` |
 | IR track/detection | `/tracks/ir` |
@@ -78,11 +76,13 @@ IR 카메라가 Zybo에서 Jetson `video_rx_node`로 들어올 때는 `5001` 포
 
 | 방향 | 포트 | 크기 | 내용 |
 | --- | --- | --- | --- |
-| GUI -> Thor | `8000/udp` | `9B` | mode 1B, tracking 1B, btn_mask 1B, pan_pos 2B, tilt_pos 2B, scan_step 1B, manual_step 1B |
+| GUI -> Thor | `8000/udp` | `13B` | mode 1B, tracking 1B, btn_mask 1B, pan_pos 2B, tilt_pos 2B, scan_step 1B, manual_step 1B, yolo_object_id 4B |
 | Thor -> GUI | `8001/udp` | `36B` | pan motor 18B + tilt motor 18B |
 
 GUI -> Thor의 pan_pos/tilt_pos는 Dynamixel 위치값 `0~4095` 범위의 UInt16 little-endian 값입니다.
 btn_mask는 `0x01` PAN+, `0x02` PAN-, `0x04` TILT+, `0x08` TILT- 비트를 사용합니다.
+yolo_object_id는 GUI가 영상 화면에서 선택했거나 자동으로 고른 YOLO 객체 ID이며 int32 little-endian으로 전송합니다.
+VLM이 객체별 위험도를 제공하면 GUI는 가장 높은 위험도를 시스템 위험 등급으로 표시하고, 각 바운딩 박스는 낮음/중간/높음 순서대로 초록/노랑/빨강으로 표시합니다.
 
 ## 실행 순서
 
@@ -108,6 +108,13 @@ GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh --build
 ```
 
 `GUI_HOST`는 PC 노트북의 IPv4 주소입니다.
+
+EO 화면은 기본적으로 전처리 전 원본 토픽인 `/camera/eo`를 사용합니다.
+전처리 영상을 다시 쓰려면 다음처럼 실행합니다.
+
+```bash
+EO_IMAGE_TOPIC=/video/eo/preprocessed GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh
+```
 
 ### 3. PC에서 GUI 실행
 

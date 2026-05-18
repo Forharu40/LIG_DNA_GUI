@@ -7,6 +7,11 @@ using System.Text.Json;
 
 namespace BroadcastControl.App.Services;
 
+/// <summary>
+/// 위험 상황을 모바일 브라우저로 알려주기 위한 작은 HTTP/SSE 서버다.
+/// GUI가 위험 알림을 발행하면 현재 화면 캡처, VLM 분석, 탐지 요약을 웹앱에 전달하고
+/// 모바일 기기는 브라우저의 알림/진동/소리 기능으로 운용자에게 알려준다.
+/// </summary>
 public sealed class MobileAlertHubService : IDisposable
 {
     private const int DefaultPort = 8088;
@@ -51,6 +56,7 @@ public sealed class MobileAlertHubService : IDisposable
 
         try
         {
+            // 별도 앱 설치 없이 같은 네트워크의 휴대폰 브라우저에서 접속할 수 있도록 TCP 서버를 연다.
             Port = port;
             _listener = new TcpListener(IPAddress.Any, port);
             _listener.Start();
@@ -67,6 +73,8 @@ public sealed class MobileAlertHubService : IDisposable
 
     public async Task PublishAlertAsync(string title, string vlmAnalysis, string detectionSummary, string threatLevel, byte[]? evidencePng)
     {
+        // 증거 이미지는 메모리에 잠시 보관하고, 모바일 페이지에는 /evidence/{id}.png URL로 제공한다.
+        // SSE로 연결된 모든 모바일 클라이언트에 같은 알림 이벤트를 동시에 보낸다.
         var id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var evidenceUrl = string.Empty;
         if (evidencePng is { Length: > 0 })

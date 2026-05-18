@@ -180,15 +180,73 @@
         </Style>
 
         <Style x:Key="SettingsActionButton" TargetType="Button" BasedOn="{StaticResource MaterialDesignOutlinedButton}">
-            <Setter Property="Height" Value="40" />
-            <Setter Property="Padding" Value="12,8" />
-            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="10,5" />
+            <Setter Property="FontSize" Value="13" />
             <Setter Property="FontWeight" Value="SemiBold" />
             <Setter Property="Background" Value="{DynamicResource DrawerItemBrush}" />
             <Setter Property="BorderBrush" Value="{DynamicResource DrawerItemBorderBrush}" />
             <Setter Property="Foreground" Value="{DynamicResource DrawerTextBrush}" />
             <Setter Property="BorderThickness" Value="1" />
             <Setter Property="materialDesign:ButtonAssist.CornerRadius" Value="2" />
+        </Style>
+
+        <Style x:Key="SettingsCompactLabel" TargetType="TextBlock">
+            <Setter Property="Foreground" Value="{DynamicResource DrawerTextBrush}" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Margin" Value="0,0,0,3" />
+        </Style>
+
+        <Style x:Key="SettingsCompactTextBox" TargetType="TextBox">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="{DynamicResource DrawerTextBrush}" />
+            <Setter Property="Background" Value="{DynamicResource DrawerItemBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DrawerItemBorderBrush}" />
+            <Setter Property="CaretBrush" Value="{DynamicResource DrawerTextBrush}" />
+            <Setter Property="SelectionBrush" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="SettingsCompactComboBox" TargetType="ComboBox">
+            <Setter Property="Height" Value="34" />
+            <Setter Property="Padding" Value="8,6" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="Foreground" Value="#FF111827" />
+            <Setter Property="Background" Value="{DynamicResource DrawerItemBrush}" />
+            <Setter Property="BorderBrush" Value="{DynamicResource DrawerItemBorderBrush}" />
+            <Setter Property="TextElement.Foreground" Value="#FF111827" />
+            <Setter Property="TextElement.FontSize" Value="14" />
+            <Setter Property="VerticalContentAlignment" Value="Center" />
+            <Setter Property="ItemTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <TextBlock Text="{Binding}"
+                            Padding="8,4"
+                            FontSize="14"
+                            Foreground="{DynamicResource DrawerTextBrush}" />
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+            <Setter Property="ItemContainerStyle">
+                <Setter.Value>
+                    <Style TargetType="ComboBoxItem">
+                        <Setter Property="Foreground" Value="{DynamicResource DrawerTextBrush}" />
+                        <Setter Property="Background" Value="Transparent" />
+                        <Setter Property="Padding" Value="8,4" />
+                        <Style.Triggers>
+                            <Trigger Property="IsHighlighted" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource TopBarButtonHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsSelected" Value="True">
+                                <Setter Property="Background" Value="{DynamicResource TopBarButtonPressedBrush}" />
+                            </Trigger>
+                        </Style.Triggers>
+                    </Style>
+                </Setter.Value>
+            </Setter>
         </Style>
 
         <Style x:Key="ZoomSliderStyle" TargetType="Slider">
@@ -1877,14 +1935,7 @@
                 <Grid>
                     <Grid.RowDefinitions>
                         <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
                         <RowDefinition Height="*" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
                     </Grid.RowDefinitions>
 
                     <TextBlock Text="{Binding Text[Settings]}"
@@ -1892,108 +1943,215 @@
                            FontWeight="Bold"
                            Foreground="{DynamicResource DrawerTextBrush}" />
 
-                    <Border Grid.Row="1"
-                        Margin="0,18,0,14"
-                        BorderBrush="{DynamicResource DrawerBorderBrush}"
-                        BorderThickness="0,0,0,3">
-                        <TextBlock Margin="0,0,0,10"
-                               Text="{Binding Text[PrimaryTargetChange]}"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource DrawerTextBrush}" />
-                    </Border>
+                    <ScrollViewer Grid.Row="1"
+                        Margin="0,14,0,0"
+                        VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <Border Margin="0,0,0,8"
+                                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                                BorderThickness="0,0,0,2">
+                                <TextBlock Margin="0,0,0,7"
+                                    Text="{Binding Text[PrimaryTargetChange]}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource DrawerTextBrush}" />
+                            </Border>
 
-                    <ItemsControl Grid.Row="2"
-                              ItemsSource="{Binding PrimaryTargets}">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Button Margin="0,0,0,10"
-                                    Command="{Binding DataContext.SelectPrimaryTargetCommand, RelativeSource={RelativeSource AncestorType=Window}}"
-                                    CommandParameter="{Binding Value}"
+                            <Button Margin="0,0,0,6"
+                                Command="{Binding SelectPrimaryTargetCommand}"
+                                CommandParameter="복합"
+                                Style="{StaticResource SettingsActionButton}"
+                                Content="{Binding Text[TargetComposite]}" />
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Button Grid.Row="0"
+                                    Grid.Column="0"
+                                    Margin="0,0,6,6"
+                                    Command="{Binding SelectPrimaryTargetCommand}"
+                                    CommandParameter="사람"
                                     Style="{StaticResource SettingsActionButton}"
-                                    Content="{Binding DisplayName}" />
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
+                                    Content="{Binding Text[TargetPerson]}" />
+                                <Button Grid.Row="0"
+                                    Grid.Column="1"
+                                    Margin="0,0,0,6"
+                                    Command="{Binding SelectPrimaryTargetCommand}"
+                                    CommandParameter="무기체계"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[TargetWeapon]}" />
+                                <Button Grid.Row="1"
+                                    Grid.Column="0"
+                                    Margin="0,0,6,0"
+                                    Command="{Binding SelectPrimaryTargetCommand}"
+                                    CommandParameter="통신 장비"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[TargetComm]}" />
+                                <Button Grid.Row="1"
+                                    Grid.Column="1"
+                                    Command="{Binding SelectPrimaryTargetCommand}"
+                                    CommandParameter="비군사 표적"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[TargetCivil]}" />
+                            </Grid>
 
-                    <Border Grid.Row="3"
-                        Margin="0,8,0,12"
-                        BorderBrush="{DynamicResource DrawerBorderBrush}"
-                        BorderThickness="0,1,0,0">
-                        <TextBlock Margin="0,12,0,0"
-                               Text="{Binding Text[ThemeChange]}"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource DrawerTextBrush}" />
-                    </Border>
+                            <Border Margin="0,10,0,8"
+                                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                                BorderThickness="0,1,0,0">
+                                <TextBlock Margin="0,9,0,0"
+                                    Text="{Binding Text[ThemeChange]}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource DrawerTextBrush}" />
+                            </Border>
 
-                    <Grid Grid.Row="4">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0"
-                            Margin="0,0,8,0"
-                            Command="{Binding SetThemeCommand}"
-                            CommandParameter="Dark"
-                            Opacity="{Binding DarkThemeButtonOpacity}"
-                            Style="{StaticResource SettingsActionButton}"
-                            Content="{Binding Text[DarkTheme]}" />
-                        <Button Grid.Column="1"
-                            Command="{Binding SetThemeCommand}"
-                            CommandParameter="Light"
-                            Opacity="{Binding LightThemeButtonOpacity}"
-                            Style="{StaticResource SettingsActionButton}"
-                            Content="{Binding Text[LightTheme]}" />
-                    </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0"
+                                    Margin="0,0,6,0"
+                                    Command="{Binding SetThemeCommand}"
+                                    CommandParameter="Dark"
+                                    Opacity="{Binding DarkThemeButtonOpacity}"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[DarkTheme]}" />
+                                <Button Grid.Column="1"
+                                    Command="{Binding SetThemeCommand}"
+                                    CommandParameter="Light"
+                                    Opacity="{Binding LightThemeButtonOpacity}"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[LightTheme]}" />
+                            </Grid>
 
-                    <Border Grid.Row="5"
-                        Margin="0,18,0,12"
-                        BorderBrush="{DynamicResource DrawerBorderBrush}"
-                        BorderThickness="0,1,0,0">
-                        <TextBlock Margin="0,12,0,0"
-                               Text="{Binding Text[LanguageChange]}"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource DrawerTextBrush}" />
-                    </Border>
+                            <Border Margin="0,12,0,8"
+                                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                                BorderThickness="0,1,0,0">
+                                <TextBlock Margin="0,9,0,0"
+                                    Text="{Binding Text[LanguageChange]}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource DrawerTextBrush}" />
+                            </Border>
 
-                    <Grid Grid.Row="6">
-                        <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="*" />
-                            <ColumnDefinition Width="*" />
-                        </Grid.ColumnDefinitions>
-                        <Button Grid.Column="0"
-                            Margin="0,0,8,0"
-                            Command="{Binding SetLanguageCommand}"
-                            CommandParameter="English"
-                            Opacity="{Binding EnglishLanguageButtonOpacity}"
-                            Style="{StaticResource SettingsActionButton}"
-                            Content="{Binding Text[English]}" />
-                        <Button Grid.Column="1"
-                            Command="{Binding SetLanguageCommand}"
-                            CommandParameter="Korean"
-                            Opacity="{Binding KoreanLanguageButtonOpacity}"
-                            Style="{StaticResource SettingsActionButton}"
-                            Content="{Binding Text[Korean]}" />
-                    </Grid>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0"
+                                    Margin="0,0,6,0"
+                                    Command="{Binding SetLanguageCommand}"
+                                    CommandParameter="English"
+                                    Opacity="{Binding EnglishLanguageButtonOpacity}"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[English]}" />
+                                <Button Grid.Column="1"
+                                    Command="{Binding SetLanguageCommand}"
+                                    CommandParameter="Korean"
+                                    Opacity="{Binding KoreanLanguageButtonOpacity}"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[Korean]}" />
+                            </Grid>
 
-                    <Border Grid.Row="7"
-                        Margin="0,18,0,12"
-                        BorderBrush="{DynamicResource DrawerBorderBrush}"
-                        BorderThickness="0,1,0,0">
-                        <TextBlock Margin="0,12,0,0"
-                               Text="{Binding Text[ScreenMode]}"
-                               FontSize="18"
-                               FontWeight="SemiBold"
-                               Foreground="{DynamicResource DrawerTextBrush}" />
-                    </Border>
+                            <Border Margin="0,12,0,8"
+                                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                                BorderThickness="0,1,0,0">
+                                <TextBlock Margin="0,9,0,0"
+                                    Text="{Binding Text[ScreenMode]}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource DrawerTextBrush}" />
+                            </Border>
 
-                    <Button x:Name="WindowModeToggleButton"
-                        Grid.Row="8"
-                        Click="WindowModeToggleButton_OnClick"
-                        Style="{StaticResource SettingsActionButton}"
-                        Content="{Binding Text[WindowMode]}" />
+                            <Button x:Name="WindowModeToggleButton"
+                                Click="WindowModeToggleButton_OnClick"
+                                Style="{StaticResource SettingsActionButton}"
+                                Content="{Binding Text[WindowMode]}" />
+
+                            <Border Margin="0,12,0,8"
+                                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                                BorderThickness="0,1,0,0">
+                                <TextBlock Margin="0,9,0,0"
+                                    Text="{Binding Text[NetworkSettings]}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource DrawerTextBrush}" />
+                            </Border>
+
+                            <StackPanel>
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0"
+                                        Margin="0,0,6,0">
+                                        <TextBlock Text="{Binding Text[JetsonIp]}"
+                                            Style="{StaticResource SettingsCompactLabel}" />
+                                        <TextBox x:Name="JetsonHostTextBox"
+                                            Style="{StaticResource SettingsCompactTextBox}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Text[PcIp]}"
+                                            Style="{StaticResource SettingsCompactLabel}" />
+                                        <ComboBox x:Name="PcGuiHostComboBox"
+                                            IsEditable="True"
+                                            Style="{StaticResource SettingsCompactComboBox}">
+                                            <ComboBox.Resources>
+                                                <Style TargetType="TextBox">
+                                                    <Setter Property="Foreground" Value="#FF111827" />
+                                                    <Setter Property="Background" Value="{DynamicResource DrawerItemBrush}" />
+                                                    <Setter Property="CaretBrush" Value="#FF111827" />
+                                                    <Setter Property="FontSize" Value="14" />
+                                                    <Setter Property="Padding" Value="8,6" />
+                                                    <Setter Property="VerticalContentAlignment" Value="Center" />
+                                                </Style>
+                                            </ComboBox.Resources>
+                                        </ComboBox>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="*" />
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Grid.Column="0"
+                                        Margin="0,0,6,0">
+                                        <TextBlock Text="{Binding Text[SshUser]}"
+                                            Style="{StaticResource SettingsCompactLabel}" />
+                                        <TextBox x:Name="JetsonSshUserTextBox"
+                                            Style="{StaticResource SettingsCompactTextBox}" />
+                                    </StackPanel>
+                                    <StackPanel Grid.Column="1">
+                                        <TextBlock Text="{Binding Text[RecordedVideoUrl]}"
+                                            Style="{StaticResource SettingsCompactLabel}" />
+                                        <TextBox x:Name="RecordedVideoUrlTextBox"
+                                            Style="{StaticResource SettingsCompactTextBox}" />
+                                    </StackPanel>
+                                </Grid>
+
+                                <CheckBox x:Name="AutoStartBridgeCheckBox"
+                                    Margin="0,0,0,6"
+                                    Content="{Binding Text[AutoStartBridge]}"
+                                    FontSize="12"
+                                    Foreground="{DynamicResource DrawerTextBrush}" />
+
+                                <Button Click="SaveNetworkSettingsButton_OnClick"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[Save]}" />
+                            </StackPanel>
+                        </StackPanel>
+                    </ScrollViewer>
                 </Grid>
             </Border>
         </Grid>

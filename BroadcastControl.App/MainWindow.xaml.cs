@@ -21,6 +21,8 @@ namespace BroadcastControl.App;
 
 public partial class MainWindow : Window
 {
+    // MainWindow는 화면 요소와 서비스들을 연결하는 중심 계층이다.
+    // 실제 UDP 파싱은 Services가 맡고, 여기서는 받은 데이터를 어떤 화면에 표시할지와 어떤 사용자 입력을 보낼지를 결정한다.
     private enum DisplayRotation
     {
         None,
@@ -31,16 +33,12 @@ public partial class MainWindow : Window
     private const double SettingsDrawerClosedOffset = 320;
     private const double WindowedWidth = 1600;
     private const double WindowedHeight = 900;
-    private const int EoUdpPort = 6000;
-    private const int IrUdpPort = 6001;
-    private const int VlmResultUdpPort = 6002;
-    private const int MobileAlertPort = 8088;
-    private const string DefaultRecordedVideoUrl = "http://192.168.3.143:8090/";
     private const string RecordedVideoCacheFolderName = "LIG_DNA_GUI_recorded_videos";
     private const double RecordedVideoMiniMapWidth = 120;
     private const double RecordedVideoMiniMapHeight = 62;
     private static readonly TimeSpan MobileAlertCooldown = TimeSpan.FromSeconds(10);
     private static readonly HttpClient RecordedVideoHttpClient = new();
+    private readonly AppNetworkSettings _networkSettings;
     private readonly MainViewModel _viewModel;
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
     private readonly UdpEncodedVideoReceiverService _irUdpCaptureService;
@@ -84,6 +82,10 @@ public partial class MainWindow : Window
     private DateTime _recordingMetadataWindowStart;
     private string? _lastFilteredOutTargetSignature;
     private string? _lastOverlaySignature;
+    // VLM이 보내는 객체별 위험도를 objectId 기준으로 저장한다.
+    // 바운딩 박스 색상과 시스템 위험도는 이 값을 우선 사용한다.
+    private string _latestGlobalVlmThreatLevel = string.Empty;
+    private readonly Dictionary<int, string> _objectThreatLevels = new();
     private readonly Dictionary<string, int> _activeMotorDirections = new(StringComparer.Ordinal);
     private readonly HashSet<Key> _pressedMotorKeys = new();
     private const int OverlayCacheLimit = 48;
@@ -145,15 +147,16 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        _motorControlService = new UdpMotorControlService();
+        _networkSettings = AppNetworkSettings.Load();
+        _motorControlService = new UdpMotorControlService(_networkSettings.JetsonHost, _networkSettings.MotorControlPort);
         _viewModel = new MainViewModel(_motorControlService);
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
         _irUdpCaptureService = new UdpEncodedVideoReceiverService(applyIrFalseColor: true);
         _viewportRecordingService = new ViewportRecordingService();
-        _motorStatusReceiverService = new UdpMotorStatusReceiverService();
-        _vlmResultReceiverService = new UdpVlmResultReceiverService(VlmResultUdpPort);
+        _motorStatusReceiverService = new UdpMotorStatusReceiverService(_networkSettings.MotorStatusPort);
+        _vlmResultReceiverService = new UdpVlmResultReceiverService(_networkSettings.VlmResultPort);
         _mobileAlertHubService = new MobileAlertHubService();
-        _jetsonBridgeSshService = new JetsonBridgeSshService();
+        _jetsonBridgeSshService = new JetsonBridgeSshService(_networkSettings);
         _motorHoldTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(50)
@@ -179,6 +182,8 @@ public partial class MainWindow : Window
 
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
+        // 앱 시작 시 모든 수신 서비스를 연결한다.
+        // EO/IR 영상, 모터 상태, VLM 결과, 모바일 알림 서버가 각각 독립적으로 동작한다.
         WindowState = WindowState.Maximized;
         UpdateWindowModeButtonText();
 
@@ -214,32 +219,33 @@ public partial class MainWindow : Window
         _recordingMetadataWindowStart = DateTime.Now;
         _recordingMetadataTimer.Start();
 
+        LoadNetworkSettingsEditor();
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
         await _jetsonBridgeSshService.StartAsync();
 
-        if (_eoUdpCaptureService.Start(EoUdpPort))
+        if (_eoUdpCaptureService.Start(_networkSettings.EoUdpPort))
         {
         }
         else
         {
-            _viewModel.AppendImportantLog($"Failed to start the EO UDP stream receiver on port {EoUdpPort}.");
+            _viewModel.AppendImportantLog($"Failed to start the EO UDP stream receiver on port {_networkSettings.EoUdpPort}.");
         }
 
-        if (_irUdpCaptureService.Start(IrUdpPort))
+        if (_irUdpCaptureService.Start(_networkSettings.IrUdpPort))
         {
         }
         else
         {
-            _viewModel.AppendImportantLog($"Failed to start the IR UDP stream receiver on port {IrUdpPort}.");
+            _viewModel.AppendImportantLog($"Failed to start the IR UDP stream receiver on port {_networkSettings.IrUdpPort}.");
         }
 
-        if (_mobileAlertHubService.Start(MobileAlertPort))
+        if (_mobileAlertHubService.Start(_networkSettings.MobileAlertPort))
         {
             _viewModel.AppendImportantLog($"모바일 위험 알림 앱이 시작되었습니다: {_mobileAlertHubService.AccessHintUrls}");
         }
         else
         {
-            _viewModel.AppendImportantLog($"모바일 위험 알림 앱 시작에 실패했습니다. 포트 {MobileAlertPort}를 확인하세요.");
+            _viewModel.AppendImportantLog($"모바일 위험 알림 앱 시작에 실패했습니다. 포트 {_networkSettings.MobileAlertPort}를 확인하세요.");
         }
     }
 
@@ -295,6 +301,14 @@ public partial class MainWindow : Window
 
     private void CameraViewport_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
+        // 큰 영상 화면을 클릭했을 때 먼저 바운딩 박스 선택을 시도한다.
+        // 박스 안을 클릭한 경우 해당 YOLO 객체 ID를 모터 추적 대상으로 보내고, 박스가 없으면 기존 줌 드래그 동작을 수행한다.
+        if (TrySelectDetectionAtPoint(e.GetPosition(CameraViewport)))
+        {
+            e.Handled = true;
+            return;
+        }
+
         if (!_viewModel.ShowZoomMiniMap)
         {
             return;
@@ -368,6 +382,8 @@ public partial class MainWindow : Window
         DetectionPacket detectionPacket,
         Dictionary<uint, DetectionPacket> detectionCache)
     {
+        // detection은 영상 프레임보다 조금 늦게 도착할 수 있으므로 frame_id 기준으로 캐시에 보관한다.
+        // 렌더링 단계에서 가장 가까운 프레임의 detection을 찾아 박스를 그린다.
         CacheDetectionPacket(detectionPacket, detectionCache);
 
         if (!_hasReceivedDetectionPacket)
@@ -375,7 +391,7 @@ public partial class MainWindow : Window
             _hasReceivedDetectionPacket = true;
         }
 
-        var displayDetections = FilterDisplayDetections(detectionPacket.Detections);
+        var displayDetections = ApplyThreatLevels(FilterDisplayDetections(detectionPacket.Detections));
 
         if (!_hasReceivedNonEmptyDetectionPacket && displayDetections.Count > 0)
         {
@@ -436,6 +452,19 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
+            // VLM 결과는 전체 위험도와 객체별 위험도로 나뉜다.
+            // 전체 위험도는 시스템 상태창에, 객체별 위험도는 각 바운딩 박스 색상에 반영한다.
+            if (!string.IsNullOrWhiteSpace(result.ThreatLevel))
+            {
+                _latestGlobalVlmThreatLevel = NormalizeThreatLevel(result.ThreatLevel);
+            }
+
+            // VLM이 객체별 위험도를 보내면 track_id/objectId 기준으로 보관했다가 바운딩 박스 색과 시스템 위험도에 반영한다.
+            foreach (var pair in result.ObjectThreatLevels)
+            {
+                _objectThreatLevels[pair.Key] = NormalizeThreatLevel(pair.Value);
+            }
+
             var threatLevel = string.IsNullOrWhiteSpace(result.ThreatLevel)
                 ? _viewModel.CurrentThreatLevel
                 : result.ThreatLevel;
@@ -444,6 +473,7 @@ public partial class MainWindow : Window
                 : $"{result.AnalysisMessage} 탐지 내용: {result.DetectionSummary}";
 
             _viewModel.ApplyVlmAnalysisResult(threatLevel, analysisMessage);
+            RenderDetectionOverlay(forceRefresh: true);
         });
     }
 
@@ -495,6 +525,8 @@ public partial class MainWindow : Window
 
     private void RenderDetectionOverlay(bool forceRefresh = false)
     {
+        // 현재 큰 화면(EO 또는 IR)에 해당하는 최신 프레임과 detection을 맞춰 바운딩 박스를 다시 그린다.
+        // 줌/창 크기/EO-IR 전환이 바뀌면 forceRefresh로 캐시된 화면 서명을 무시한다.
         if (_isRenderingOverlay)
         {
             return;
@@ -523,7 +555,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var displayDetections = FilterDisplayDetections(detectionPacket.Detections);
+            var displayDetections = ApplyThreatLevels(FilterDisplayDetections(detectionPacket.Detections));
             if (displayDetections.Count == 0)
             {
                 _lastOverlaySignature = null;
@@ -593,11 +625,92 @@ public partial class MainWindow : Window
         return DisplayRotation.None;
     }
 
+    private bool TrySelectDetectionAtPoint(Point viewportPoint)
+    {
+        // 사용자가 누른 GUI 좌표를 현재 영상 스케일/여백/줌 이동이 적용된 바운딩 박스 좌표와 비교한다.
+        // 여러 박스가 겹쳐 있으면 더 위험하고 신뢰도가 높은 객체를 우선 선택한다.
+        if (!TryGetRenderableFrameAndDetection(out var frameToRender, out var detectionPacket))
+        {
+            return false;
+        }
+
+        var displayDetections = ApplyThreatLevels(FilterDisplayDetections(detectionPacket.Detections));
+        if (displayDetections.Count == 0)
+        {
+            return false;
+        }
+
+        var rotation = GetCurrentDisplayRotation();
+        var originalSourceWidth = detectionPacket.Width > 0 ? detectionPacket.Width : frameToRender.Width;
+        var originalSourceHeight = detectionPacket.Height > 0 ? detectionPacket.Height : frameToRender.Height;
+        if (originalSourceWidth <= 0 || originalSourceHeight <= 0)
+        {
+            return false;
+        }
+
+        var rotatedSourceWidth = GetRotatedWidth(originalSourceWidth, originalSourceHeight, rotation);
+        var rotatedSourceHeight = GetRotatedHeight(originalSourceWidth, originalSourceHeight, rotation);
+        var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
+        var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
+        var baseScale = Math.Max(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
+        var scaledWidth = rotatedSourceWidth * baseScale;
+        var scaledHeight = rotatedSourceHeight * baseScale;
+        var baseLeft = (viewportWidth - scaledWidth) / 2.0;
+        var baseTop = (viewportHeight - scaledHeight) / 2.0;
+
+        // 화면이 확대/이동된 상태에서도 사용자가 실제로 보는 바운딩 박스 위치를 기준으로 클릭 판정을 한다.
+        var zoomLevel = Math.Max(_viewModel.ZoomLevel, 1.0);
+        var viewportCenter = new Point(viewportWidth / 2.0, viewportHeight / 2.0);
+
+        var selectedDetection = displayDetections
+            .Select(detection => RotateDetectionForDisplay(detection, originalSourceWidth, originalSourceHeight, rotation))
+            .Select(detection => new
+            {
+                Detection = detection,
+                Rect = TransformRectForZoom(
+                    new Rect(
+                        baseLeft + (detection.X1 * baseScale),
+                        baseTop + (detection.Y1 * baseScale),
+                        Math.Max(2, (detection.X2 - detection.X1) * baseScale),
+                        Math.Max(2, (detection.Y2 - detection.Y1) * baseScale)),
+                    viewportCenter,
+                    zoomLevel,
+                    _viewModel.ZoomTransformX,
+                    _viewModel.ZoomTransformY)
+            })
+            .Where(item => item.Rect.Contains(viewportPoint))
+            .OrderByDescending(item => GetThreatWeight(item.Detection.ThreatLevel))
+            .ThenByDescending(item => item.Detection.Score)
+            .FirstOrDefault();
+
+        if (selectedDetection is null)
+        {
+            return false;
+        }
+
+        _viewModel.SelectYoloObject(selectedDetection.Detection.ObjectId);
+        return true;
+    }
+
+    private static Rect TransformRectForZoom(Rect rect, Point center, double scale, double translateX, double translateY)
+    {
+        var topLeft = TransformPointForZoom(rect.TopLeft, center, scale, translateX, translateY);
+        var bottomRight = TransformPointForZoom(rect.BottomRight, center, scale, translateX, translateY);
+        return new Rect(topLeft, bottomRight);
+    }
+
+    private static Point TransformPointForZoom(Point point, Point center, double scale, double translateX, double translateY)
+    {
+        return new Point(
+            center.X + ((point.X - center.X) * scale) + translateX,
+            center.Y + ((point.Y - center.Y) * scale) + translateY);
+    }
+
     private static string BuildOverlaySignature(IReadOnlyList<DetectionInfo> detections)
     {
         return string.Join(
             "|",
-            detections.Select(d => $"{d.ObjectId}:{d.ClassName}:{d.X1:0}:{d.Y1:0}:{d.X2:0}:{d.Y2:0}"));
+            detections.Select(d => $"{d.ObjectId}:{d.ClassName}:{d.ThreatLevel}:{d.X1:0}:{d.Y1:0}:{d.X2:0}:{d.Y2:0}"));
     }
 
     private static int GetRotatedWidth(int sourceWidth, int sourceHeight, DisplayRotation rotation)
@@ -625,7 +738,8 @@ public partial class MainWindow : Window
                 (float)(sourceHeight - detection.Y2),
                 (float)(sourceWidth - detection.X1),
                 (float)(sourceHeight - detection.Y1),
-                detection.ObjectId),
+                detection.ObjectId,
+                detection.ThreatLevel),
             DisplayRotation.RotateLeft90 => RotateDetectionLeft90(detection, sourceWidth),
             _ => detection
         };
@@ -653,7 +767,8 @@ public partial class MainWindow : Window
             (float)y1,
             (float)x2,
             (float)y2,
-            detection.ObjectId);
+            detection.ObjectId,
+            detection.ThreatLevel);
     }
 
     private static Point RotatePointLeft90(double x, double y, int sourceWidth)
@@ -764,6 +879,83 @@ public partial class MainWindow : Window
         return filtered;
     }
 
+    private IReadOnlyList<DetectionInfo> ApplyThreatLevels(IReadOnlyList<DetectionInfo> detections)
+    {
+        return detections
+            .Select(detection => detection with { ThreatLevel = GetDetectionThreatLevel(detection) })
+            .ToArray();
+    }
+
+    private string GetDetectionThreatLevel(DetectionInfo detection)
+    {
+        // 우선순위:
+        // 1. VLM이 명시한 objectId별 위험도
+        // 2. detection 자체가 가진 위험도
+        // 3. VLM 전체 위험도
+        // 4. 클래스 이름 기반 임시 추정값
+        if (_objectThreatLevels.TryGetValue(detection.ObjectId, out var objectThreatLevel))
+        {
+            return NormalizeThreatLevel(objectThreatLevel);
+        }
+
+        if (!string.IsNullOrWhiteSpace(detection.ThreatLevel))
+        {
+            return NormalizeThreatLevel(detection.ThreatLevel);
+        }
+
+        if (_objectThreatLevels.Count == 0 && !string.IsNullOrWhiteSpace(_latestGlobalVlmThreatLevel))
+        {
+            return NormalizeThreatLevel(_latestGlobalVlmThreatLevel);
+        }
+
+        return EstimateThreatLevelFromClass(detection.ClassName);
+    }
+
+    private static string EstimateThreatLevelFromClass(string className)
+    {
+        // VLM 객체별 위험도가 아직 오지 않은 순간에도 화면 색이 완전히 비어 보이지 않도록 임시 기준을 둔다.
+        var normalizedClass = className.Trim().ToLowerInvariant();
+        if (normalizedClass is "airplane" or "car" or "motorcycle" or "bus" or "truck" or "train" or "boat" or "tank" or "drone" or "missile" or "weapon")
+        {
+            return "높음";
+        }
+
+        if (normalizedClass is "person" or "bicycle" or "cell phone" or "laptop")
+        {
+            return "중간";
+        }
+
+        return "낮음";
+    }
+
+    private static string NormalizeThreatLevel(string threatLevel)
+    {
+        return threatLevel.Trim().ToLowerInvariant() switch
+        {
+            "high" or "높음" => "높음",
+            "medium" or "mid" or "중간" => "중간",
+            _ => "낮음"
+        };
+    }
+
+    private static int GetThreatWeight(string threatLevel)
+    {
+        return NormalizeThreatLevel(threatLevel) switch
+        {
+            "높음" => 3,
+            "중간" => 2,
+            _ => 1
+        };
+    }
+
+    private static string GetHighestThreatLevel(IReadOnlyList<DetectionInfo> detections)
+    {
+        return detections
+            .OrderByDescending(detection => GetThreatWeight(detection.ThreatLevel))
+            .Select(detection => NormalizeThreatLevel(detection.ThreatLevel))
+            .FirstOrDefault("낮음");
+    }
+
     private bool ShouldDisplayDetectionSafe(DetectionInfo detection)
     {
         var className = detection.ClassName.ToLowerInvariant();
@@ -820,6 +1012,8 @@ public partial class MainWindow : Window
 
     private void UpdateRiskAndMobileAlert(uint frameId, IReadOnlyList<DetectionInfo> detections)
     {
+        // 시스템 위험도는 화면에 표시 중인 객체들의 위험도 중 가장 높은 값으로 결정한다.
+        // 위험 상황이 반복해서 들어와도 모바일 알림이 과도하게 울리지 않도록 cooldown과 signature를 함께 사용한다.
         if (detections.Count == 0)
         {
             _viewModel.ApplyVlmAnalysisResult("낮음", "VLM 분석: 현재 선택된 주 탐지체 기준 위험 객체가 확인되지 않았습니다.");
@@ -828,7 +1022,8 @@ public partial class MainWindow : Window
 
         var analysis = BuildVlmStyleAnalysis(detections);
         var detectionSummary = BuildDetectionSummary(detections);
-        _viewModel.ApplyVlmAnalysisResult("높음", $"{analysis} 탐지 내용: {detectionSummary}");
+        var systemThreatLevel = GetHighestThreatLevel(detections);
+        _viewModel.ApplyVlmAnalysisResult(systemThreatLevel, $"{analysis} 탐지 내용: {detectionSummary}");
 
         var alertSignature = $"{_viewModel.SelectedPrimaryTarget}:{frameId}:{BuildOverlaySignature(detections)}";
         var now = DateTimeOffset.Now;
@@ -864,7 +1059,7 @@ public partial class MainWindow : Window
             detections
                 .OrderByDescending(d => d.Score)
                 .Take(8)
-                .Select((d, index) => $"{index + 1}. {d.ClassName} object{d.ObjectId} / 신뢰도 {d.Score:0.00} / bbox ({d.X1:0}, {d.Y1:0})-({d.X2:0}, {d.Y2:0})"));
+                .Select((d, index) => $"{index + 1}. {d.ClassName} object{d.ObjectId} / 위험도 {d.ThreatLevel} / 신뢰도 {d.Score:0.00} / bbox ({d.X1:0}, {d.Y1:0})-({d.X2:0}, {d.Y2:0})"));
     }
 
     private static byte[]? CaptureElementAsPng(FrameworkElement element)
@@ -912,7 +1107,7 @@ public partial class MainWindow : Window
         double rectHeight,
         DetectionInfo detection)
     {
-        var accentBrush = new SolidColorBrush(Color.FromRgb(105, 255, 132));
+        var accentBrush = GetDetectionThreatBrush(detection.ThreatLevel);
         accentBrush.Freeze();
         var mainRectangle = new Rectangle
         {
@@ -951,6 +1146,16 @@ public partial class MainWindow : Window
         Canvas.SetLeft(labelText, labelLeft);
         Canvas.SetTop(labelText, Math.Max(0, labelTop));
         DetectionOverlayCanvas.Children.Add(labelText);
+    }
+
+    private static SolidColorBrush GetDetectionThreatBrush(string threatLevel)
+    {
+        return NormalizeThreatLevel(threatLevel) switch
+        {
+            "높음" => new SolidColorBrush(Color.FromRgb(255, 107, 107)),
+            "중간" => new SolidColorBrush(Color.FromRgb(255, 193, 69)),
+            _ => new SolidColorBrush(Color.FromRgb(123, 216, 143))
+        };
     }
 
     private void AddCornerToCanvas(
@@ -1190,13 +1395,9 @@ public partial class MainWindow : Window
         }
     }
 
-    private static Uri GetRecordedVideoBaseUri()
+    private Uri GetRecordedVideoBaseUri()
     {
-        var videoUrl = Environment.GetEnvironmentVariable("JETSON_VIDEO_URL");
-        if (string.IsNullOrWhiteSpace(videoUrl))
-        {
-            videoUrl = DefaultRecordedVideoUrl;
-        }
+        var videoUrl = _networkSettings.RecordedVideoUrl;
 
         if (!videoUrl.EndsWith("/", StringComparison.Ordinal))
         {
@@ -1671,6 +1872,39 @@ public partial class MainWindow : Window
 
     private void Button_Click_1(object sender, RoutedEventArgs e)
     {
+    }
+
+    private void LoadNetworkSettingsEditor()
+    {
+        JetsonHostTextBox.Text = _networkSettings.JetsonHost;
+        JetsonSshUserTextBox.Text = _networkSettings.JetsonSshUser;
+        RecordedVideoUrlTextBox.Text = _networkSettings.RecordedVideoUrl;
+        AutoStartBridgeCheckBox.IsChecked = _networkSettings.AutoStartBridge;
+
+        var localAddresses = AppNetworkSettings.GetLocalIpv4Addresses();
+        PcGuiHostComboBox.ItemsSource = localAddresses;
+        PcGuiHostComboBox.Text = _networkSettings.PcGuiHost;
+        if (localAddresses.Count > 0 && !localAddresses.Contains(_networkSettings.PcGuiHost, StringComparer.Ordinal))
+        {
+            _viewModel.AppendImportantLog($"현재 PC IP 후보: {string.Join(", ", localAddresses)}");
+        }
+    }
+
+    private void SaveNetworkSettingsButton_OnClick(object sender, RoutedEventArgs e)
+    {
+        _networkSettings.JetsonHost = JetsonHostTextBox.Text;
+        _networkSettings.PcGuiHost = PcGuiHostComboBox.Text;
+        _networkSettings.JetsonSshUser = JetsonSshUserTextBox.Text;
+        _networkSettings.RecordedVideoUrl = RecordedVideoUrlTextBox.Text;
+        _networkSettings.AutoStartBridge = AutoStartBridgeCheckBox.IsChecked == true;
+        _networkSettings.Save();
+
+        _viewModel.AppendImportantLog($"네트워크 설정을 저장했습니다: {AppNetworkSettings.SettingsPath}");
+        MessageBox.Show(
+            "네트워크 설정을 저장했습니다. UDP 포트와 Jetson 자동 실행 설정은 GUI를 다시 시작하면 적용됩니다.",
+            "Network Settings",
+            MessageBoxButton.OK,
+            MessageBoxImage.Information);
     }
 
     private void WindowModeToggleButton_OnClick(object sender, RoutedEventArgs e)
