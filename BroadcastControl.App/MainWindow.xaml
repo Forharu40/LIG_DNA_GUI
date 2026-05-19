@@ -226,14 +226,14 @@
                         <TextBlock Text="{Binding}"
                             Padding="8,4"
                             FontSize="14"
-                            Foreground="{DynamicResource DrawerTextBrush}" />
+                            Foreground="#FF111827" />
                     </DataTemplate>
                 </Setter.Value>
             </Setter>
             <Setter Property="ItemContainerStyle">
                 <Setter.Value>
                     <Style TargetType="ComboBoxItem">
-                        <Setter Property="Foreground" Value="{DynamicResource DrawerTextBrush}" />
+                        <Setter Property="Foreground" Value="#FF111827" />
                         <Setter Property="Background" Value="Transparent" />
                         <Setter Property="Padding" Value="8,4" />
                         <Style.Triggers>
@@ -264,8 +264,8 @@
         <Grid x:Name="RootLayout"
           Width="1600"
           Height="900">
-            <!-- ?꾩껜 李?理쒖긽??而⑦뀒?대꼫??
-             ?곷떒 ?대컮, 蹂몃Ц ?⑤꼸, ?ㅼ젙 ?쒕줈?대? ??Grid ?덉뿉 諛곗튂 -->
+            <!-- 전체 창의 최상위 컨테이너.
+             본문 패널과 설정 드로어를 이 Grid 안에 배치한다. -->
             <Grid Margin="12">
                 <Grid.RowDefinitions>
                     <RowDefinition Height="0" />
@@ -280,8 +280,8 @@
                     </Rectangle.Fill>
                 </Rectangle>
 
-                <!-- ?곷떒 ?대컮:
-                 ?꾩썝 醫낅즺, ?뱁솕 ?곹깭, 諛앷린/?議곕퉬, 紐⑤뱶 ?꾪솚, ?ㅼ젙 踰꾪듉 諛곗튂 -->
+                <!-- 상단 바:
+                 전원 종료, 녹화 상태, 밝기/대조비, 모드 전환, 설정 버튼을 배치한다. -->
                 <Border Grid.Row="0"
                     Visibility="Collapsed"
                     Style="{StaticResource GlassCardBorder}"
@@ -403,8 +403,8 @@
                     </Grid>
                 </Border>
 
-                <!-- 蹂몃Ц ?곸뿭:
-                 ?쇱そ 移대찓???붾㈃, ?ㅻⅨ履??쒖뒪???꾪솴/?곹솴 遺꾩꽍/?쒖뒪??濡쒓렇 ?⑤꼸 -->
+                <!-- 본문 영역:
+                 왼쪽 카메라 화면과 오른쪽 시스템 현황/상황 분석/시스템 로그 패널을 배치한다. -->
                 <Grid Grid.Row="1"
                   Margin="0">
                     <Grid.ColumnDefinitions>
@@ -601,7 +601,11 @@
                                          Foreground="{DynamicResource PrimaryTextBrush}"
                                          Background="{DynamicResource OverlayPanelBrush}"
                                          BorderBrush="{DynamicResource PanelBorderBrush}"
-                                         Text="{Binding MotorTargetPanText, UpdateSourceTrigger=PropertyChanged}" />
+                                         Text="{Binding MotorTargetPanText, UpdateSourceTrigger=PropertyChanged}">
+                                        <TextBox.InputBindings>
+                                            <KeyBinding Key="Enter" Command="{Binding SendMotorTargetCommand}" />
+                                        </TextBox.InputBindings>
+                                    </TextBox>
                                     <TextBlock Grid.Column="3"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource SecondaryTextBrush}"
@@ -615,7 +619,11 @@
                                          Foreground="{DynamicResource PrimaryTextBrush}"
                                          Background="{DynamicResource OverlayPanelBrush}"
                                          BorderBrush="{DynamicResource PanelBorderBrush}"
-                                         Text="{Binding MotorTargetTiltText, UpdateSourceTrigger=PropertyChanged}" />
+                                         Text="{Binding MotorTargetTiltText, UpdateSourceTrigger=PropertyChanged}">
+                                        <TextBox.InputBindings>
+                                            <KeyBinding Key="Enter" Command="{Binding SendMotorTargetCommand}" />
+                                        </TextBox.InputBindings>
+                                    </TextBox>
                                 </Grid>
                                 <Button Grid.Row="2"
                                     Height="29"
@@ -635,11 +643,12 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <TextBlock Foreground="{DynamicResource PrimaryTextBrush}"
                                        FontSize="16"
                                        FontWeight="Bold"
-                                       Text="Step Size (+/-)" />
+                                       Text="Angle Size (+/-)" />
                                 <Grid Grid.Row="1" Margin="0,10,0,0">
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="Auto" />
@@ -650,10 +659,8 @@
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
-                                        <Button Height="24" Padding="6,1" FontSize="12" FontWeight="Bold" HorizontalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Pan:Reset" Style="{StaticResource TopBarSmallButton}" Content="Auto Pan" />
+                                        <Button Height="24" Padding="6,1" FontSize="12" FontWeight="Bold" HorizontalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Reset" Style="{StaticResource TopBarSmallButton}" Content="Scan" />
                                         <Grid Grid.Row="1" Margin="0,6,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -662,37 +669,20 @@
                                                 <ColumnDefinition Width="7" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Button Grid.Column="0" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Pan:-1" Style="{StaticResource TopBarButton}" Content="-" />
+                                            <Button Grid.Column="0" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:-1" Style="{StaticResource TopBarButton}" Content="-" />
                                             <Border Grid.Column="2" Height="33" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
-                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="20" FontWeight="Bold" Text="{Binding AutoPanMotorStepSizeText}" />
+                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="18" FontWeight="Bold" Text="{Binding AutoMotorAngleSizeText}" />
                                             </Border>
-                                            <Button Grid.Column="4" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Pan:1" Style="{StaticResource TopBarButton}" Content="+" />
-                                        </Grid>
-                                        <Button Grid.Row="2" Margin="0,8,0,0" Height="24" Padding="6,1" FontSize="12" FontWeight="Bold" HorizontalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Tilt:Reset" Style="{StaticResource TopBarSmallButton}" Content="Auto Tilt" />
-                                        <Grid Grid.Row="3" Margin="0,6,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="7" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="7" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <Button Grid.Column="0" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Tilt:-1" Style="{StaticResource TopBarButton}" Content="-" />
-                                            <Border Grid.Column="2" Height="33" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
-                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="20" FontWeight="Bold" Text="{Binding AutoTiltMotorStepSizeText}" />
-                                            </Border>
-                                            <Button Grid.Column="4" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:Tilt:1" Style="{StaticResource TopBarButton}" Content="+" />
+                                            <Button Grid.Column="4" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Auto:1" Style="{StaticResource TopBarButton}" Content="+" />
                                         </Grid>
                                     </Grid>
 
-                                    <Grid Grid.Row="1" Margin="0,14,0,0">
+                                    <Grid Grid.Row="1" Margin="0,12,0,0">
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
-                                        <Button Height="24" Padding="6,1" FontSize="12" FontWeight="Bold" HorizontalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Pan:Reset" Style="{StaticResource TopBarSmallButton}" Content="Manual Pan" />
+                                        <Button Height="24" Padding="6,1" FontSize="12" FontWeight="Bold" HorizontalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Reset" Style="{StaticResource TopBarSmallButton}" Content="Manual" />
                                         <Grid Grid.Row="1" Margin="0,6,0,0">
                                             <Grid.ColumnDefinitions>
                                                 <ColumnDefinition Width="*" />
@@ -701,47 +691,88 @@
                                                 <ColumnDefinition Width="7" />
                                                 <ColumnDefinition Width="*" />
                                             </Grid.ColumnDefinitions>
-                                            <Button Grid.Column="0" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Pan:-1" Style="{StaticResource TopBarButton}" Content="-" />
+                                            <Button Grid.Column="0" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:-1" Style="{StaticResource TopBarButton}" Content="-" />
                                             <Border Grid.Column="2" Height="33" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
-                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="20" FontWeight="Bold" Text="{Binding ManualPanMotorStepSizeText}" />
+                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="18" FontWeight="Bold" Text="{Binding ManualMotorAngleSizeText}" />
                                             </Border>
-                                            <Button Grid.Column="4" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Pan:1" Style="{StaticResource TopBarButton}" Content="+" />
-                                        </Grid>
-                                        <Button Grid.Row="2" Margin="0,8,0,0" Height="24" Padding="6,1" FontSize="12" FontWeight="Bold" HorizontalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Tilt:Reset" Style="{StaticResource TopBarSmallButton}" Content="Manual Tilt" />
-                                        <Grid Grid.Row="3" Margin="0,6,0,0">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="7" />
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="7" />
-                                                <ColumnDefinition Width="*" />
-                                            </Grid.ColumnDefinitions>
-                                            <Button Grid.Column="0" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Tilt:-1" Style="{StaticResource TopBarButton}" Content="-" />
-                                            <Border Grid.Column="2" Height="33" Background="{DynamicResource OverlayPanelBrush}" BorderBrush="{DynamicResource PanelBorderBrush}" BorderThickness="1" CornerRadius="2">
-                                                <TextBlock HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="{DynamicResource PrimaryTextBrush}" FontSize="20" FontWeight="Bold" Text="{Binding ManualTiltMotorStepSizeText}" />
-                                            </Border>
-                                            <Button Grid.Column="4" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:Tilt:1" Style="{StaticResource TopBarButton}" Content="+" />
+                                            <Button Grid.Column="4" Height="31" Padding="0" FontSize="17" HorizontalContentAlignment="Center" VerticalContentAlignment="Center" Command="{Binding AdjustMotorStepCommand}" CommandParameter="Manual:1" Style="{StaticResource TopBarButton}" Content="+" />
                                         </Grid>
                                     </Grid>
                                 </Grid>
                                 <TextBlock Grid.Row="2"
-                                       Margin="0,4,0,3"
+                                       Margin="0,8,0,0"
                                        HorizontalAlignment="Center"
                                        Foreground="{DynamicResource PrimaryTextBrush}"
                                        FontSize="13"
-                                       FontWeight="SemiBold"
-                                       ><Run Text="A"/><Run Text="uto"/><Run Text=" "/><Run Text=": + / -&#xA;"/><Run Language="ko-kr" Text="M"/><Run Text="anual"/><Run Text=" "/><Run Text=": Ctrl + / -"/></TextBlock>
+                                       FontWeight="SemiBold">
+                                    <Run Text="Scan: + / -" />
+                                    <LineBreak />
+                                    <Run Text="Manual: Ctrl + / -" />
+                                </TextBlock>
+                                <Border Grid.Row="3"
+                                    Margin="0,20,0,0"
+                                    Padding="8,8"
+                                    Background="{DynamicResource OverlayPanelBrush}"
+                                    BorderBrush="{DynamicResource PanelBorderBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="2"
+                                    Opacity="{Binding MotorControlsOpacity}"
+                                    IsEnabled="{Binding CanUseMotorControls}">
+                                    <Grid>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="*" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock HorizontalAlignment="Center"
+                                               Foreground="{DynamicResource PrimaryTextBrush}"
+                                               FontSize="13"
+                                               FontWeight="Bold"
+                                               Text="{Binding Text[MotorControl]}" />
+                                        <Grid Grid.Row="1"
+                                          Width="128"
+                                          Height="104"
+                                          Margin="0,8,0,0"
+                                          HorizontalAlignment="Center"
+                                          VerticalAlignment="Center">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="32" />
+                                                <RowDefinition Height="36" />
+                                                <RowDefinition Height="32" />
+                                            </Grid.RowDefinitions>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="42" />
+                                                <ColumnDefinition Width="44" />
+                                                <ColumnDefinition Width="42" />
+                                            </Grid.ColumnDefinitions>
+                                            <Button x:Name="MotorPadUpButton" Grid.Row="0" Grid.Column="1" Tag="Up" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                                <materialDesign:PackIcon Kind="ArrowUpBold" Width="15" Height="15" />
+                                            </Button>
+                                            <Button x:Name="MotorPadLeftButton" Grid.Row="1" Grid.Column="0" Tag="Left" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                                <materialDesign:PackIcon Kind="ArrowLeftBold" Width="15" Height="15" />
+                                            </Button>
+                                            <Button x:Name="MotorPadCenterButton" Grid.Row="1" Grid.Column="1" Tag="Center" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                                <Ellipse Width="12" Height="12" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="1.6" Fill="Transparent" />
+                                            </Button>
+                                            <Button x:Name="MotorPadRightButton" Grid.Row="1" Grid.Column="2" Tag="Right" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                                <materialDesign:PackIcon Kind="ArrowRightBold" Width="15" Height="15" />
+                                            </Button>
+                                            <Button x:Name="MotorPadDownButton" Grid.Row="2" Grid.Column="1" Tag="Down" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
+                                                <materialDesign:PackIcon Kind="ArrowDownBold" Width="15" Height="15" />
+                                            </Button>
+                                        </Grid>
+                                    </Grid>
+                                </Border>
                             </Grid>
                         </Border>
                     </Grid>
 
-                    <!-- 移대찓???⑤꼸:
-                     EO 二??붾㈃, IR ?몄뀑 ?붾㈃, 紐⑦꽣 議곗옉 踰꾪듉, ?꾩옄 以?UI瑜??ы븿?? -->
+                    <!-- 카메라 패널:
+                     EO 주 화면, IR 인셋 화면, 모터 조작 버튼, 전자 줌 UI를 포함한다. -->
                     <Grid Grid.Column="1"
                       Margin="0,0,12,0">
                         <Grid.RowDefinitions>
                             <RowDefinition Height="*" />
-                            <RowDefinition Height="150" />
+                            <RowDefinition Height="180" />
                         </Grid.RowDefinitions>
 
                         <Border x:Name="CameraPanel"
@@ -759,8 +790,8 @@
                           MouseLeftButtonUp="CameraViewport_OnMouseLeftButtonUp">
                                 <Rectangle Fill="{DynamicResource SurfaceAltBrush}" />
 
-                                <!-- LargeFeedImage???ш쾶 蹂댁뿬以?移대찓???곸긽 諛붿씤?⑹엫.
-                             EO/IR ?ㅼ솑 ?곹깭???곕씪 ?쒖떆 ?곸긽???щ씪吏? -->
+                                <!-- LargeFeedImage는 크게 보여줄 카메라 영상 바인딩이다.
+                             EO/IR 전환 상태에 따라 표시 영상이 달라진다. -->
                                 <Image Source="{Binding LargeFeedImage}"
                                Margin="0"
                                Stretch="{Binding LargeFeedStretch}"
@@ -779,7 +810,7 @@
                                     </Image.RenderTransform>
                                 </Image>
 
-                                <!-- 醫뚯긽???쇰꺼? ?꾩옱 ???붾㈃??移대찓??醫낅쪟 ?쒖떆?? -->
+                                <!-- 좌상단 라벨은 현재 큰 화면의 카메라 종류를 표시한다. -->
                                 <Border Margin="16,12,0,0"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Top"
@@ -802,8 +833,8 @@
                                     </DockPanel>
                                 </Border>
 
-                                <!-- ?꾩옄 以?誘몃땲留?
-                             ?뺣? 以??꾩껜 ?붾㈃ ?鍮??꾩옱 蹂닿퀬 ?덈뒗 ?곸뿭???묒? 吏?꾩쿂???쒖떆?? -->
+                                <!-- 전자 줌 미니맵.
+                             확대 중 전체 화면 대비 현재 보고 있는 영역을 작은 지도처럼 표시한다. -->
                                 <Border Width="152"
                                 Height="108"
                                 Margin="18,0,0,20"
@@ -856,8 +887,8 @@
                                     </Canvas.RenderTransform>
                                 </Canvas>
 
-                                <!-- IR/EO ?몄뀑 ?붾㈃:
-                             ?묒? ?붾㈃ ?대┃ ?????붾㈃怨??ㅼ솑?섎뒗 ?낅젰 ?곸뿭?? -->
+                                <!-- IR/EO 인셋 화면:
+                             작은 화면 클릭 시 큰 화면과 전환되는 입력 영역이다. -->
                                 <Button Width="168"
                                 Height="124"
                                 Margin="0,8,26,0"
@@ -867,7 +898,7 @@
                                 Background="Transparent"
                                 BorderThickness="0"
                                 Padding="0">
-                                    <!-- IR ?몄뀑? ?곸긽留?蹂댁씠?꾨줉 ?대? 諛곌꼍怨??뚮몢由щ? ?쒓굅?? -->
+                                    <!-- IR 인셋은 영상만 보이도록 내부 배경과 테두리를 제거한다. -->
                                     <Border Background="Transparent"
                                     BorderBrush="Transparent"
                                     BorderThickness="0"
@@ -908,8 +939,8 @@
                                     </Border>
                                 </Button>
 
-                                <!-- 紐⑦꽣 諛⑺뼢 踰꾪듉:
-                             ?섎룞 紐⑤뱶?먯꽌留??쒖떆?섎ŉ ?댄썑 ?ㅼ젣 紐⑦꽣 ?쒖뼱 紐낅졊怨??곌껐???꾩튂?? -->
+                                <!-- 모터 방향 버튼:
+                             수동 모드에서 표시되며 실제 모터 제어 명령과 연결된다. -->
                                 <Grid Margin="0,0,24,26"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom"
@@ -1000,9 +1031,9 @@
                                     </Button>
                                 </Grid>
 
-                                <!-- ?꾩옄 以??⑤꼸? 諛곌꼍??怨쇳븯寃?湲몄뼱 蹂댁씠吏 ?딅룄濡?怨좎젙 ??쑝濡?臾띠쓬. -->
-                                <!-- ?꾩옄 以??⑤꼸:
-                             以?由ъ뀑 踰꾪듉, 諛곗쑉 ?щ씪?대뜑, ?꾩옱 諛곗쑉 ?띿뒪?몃? ??臾띠쓬?쇰줈 ?쒖떆?? -->
+                                <!-- 전자 줌 패널은 배경이 과하게 길어 보이지 않도록 고정 폭으로 묶는다. -->
+                                <!-- 전자 줌 패널:
+                             줌 리셋 버튼, 배율 슬라이더, 현재 배율 텍스트를 한 묶음으로 표시한다. -->
                                 <Border Margin="182,0,220,18"
                                 Padding="10,7"
                                 Width="340"
@@ -1017,7 +1048,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <!-- ?꾩옄 以??쇰꺼? ?묒? 由ъ뀑 踰꾪듉?? ?대┃ ??x1.0 湲곕낯 諛곗쑉濡?蹂듦??? -->
+                                        <!-- 전자 줌 라벨은 리셋 버튼이며 클릭 시 x1.0 기본 배율로 복귀한다. -->
                                         <Button VerticalAlignment="Center"
                                         Command="{Binding ResetZoomCommand}"
                                         Style="{StaticResource TopBarSmallButton}"
@@ -1171,8 +1202,8 @@
                             </Grid>
                         </Border>
 
-                        <!-- ?곗륫 ?뺣낫 ?⑤꼸:
-                     ?쒖뒪???꾪솴, ?곹솴 遺꾩꽍, ?쒖뒪??濡쒓렇瑜??몃줈濡?諛곗튂?? -->
+                        <!-- 오른쪽 정보 패널:
+                     시스템 현황, 상황 분석, 시스템 로그를 세로로 배치한다. -->
                         <Border Grid.Row="1"
                             Padding="14,12"
                             Style="{StaticResource GlassCardBorder}"
@@ -1184,11 +1215,11 @@
                                     <RowDefinition Height="*" />
                                 </Grid.RowDefinitions>
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="2.15*" />
-                                    <ColumnDefinition Width="1.05*" />
-                                    <ColumnDefinition Width="1.05*" />
-                                    <ColumnDefinition Width="1.25*" />
-                                    <ColumnDefinition Width="1.25*" />
+                                    <ColumnDefinition Width="2.0*" />
+                                    <ColumnDefinition Width="1.0*" />
+                                    <ColumnDefinition Width="1.0*" />
+                                    <ColumnDefinition Width="1.6*" />
+                                    <ColumnDefinition Width="1.15*" />
                                 </Grid.ColumnDefinitions>
 
                                 <StackPanel Grid.Row="0" Grid.Column="0" Margin="0,0,6,0" Orientation="Horizontal" VerticalAlignment="Center">
@@ -1235,50 +1266,63 @@
                                     Background="{DynamicResource OverlayPanelBrush}"
                                     BorderBrush="{DynamicResource PanelBorderBrush}"
                                     BorderThickness="1"
-                                    CornerRadius="2"
-                                    Opacity="{Binding MotorControlsOpacity}"
-                                    IsEnabled="{Binding CanUseMotorControls}">
+                                    CornerRadius="2">
                                     <Grid>
                                         <Grid.RowDefinitions>
                                             <RowDefinition Height="Auto" />
-                                            <RowDefinition Height="*" />
+                                            <RowDefinition Height="Auto" />
+                                            <RowDefinition Height="Auto" />
                                         </Grid.RowDefinitions>
-                                        <TextBlock HorizontalAlignment="Center"
-                                               Foreground="{DynamicResource PrimaryTextBrush}"
-                                               FontSize="11"
-                                               FontWeight="Bold"
-                                               Text="{Binding Text[MotorControl]}" />
-                                        <Grid Grid.Row="1"
-                                          Width="112"
-                                          Height="98"
-                                          HorizontalAlignment="Center"
-                                          VerticalAlignment="Center">
-                                            <Grid.RowDefinitions>
-                                                <RowDefinition Height="30" />
-                                                <RowDefinition Height="34" />
-                                                <RowDefinition Height="30" />
-                                            </Grid.RowDefinitions>
+                                        <Grid>
                                             <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="38" />
-                                                <ColumnDefinition Width="36" />
-                                                <ColumnDefinition Width="38" />
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
                                             </Grid.ColumnDefinitions>
-                                            <Button x:Name="MotorPadUpButton" Grid.Row="0" Grid.Column="1" Tag="Up" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
-                                                <materialDesign:PackIcon Kind="ArrowUpBold" Width="14" Height="14" />
-                                            </Button>
-                                            <Button x:Name="MotorPadLeftButton" Grid.Row="1" Grid.Column="0" Tag="Left" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
-                                                <materialDesign:PackIcon Kind="ArrowLeftBold" Width="14" Height="14" />
-                                            </Button>
-                                            <Button x:Name="MotorPadCenterButton" Grid.Row="1" Grid.Column="1" Tag="Center" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
-                                                <Ellipse Width="11" Height="11" Stroke="{DynamicResource PrimaryTextBrush}" StrokeThickness="1.6" Fill="Transparent" />
-                                            </Button>
-                                            <Button x:Name="MotorPadRightButton" Grid.Row="1" Grid.Column="2" Tag="Right" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
-                                                <materialDesign:PackIcon Kind="ArrowRightBold" Width="14" Height="14" />
-                                            </Button>
-                                            <Button x:Name="MotorPadDownButton" Grid.Row="2" Grid.Column="1" Tag="Down" PreviewMouseLeftButtonDown="MotorButton_OnPreviewMouseLeftButtonDown" PreviewMouseLeftButtonUp="MotorButton_OnPreviewMouseLeftButtonUp" MouseLeave="MotorButton_OnMouseLeave" Style="{StaticResource MotorPadButton}">
-                                                <materialDesign:PackIcon Kind="ArrowDownBold" Width="14" Height="14" />
-                                            </Button>
+                                            <TextBlock VerticalAlignment="Center"
+                                                   Foreground="{DynamicResource PrimaryTextBrush}"
+                                                   FontSize="11"
+                                                   FontWeight="Bold"
+                                                   Text="{Binding Text[NetworkSettings]}" />
+                                            <Button Grid.Column="1"
+                                                Width="48"
+                                                Height="24"
+                                                Margin="6,0,0,0"
+                                                Padding="4,0"
+                                                FontSize="11"
+                                                Click="SaveNetworkSettingsButton_OnClick"
+                                                Style="{StaticResource TopBarSmallButton}"
+                                                Content="{Binding Text[Save]}" />
                                         </Grid>
+                                        <StackPanel Grid.Row="1" Margin="0,5,0,0">
+                                            <TextBlock Text="{Binding Text[JetsonIp]}"
+                                                Style="{StaticResource SettingsCompactLabel}" />
+                                            <TextBox x:Name="JetsonHostTextBox"
+                                                Height="28"
+                                                Padding="6,3"
+                                                FontSize="12"
+                                                Style="{StaticResource SettingsCompactTextBox}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Row="2" Margin="0,5,0,0">
+                                            <TextBlock Text="{Binding Text[PcIp]}"
+                                                Style="{StaticResource SettingsCompactLabel}" />
+                                            <ComboBox x:Name="PcGuiHostComboBox"
+                                                Height="28"
+                                                Padding="6,2"
+                                                FontSize="12"
+                                                IsEditable="True"
+                                                Style="{StaticResource SettingsCompactComboBox}">
+                                                <ComboBox.Resources>
+                                                    <Style TargetType="TextBox">
+                                                        <Setter Property="Foreground" Value="#FF111827" />
+                                                        <Setter Property="Background" Value="{DynamicResource DrawerItemBrush}" />
+                                                        <Setter Property="CaretBrush" Value="#FF111827" />
+                                                        <Setter Property="FontSize" Value="12" />
+                                                        <Setter Property="Padding" Value="6,3" />
+                                                        <Setter Property="VerticalContentAlignment" Value="Center" />
+                                                    </Style>
+                                                </ComboBox.Resources>
+                                            </ComboBox>
+                                        </StackPanel>
                                     </Grid>
                                 </Border>
 
@@ -1340,8 +1384,8 @@
                             </Button>
                         </Grid>
 
-                        <!-- ?쒖뒪???꾪솴 ?⑤꼸:
-                         ?꾪뿕 ?깃툒怨?二??먯?泥댁쿂??利됱떆 ?꾩슂???곹깭留??쒖떆?? -->
+                        <!-- 시스템 현황 패널:
+                         위험 등급과 주 탐지체처럼 즉시 필요한 상태만 표시한다. -->
                         <Border Grid.Row="1"
                             Margin="0,0,0,12"
                             Style="{StaticResource GlassCardBorder}"
@@ -1372,8 +1416,8 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- ?곹솴 遺꾩꽍 ?⑤꼸:
-                         ?ν썑 VLM 遺꾩꽍 臾몄옣???ㅼ떆媛꾩쑝濡??꾩쟻 ?쒖떆???곸뿭?? -->
+                        <!-- 상황 분석 패널:
+                         향후 VLM 분석 문장을 실시간으로 누적 표시할 영역이다. -->
                         <Border Grid.Row="1"
                             Margin="0,0,0,12"
                             Style="{StaticResource GlassCardBorder}"
@@ -1428,8 +1472,8 @@
                             </Grid>
                         </Border>
 
-                        <!-- ?쒖뒪??濡쒓렇 ?⑤꼸:
-                         以묒슂??紐⑤뱶 蹂寃? ??? 寃쎄퀬 ?대깽?몃쭔 ?④린???댁쁺 濡쒓렇 ?곸뿭?? -->
+                        <!-- 시스템 로그 패널:
+                         중요한 모드 변경과 상태 경고 이벤트만 남기는 운용 로그 영역이다. -->
                         <Border Grid.Row="2"
                             Style="{StaticResource GlassCardBorder}"
                             CornerRadius="2"
@@ -1899,7 +1943,7 @@
                 </Border>
             </Grid>
 
-            <!-- SettingsBackdrop? ?ㅼ젙李???諛곌꼍???대몼寃?源붽퀬 諛붽묑 ?대┃ ???ル뒗 ?ㅻ쾭?덉씠?? -->
+            <!-- SettingsBackdrop은 설정창 뒤 배경을 어둡게 깔고 바깥 클릭 시 닫히는 오버레이다. -->
             <Rectangle x:Name="SettingsBackdrop"
                    Fill="#22000000"
                    Opacity="0"
@@ -1908,8 +1952,8 @@
                    Panel.ZIndex="20"
                    MouseLeftButtonDown="SettingsBackdrop_OnMouseLeftButtonDown" />
 
-            <!-- ?ㅼ젙 ?쒕줈??
-             ?곗륫 ?щ씪?대뱶 ?⑤꼸?대ŉ 二??먯?泥댁? ?뚮쭏 蹂寃?湲곕뒫???댁쓬. -->
+            <!-- 설정 드로어.
+             오른쪽 슬라이드 패널이며 주 탐지체, 테마, 언어, 화면 모드, 네트워크 설정을 담는다. -->
             <Border x:Name="SettingsDrawer"
                 Width="280"
                 Margin="0,12,12,12"
@@ -1926,7 +1970,7 @@
                 Visibility="Collapsed"
                 Panel.ZIndex="21">
                 <Border.RenderTransform>
-                    <!-- 湲곕낯 ?꾩튂???붾㈃ ?ㅻⅨ履?諛붽묑?? ?대┫ ???덉そ?쇰줈 遺?쒕읇寃??대룞?? -->
+                    <!-- 기본 위치는 화면 오른쪽 바깥이며 열릴 때 왼쪽으로 부드럽게 이동한다. -->
                     <TranslateTransform x:Name="SettingsDrawerTransform" X="320" />
                 </Border.RenderTransform>
                 <Border.CacheMode>
@@ -2077,79 +2121,6 @@
                                 Style="{StaticResource SettingsActionButton}"
                                 Content="{Binding Text[WindowMode]}" />
 
-                            <Border Margin="0,12,0,8"
-                                BorderBrush="{DynamicResource DrawerBorderBrush}"
-                                BorderThickness="0,1,0,0">
-                                <TextBlock Margin="0,9,0,0"
-                                    Text="{Binding Text[NetworkSettings]}"
-                                    FontSize="16"
-                                    FontWeight="SemiBold"
-                                    Foreground="{DynamicResource DrawerTextBrush}" />
-                            </Border>
-
-                            <StackPanel>
-                                <Grid Margin="0,0,0,6">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0"
-                                        Margin="0,0,6,0">
-                                        <TextBlock Text="{Binding Text[JetsonIp]}"
-                                            Style="{StaticResource SettingsCompactLabel}" />
-                                        <TextBox x:Name="JetsonHostTextBox"
-                                            Style="{StaticResource SettingsCompactTextBox}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1">
-                                        <TextBlock Text="{Binding Text[PcIp]}"
-                                            Style="{StaticResource SettingsCompactLabel}" />
-                                        <ComboBox x:Name="PcGuiHostComboBox"
-                                            IsEditable="True"
-                                            Style="{StaticResource SettingsCompactComboBox}">
-                                            <ComboBox.Resources>
-                                                <Style TargetType="TextBox">
-                                                    <Setter Property="Foreground" Value="#FF111827" />
-                                                    <Setter Property="Background" Value="{DynamicResource DrawerItemBrush}" />
-                                                    <Setter Property="CaretBrush" Value="#FF111827" />
-                                                    <Setter Property="FontSize" Value="14" />
-                                                    <Setter Property="Padding" Value="8,6" />
-                                                    <Setter Property="VerticalContentAlignment" Value="Center" />
-                                                </Style>
-                                            </ComboBox.Resources>
-                                        </ComboBox>
-                                    </StackPanel>
-                                </Grid>
-
-                                <Grid Margin="0,0,0,6">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="*" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Grid.Column="0"
-                                        Margin="0,0,6,0">
-                                        <TextBlock Text="{Binding Text[SshUser]}"
-                                            Style="{StaticResource SettingsCompactLabel}" />
-                                        <TextBox x:Name="JetsonSshUserTextBox"
-                                            Style="{StaticResource SettingsCompactTextBox}" />
-                                    </StackPanel>
-                                    <StackPanel Grid.Column="1">
-                                        <TextBlock Text="{Binding Text[RecordedVideoUrl]}"
-                                            Style="{StaticResource SettingsCompactLabel}" />
-                                        <TextBox x:Name="RecordedVideoUrlTextBox"
-                                            Style="{StaticResource SettingsCompactTextBox}" />
-                                    </StackPanel>
-                                </Grid>
-
-                                <CheckBox x:Name="AutoStartBridgeCheckBox"
-                                    Margin="0,0,0,6"
-                                    Content="{Binding Text[AutoStartBridge]}"
-                                    FontSize="12"
-                                    Foreground="{DynamicResource DrawerTextBrush}" />
-
-                                <Button Click="SaveNetworkSettingsButton_OnClick"
-                                    Style="{StaticResource SettingsActionButton}"
-                                    Content="{Binding Text[Save]}" />
-                            </StackPanel>
                         </StackPanel>
                     </ScrollViewer>
                 </Grid>

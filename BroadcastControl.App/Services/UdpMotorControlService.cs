@@ -5,7 +5,7 @@ namespace BroadcastControl.App.Services;
 
 /// <summary>
 /// GUI에서 Thor로 모터 제어 명령을 보내는 UDP 송신 서비스다.
-/// MainViewModel이 만든 모드/추적/방향/각도/step size/YOLO 객체 ID 값을
+/// MainViewModel이 만든 모드/추적/방향/목표 각도/회전 각도 크기/YOLO 객체 ID 값을
 /// Thor가 해석할 수 있는 13B little-endian 패킷으로 직렬화한다.
 /// </summary>
 public sealed class UdpMotorControlService : IDisposable
@@ -15,16 +15,46 @@ public sealed class UdpMotorControlService : IDisposable
     private const int MotorCommandPacketSize = 13;
 
     private readonly UdpClient _udpClient = new();
+    private readonly object _endpointLock = new();
+    private string _host;
+    private int _port;
 
     public UdpMotorControlService(string? host = null, int? port = null)
     {
-        Host = ResolveHost(host);
-        Port = ResolvePort(port);
+        _host = ResolveHost(host);
+        _port = ResolvePort(port);
     }
 
-    public string Host { get; }
+    public string Host
+    {
+        get
+        {
+            lock (_endpointLock)
+            {
+                return _host;
+            }
+        }
+    }
 
-    public int Port { get; }
+    public int Port
+    {
+        get
+        {
+            lock (_endpointLock)
+            {
+                return _port;
+            }
+        }
+    }
+
+    public void ConfigureEndpoint(string? host, int? port = null)
+    {
+        lock (_endpointLock)
+        {
+            _host = ResolveHost(host);
+            _port = ResolvePort(port);
+        }
+    }
 
     public bool TrySendMotorCommandPacket(
         byte mode,
@@ -35,6 +65,7 @@ public sealed class UdpMotorControlService : IDisposable
         byte scanStep,
         byte manualStep,
         int yoloObjectId,
+        bool publishAngleCommand,
         out string? error)
     {
         // GUI -> Thor 모터 제어 패킷:
@@ -60,7 +91,15 @@ public sealed class UdpMotorControlService : IDisposable
     {
         try
         {
-            _udpClient.Send(packet, packet.Length, Host, Port);
+            string host;
+            int port;
+            lock (_endpointLock)
+            {
+                host = _host;
+                port = _port;
+            }
+
+            _udpClient.Send(packet, packet.Length, host, port);
             error = null;
             return true;
         }
@@ -73,12 +112,12 @@ public sealed class UdpMotorControlService : IDisposable
 
     private static byte EncodeStepSize(int stepSize)
     {
-        return (byte)Math.Clamp(stepSize, 1, 10);
+        return (byte)Math.Clamp(stepSize, 0, byte.MaxValue);
     }
 
     private static byte EncodeButtonMask(MotorButtonMask buttons)
     {
-        return (byte)((byte)buttons & 0x0F);
+        return (byte)((byte)buttons & 0x1F);
     }
 
     private static string ResolveHost(string? host)
@@ -106,15 +145,4 @@ public sealed class UdpMotorControlService : IDisposable
             ? parsedPort
             : DefaultPort;
     }
-}
-
-[Flags]
-public enum MotorButtonMask : byte
-{
-    None = 0,
-    Right = 0x01,
-    Left = 0x02,
-    Up = 0x04,
-    Down = 0x08,
-    Center = 0x10
 }

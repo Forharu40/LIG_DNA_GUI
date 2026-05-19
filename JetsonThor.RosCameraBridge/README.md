@@ -65,7 +65,17 @@ GUI에서 별도 수신하는 UDP 포트:
 
 ## 실행
 
-PC 노트북 IP가 `192.168.1.94`일 때:
+기본 실행:
+
+```bash
+cd ~/LIG_DNA_GUI/JetsonThor.RosCameraBridge
+bash ./run_camera_udp_bridge.sh
+```
+
+`GUI_HOST`를 직접 지정하지 않으면 스크립트가 `../BroadcastControl.App/LigDnaGui.config.json`의 `PcGuiHost` 값을 읽어 GUI 송출 대상 IP로 사용합니다.
+GUI에서 GUI IP를 바꾸고 저장한 뒤 Jetson 쪽 코드에도 같은 설정 파일이 반영되어 있으면, 다음 브릿지 실행부터 새 GUI IP로 송출됩니다.
+
+특정 IP를 임시로 강제하려면:
 
 ```bash
 cd ~/LIG_DNA_GUI/JetsonThor.RosCameraBridge
@@ -76,7 +86,7 @@ GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh
 
 ```bash
 cd ~/LIG_DNA_GUI/JetsonThor.RosCameraBridge
-GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh --build
+bash ./run_camera_udp_bridge.sh --build
 ```
 
 스크립트 기본값:
@@ -86,6 +96,7 @@ CONTAINER_NAME=gui_camera_bridge
 IMAGE_NAME=gui_camera_bridge
 WORKSPACE_DIR=/home/lig/gui_camera_ws
 WORKSPACE_SETUP=/ros2_ws/install/local_setup.bash
+GUI_CONFIG_FILE=../BroadcastControl.App/LigDnaGui.config.json
 EO_GUI_PORT=6000
 IR_GUI_PORT=6001
 JETSON_RECORDING_DIR=/home/lig/Desktop/video

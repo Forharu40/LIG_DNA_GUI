@@ -34,6 +34,10 @@ try:
     from sentinel_interfaces.msg import TrackedDetection2DArray as TrackArrayMessage
 except ImportError:
     from sentinel_interfaces.msg import Detection2DArray as TrackArrayMessage
+try:
+    from sentinel_interfaces.msg import MotorAngle
+except ImportError:
+    MotorAngle = None
 
 
 LEGACY_IMAGE_HEADER_SIZE = 20
@@ -76,6 +80,9 @@ EO_IMAGE_TOPIC = os.getenv("EO_IMAGE_TOPIC", "/camera/eo")
 IR_IMAGE_TOPIC = os.getenv("IR_IMAGE_TOPIC", "/camera/ir")
 EO_DETECTION_TOPIC = os.getenv("EO_DETECTION_TOPIC", "/tracks/eo")
 IR_DETECTION_TOPIC = os.getenv("IR_DETECTION_TOPIC", "/tracks/ir")
+MOTOR_CONTROL_PORT = getenv_int("MOTOR_CONTROL_PORT", 8000)
+MOTOR_ANGLE_SET_TOPIC = os.getenv("MOTOR_ANGLE_SET_TOPIC", "/motor/angle/set")
+MOTOR_ANGLE_BRIDGE_ENABLED = getenv_bool("MOTOR_ANGLE_BRIDGE_ENABLED", False)
 STREAM_WIDTH = getenv_int("STREAM_WIDTH", 0)
 STREAM_HEIGHT = getenv_int("STREAM_HEIGHT", 0)
 JPEG_QUALITY = getenv_int("JPEG_QUALITY", 85)
@@ -817,6 +824,80 @@ class StreamBridge:
             recorder.close()
 
 
+class MotorCommandUdpReceiver:
+    COMMAND_PACKET_SIZE = 13
+    ANGLE_COMMAND_FLAG = 0x80
+
+    def __init__(self, node: Node, port: int, topic: str) -> None:
+        self.node = node
+        self.port = port
+        self.topic = topic
+        self.publisher = None
+        self.sock: socket.socket | None = None
+        self.thread: threading.Thread | None = None
+        self._stop_event = threading.Event()
+
+        if MotorAngle is None:
+            self.node.get_logger().warning(
+                "sentinel_interfaces/msg/MotorAngle is unavailable; GUI motor UDP commands will not be published."
+            )
+            return
+
+        self.publisher = self.node.create_publisher(MotorAngle, topic, 10)
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("0.0.0.0", port))
+        self.sock.settimeout(0.5)
+        self.thread = threading.Thread(target=self._receive_loop, name="motor-command-udp", daemon=True)
+        self.thread.start()
+        self.node.get_logger().info(f"Listening for GUI motor commands on UDP port {port}")
+        self.node.get_logger().info(f"Publishing motor angle commands to {topic}")
+
+    def _receive_loop(self) -> None:
+        assert self.sock is not None
+        while not self._stop_event.is_set():
+            try:
+                packet, _ = self.sock.recvfrom(1024)
+            except socket.timeout:
+                continue
+            except OSError:
+                return
+
+            if len(packet) < self.COMMAND_PACKET_SIZE:
+                continue
+
+            try:
+                button_mask = packet[2]
+                if (button_mask & self.ANGLE_COMMAND_FLAG) == 0:
+                    continue
+
+                pan = self._clamp_raw(struct.unpack_from("<H", packet, 3)[0])
+                tilt = self._clamp_raw(struct.unpack_from("<H", packet, 5)[0])
+                self._publish_motor_angle(pan, tilt)
+            except Exception as exc:
+                self.node.get_logger().error(f"Failed to publish GUI motor command: {exc}")
+
+    def _publish_motor_angle(self, pan: int, tilt: int) -> None:
+        if self.publisher is None or MotorAngle is None:
+            return
+
+        message = MotorAngle()
+        message.pan = pan
+        message.tilt = tilt
+        self.publisher.publish(message)
+
+    @staticmethod
+    def _clamp_raw(value: int) -> int:
+        return max(0, min(4095, int(value)))
+
+    def close(self) -> None:
+        self._stop_event.set()
+        if self.sock is not None:
+            self.sock.close()
+        if self.thread is not None:
+            self.thread.join(timeout=1.0)
+
+
 class CameraUdpBridge(Node):
     def __init__(self) -> None:
         super().__init__("camera_udp_bridge")
@@ -824,6 +905,11 @@ class CameraUdpBridge(Node):
         # 이 노드가 topic 데이터를 GUI 전용 UDP 프로토콜로 변환하는 경계 역할을 한다.
         self._eo = StreamBridge("eo", EO_IMAGE_TOPIC, EO_DETECTION_TOPIC, GUI_HOST, EO_GUI_PORT)
         self._ir = StreamBridge("ir", IR_IMAGE_TOPIC, IR_DETECTION_TOPIC, GUI_HOST, IR_GUI_PORT)
+        self._motor = (
+            MotorCommandUdpReceiver(self, MOTOR_CONTROL_PORT, MOTOR_ANGLE_SET_TOPIC)
+            if MOTOR_ANGLE_BRIDGE_ENABLED
+            else None
+        )
         self._recording_http_server: ThreadingHTTPServer | None = None
         self._recording_http_thread: threading.Thread | None = None
         self._recording_segment_scheduler = (
@@ -843,6 +929,10 @@ class CameraUdpBridge(Node):
         self.get_logger().info(f"IR detection topic: {IR_DETECTION_TOPIC}")
         self.get_logger().info(f"Streaming EO UDP packets to {GUI_HOST}:{EO_GUI_PORT}")
         self.get_logger().info(f"Streaming IR UDP packets to {GUI_HOST}:{IR_GUI_PORT}")
+        if MOTOR_ANGLE_BRIDGE_ENABLED:
+            self.get_logger().info(f"Motor angle bridge enabled on UDP port {MOTOR_CONTROL_PORT}")
+        else:
+            self.get_logger().info("Motor angle bridge disabled; UDP 8000 remains available for the motor controller")
         if RECORDING_ENABLED:
             self.get_logger().info(
                 f"Recording EO/IR videos to {RECORDING_DIR} every {RECORDING_SEGMENT_SECONDS} seconds"
@@ -888,6 +978,8 @@ class CameraUdpBridge(Node):
     def close(self) -> None:
         self._eo.close()
         self._ir.close()
+        if self._motor is not None:
+            self._motor.close()
         if self._recording_segment_scheduler is not None:
             self._recording_segment_scheduler.close()
         if self._recording_http_server is not None:

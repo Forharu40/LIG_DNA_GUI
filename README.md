@@ -1,201 +1,122 @@
 # LIG DNA GUI
 
-운용통제 GUI와 Jetson ROS2 브릿지를 함께 사용하는 EO/IR 감시 시스템입니다.
+LIG DNA GUI는 Windows WPF 기반 운용통제 화면과 Jetson ROS2 브릿지를 함께 사용하는 EO/IR 감시 GUI입니다.
 
-PC의 WPF GUI는 Jetson ROS2 토픽을 직접 구독하지 않고, Jetson에서 실행되는
-`gui_camera_bridge`가 ROS2 토픽을 구독한 뒤 GUI 전용 UDP 패킷으로 변환해 보내는
-구조를 기본으로 사용합니다.
+GUI는 Jetson의 ROS2 토픽을 직접 구독하지 않습니다. Jetson에서 실행되는 브릿지가 ROS2 토픽을 UDP 패킷으로 변환해 PC GUI로 보내고, GUI는 영상, 탐지 결과, VLM 결과, 모터 상태를 받아 화면에 표시합니다.
 
-## 전체 시스템 흐름
+## 현재 운용 구조
 
 ```text
-Zybo / Camera
-  -> Jetson video_rx node
-  -> /camera/eo, /camera/ir
-  -> YOLO detector node
-  -> /tracks/eo, /tracks/ir
-  -> gui_camera_bridge
-  -> PC GUI UDP 6000/6001, VLM UDP 6002
-  -> BroadcastControl.App 화면 출력, 바운딩 박스, 녹화, 알림, 모터 제어
+Camera / Zybo
+  -> Jetson ROS2 nodes
+  -> gui_bridge:dev 또는 camera bridge
+  -> PC GUI UDP ports
+  -> BroadcastControl.App
 ```
 
-## 주요 구성 요소
+GUI에서 Jetson 브릿지를 SSH로 자동 실행하는 기능은 제거했습니다. Network Settings에는 Jetson IP와 PC IP만 남겨 두고, 브릿지 컨테이너 실행과 종료는 Jetson에서 별도로 관리합니다.
 
-| 구성 | 역할 |
+## 주요 구성
+
+| 경로 | 역할 |
 | --- | --- |
-| `BroadcastControl.App` | Windows WPF 운용통제 GUI |
-| `JetsonThor.RosCameraBridge` | Jetson ROS2 토픽을 PC GUI UDP 패킷으로 변환하는 Docker 브릿지 |
-| `BroadcastControl.UdpBenchmark` | EO/IR UDP 수신 성능 비교 도구 |
-| `docs` | 구조와 기능 정리 문서 |
+| `BroadcastControl.App` | Windows WPF GUI |
+| `JetsonThor.RosCameraBridge` | Jetson 카메라 UDP 브릿지 실행 스크립트와 Python 브릿지 |
+| `BroadcastControl.UdpBenchmark` | UDP 수신 성능 확인용 도구 |
+| `docs` | 구조와 운용 관련 보조 문서 |
 
-## PC GUI 역할
+## 네트워크 포트
 
-`BroadcastControl.App`는 PC에서 실행되는 운용통제 화면입니다.
+| 포트 | 방향 | 기능 |
+| --- | --- | --- |
+| `6000/udp` | Jetson -> GUI | EO 영상, EO 탐지/추적 패킷 |
+| `6001/udp` | Jetson -> GUI | IR 영상 |
+| `6002/udp` | Jetson/VLM -> GUI | VLM 분석 결과 |
+| `8000/udp` | GUI -> Jetson | 모터 제어 명령 패킷 |
+| `8001/udp` | Jetson -> GUI | 모터 상태 패킷 |
+| `8088/tcp` | Mobile -> GUI | 모바일 위험 알림 HTTP/SSE |
+| `8090/tcp` | GUI -> Jetson | 녹화 영상 목록/다운로드 HTTP 서버 |
 
-- EO 영상 UDP 수신: `6000`
-- IR 영상 UDP 수신: `6001`
-- VLM 결과 UDP 수신: `6002`
-- 모터 명령 UDP 송신: `8000`
-- 모터 상태 UDP 수신: `8001`
-- YOLO detection 패킷 수신 및 바운딩 박스 표시
-- EO/IR 화면 회전, 전자 줌, 밝기/대조비 조절
-- 녹화 영상 목록 확인 및 재생
-- 위험 등급, 주 탐지체, VLM 분석 결과 표시
-- 모바일 위험 알림 웹앱 제공
-- 모터 수동 제어, 각도 설정, 모터 상태 표시
+## 모터 제어 패킷
 
-GUI는 Jetson ROS2 토픽을 직접 받는 것이 아니라, Jetson bridge가 보내는 UDP 패킷을 받습니다.
+GUI는 `8000/udp`로 13바이트 little-endian 패킷을 보냅니다.
 
-## Jetson Bridge 역할
+| 바이트 | 필드 | 설명 |
+| --- | --- | --- |
+| `0` | mode | 자동/수동 모드 |
+| `1` | tracking | 추적 명령. 추적 상태가 켜져 있고 위험 객체가 선택된 경우에만 `1` |
+| `2` | btn_mask | 방향 버튼 비트 |
+| `3~4` | pan_pos | pan raw 위치 `0~4095` |
+| `5~6` | tilt_pos | tilt raw 위치 `0~4095` |
+| `7` | scan_step | 자동 스캔 step size |
+| `8` | manual_step | 수동 조작 step size |
+| `9~12` | yolo_object_id | 추적 대상 YOLO/track 객체 ID |
 
-`gui_camera_bridge`는 Jetson에서 실행되는 Docker 컨테이너입니다.
+GUI의 step size 표시는 1도부터 10도까지 사용합니다. 모터로 보낼 때는 `deg / 360.0 * 4096.0` 기준으로 raw step 값으로 변환합니다.
 
-구독하는 ROS2 토픽:
+모터 상태는 `8001/udp`로 받습니다. 현재 명세는 pan 18바이트와 tilt 18바이트가 이어진 36바이트 패킷입니다.
 
-| 데이터 | 기본 토픽 |
-| --- | --- |
-| EO image | `/camera/eo` |
-| IR image | `/camera/ir` |
-| EO track/detection | `/tracks/eo` |
-| IR track/detection | `/tracks/ir` |
+## 녹화 영상
 
-PC GUI로 보내는 UDP 포트:
+GUI의 녹화 영상 목록은 Jetson의 녹화 HTTP 서버에서 가져옵니다.
 
-| 데이터 | GUI 포트 |
-| --- | --- |
-| EO 영상 및 EO detection | `6000` |
-| IR 영상 | `6001` |
-| VLM 결과 | `6002` |
-| 모터 명령 | `8000` |
-| 모터 상태 | `8001` |
+기본 주소는 다음 형식입니다.
 
-IR 카메라가 Zybo에서 Jetson `video_rx_node`로 들어올 때는 `5001` 포트를 사용합니다.
-혼동을 피하기 위해 Jetson bridge에서 PC GUI로 보내는 IR 포트는 `6001`로 분리했습니다.
-
-모터 UDP 패킷:
-
-| 방향 | 포트 | 크기 | 내용 |
-| --- | --- | --- | --- |
-| GUI -> Thor | `8000/udp` | `13B` | mode 1B, tracking 1B, btn_mask 1B, pan_pos 2B, tilt_pos 2B, scan_step 1B, manual_step 1B, yolo_object_id 4B |
-| Thor -> GUI | `8001/udp` | `36B` | pan motor 18B + tilt motor 18B |
-
-GUI -> Thor의 pan_pos/tilt_pos는 Dynamixel 위치값 `0~4095` 범위의 UInt16 little-endian 값입니다.
-btn_mask는 `0x01` PAN+, `0x02` PAN-, `0x04` TILT+, `0x08` TILT- 비트를 사용합니다.
-yolo_object_id는 GUI가 영상 화면에서 선택했거나 자동으로 고른 YOLO 객체 ID이며 int32 little-endian으로 전송합니다.
-VLM이 객체별 위험도를 제공하면 GUI는 가장 높은 위험도를 시스템 위험 등급으로 표시하고, 각 바운딩 박스는 낮음/중간/높음 순서대로 초록/노랑/빨강으로 표시합니다.
-
-## 실행 순서
-
-### 1. Jetson에서 ROS2 영상 토픽 확인
-
-```bash
-docker exec thor2 bash -lc 'source /opt/ros/jazzy/setup.bash; source /ros2_ws/install/local_setup.bash; ros2 topic list | grep -E "camera|video|detection"'
-docker exec thor2 bash -lc 'source /opt/ros/jazzy/setup.bash; source /ros2_ws/install/local_setup.bash; timeout 10 ros2 topic hz /camera/ir'
+```text
+http://{Jetson IP}:8090/api/videos
 ```
 
-### 2. Jetson에서 bridge 실행
+따라서 GUI 목록에 녹화 영상이 뜨려면 Jetson 쪽에서 `8090/tcp` HTTP 서버가 실행 중이어야 하고, PC에서 해당 Jetson IP로 접근 가능해야 합니다.
+
+## GUI IP 적용
+
+GUI의 Network 영역에서 `GUI IP`를 저장하면 `LigDnaGui.config.json`의 `PcGuiHost` 값이 바뀝니다.
+`JetsonThor.RosCameraBridge/run_camera_udp_bridge.sh`는 `GUI_HOST` 환경변수를 따로 주지 않은 경우 이 값을 읽어 다음 실행 시 송출 대상 IP로 사용합니다.
+
+즉, Jetson 브릿지를 껐다가 다시 켤 때 다음처럼 실행하면 저장된 GUI IP가 자동 적용됩니다.
 
 ```bash
 cd ~/LIG_DNA_GUI/JetsonThor.RosCameraBridge
-GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh
+bash ./run_camera_udp_bridge.sh
 ```
 
-이미지를 새로 빌드해야 할 때:
+단, Windows GUI에서 저장한 설정 파일과 Jetson 쪽 `~/LIG_DNA_GUI/BroadcastControl.App/LigDnaGui.config.json`이 같은 값으로 반영되어 있어야 합니다.
 
-```bash
-cd ~/LIG_DNA_GUI/JetsonThor.RosCameraBridge
-GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh --build
-```
+## C# 파일 역할
 
-`GUI_HOST`는 PC 노트북의 IPv4 주소입니다.
+| 파일 | 역할 |
+| --- | --- |
+| `BroadcastControl.App/App.xaml.cs` | 앱 시작점, 다크/라이트 테마 적용, 공통 브러시 리소스 갱신 |
+| `BroadcastControl.App/AssemblyInfo.cs` | WPF 리소스 딕셔너리 탐색 위치 설정 |
+| `BroadcastControl.App/MainWindow.xaml.cs` | 메인 화면 code-behind. 서비스 연결, UI 이벤트, 영상 표시, 탐지 오버레이, 녹화 영상 UI, 네트워크 설정 저장을 담당 |
+| `BroadcastControl.App/Infrastructure/RelayCommand.cs` | ViewModel 명령을 WPF `ICommand`로 연결하는 공통 커맨드 클래스 |
+| `BroadcastControl.App/Services/AppNetworkSettings.cs` | `LigDnaGui.config.json` 기반 네트워크 설정 로드/저장, 로컬 PC IPv4 목록 조회 |
+| `BroadcastControl.App/Services/MobileAlertHubService.cs` | 모바일 브라우저용 위험 알림 HTTP/SSE 서버 |
+| `BroadcastControl.App/Services/UdpEncodedVideoReceiverService.cs` | EO/IR UDP 영상 조각 조립, JPEG 디코딩, detection/status 패킷 전달 |
+| `BroadcastControl.App/Services/UdpMotorControlService.cs` | GUI의 모터 제어 상태를 13바이트 UDP 패킷으로 직렬화해 Jetson으로 송신 |
+| `BroadcastControl.App/Services/UdpMotorStatusReceiverService.cs` | Jetson에서 오는 모터 상태 패킷을 수신하고 pan/tilt 상태로 파싱 |
+| `BroadcastControl.App/Services/UdpVlmResultReceiverService.cs` | VLM 분석 결과 UDP 수신, 전체 위험도와 객체별 위험도 파싱 |
+| `BroadcastControl.App/Services/ViewportRecordingService.cs` | 현재 GUI 화면 영역을 로컬 동영상 파일로 저장 |
+| `BroadcastControl.App/ViewModels/MainViewModel.cs` | 화면 상태와 명령의 중심 ViewModel. 모드, 추적 조건, 모터 raw/degree 변환, 로그, 언어, 테마 상태를 관리 |
 
-EO 화면은 기본적으로 전처리 전 원본 토픽인 `/camera/eo`를 사용합니다.
-전처리 영상을 다시 쓰려면 다음처럼 실행합니다.
+## MVVM 구조
 
-```bash
-EO_IMAGE_TOPIC=/video/eo/preprocessed GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh
-```
+이 프로젝트는 WPF MVVM 구조를 기본으로 사용합니다.
 
-### 3. PC에서 GUI 실행
+| 계층 | 파일 | 설명 |
+| --- | --- | --- |
+| View | `MainWindow.xaml` | 실제 화면 레이아웃과 바인딩 정의 |
+| View code-behind | `MainWindow.xaml.cs` | WPF 컨트롤, 마우스 입력, 영상 렌더링처럼 View에 가까운 작업 처리 |
+| ViewModel | `MainViewModel.cs` | 화면에 표시할 상태와 버튼 명령 관리 |
+| Services | `Services/*.cs` | UDP, HTTP, 녹화, 설정 파일 같은 외부 입출력 담당 |
+| Infrastructure | `RelayCommand.cs` | MVVM 명령 연결 보조 |
 
-Visual Studio에서 `BroadcastControl.App`를 시작 프로젝트로 설정한 뒤 실행합니다.
+영상 렌더링, 마우스 클릭 좌표, WPF `Image` 컨트롤, 녹화 미디어 컨트롤처럼 View 객체에 직접 접근해야 하는 기능은 `MainWindow.xaml.cs`에 남겨 두었습니다. 대신 모드 판단, 추적 가능 여부, 모터 값 변환, 표시 텍스트 같은 상태 중심 로직은 `MainViewModel.cs`에서 관리합니다.
 
-## FastDDS no-shm 설정
-
-Jetson에서 `thor2` 컨테이너는 `/camera/ir` 토픽을 정상 수신하지만,
-별도 `gui_camera_bridge` 컨테이너가 이미지 메시지를 받지 못하는 경우가 있었습니다.
-
-원인은 컨테이너 간 DDS shared memory 전송 문제였고, 현재
-`run_camera_udp_bridge.sh`는 기본적으로 FastDDS shared memory를 끄는 설정을 자동 적용합니다.
-
-기본값:
-
-```text
-FASTDDS_NO_SHM=true
-```
-
-스크립트가 자동으로 생성하는 파일:
-
-```text
-JetsonThor.RosCameraBridge/fastdds_no_shm.xml
-```
-
-기본 설정을 끄고 원래 방식으로 실행하려면:
-
-```bash
-FASTDDS_NO_SHM=false GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh
-```
-
-## 문제 확인 명령어
-
-### Zybo -> Jetson IR 입력 확인
-
-```bash
-sudo tcpdump -ni any udp port 5001
-```
-
-### Jetson video_rx 상태 확인
-
-```bash
-docker exec thor2 bash -lc 'source /opt/ros/jazzy/setup.bash; source /ros2_ws/install/local_setup.bash; ros2 topic echo /camera/ir/rx_status --once'
-```
-
-### Bridge 로그 확인
-
-```bash
-docker logs --tail 100 gui_camera_bridge
-```
-
-정상 로그 예:
-
-```text
-Streaming IR UDP packets to 192.168.1.94:6001
-IR first image sent!
-```
-
-### Jetson -> PC GUI UDP 송신 확인
-
-```bash
-sudo tcpdump -ni any dst host 192.168.1.94 and udp and \( port 6000 or port 6001 or port 6002 \)
-```
-
-### Windows에서 UDP 수신 확인
-
-GUI를 끈 뒤 PowerShell에서:
-
-```powershell
-$udp = New-Object System.Net.Sockets.UdpClient(6001)
-$ep = New-Object System.Net.IPEndPoint([System.Net.IPAddress]::Any, 0)
-while ($true) {
-  $bytes = $udp.Receive([ref]$ep)
-  Write-Host "$($ep.Address):$($ep.Port) length=$($bytes.Length)"
-}
-```
-
-## PC GUI 빌드
+## 빌드
 
 ```powershell
 dotnet build .\BroadcastControl.App\BroadcastControl.App.csproj
 ```
 
-현재 GUI는 `net10.0-windows`를 대상으로 하므로 Windows Desktop을 포함한 .NET 10 SDK가 필요합니다.
+현재 GUI는 Windows WPF 앱이므로 Windows Desktop을 포함한 .NET SDK가 필요합니다.

@@ -253,11 +253,3 @@ public sealed class UdpVlmResultReceiverService : IDisposable
             : DefaultPort;
     }
 }
-
-public readonly record struct VlmResultPacket(
-    string ThreatLevel,
-    string AnalysisMessage,
-    string DetectionSummary,
-    uint? FrameId,
-    IReadOnlyDictionary<int, string> ObjectThreatLevels,
-    DateTime ReceivedAt);

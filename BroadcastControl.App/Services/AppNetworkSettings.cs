@@ -19,15 +19,7 @@ public sealed class AppNetworkSettings
 
     public string PcGuiHost { get; set; } = "192.168.1.94";
 
-    public string JetsonSshUser { get; set; } = "lig";
-
-    public string JetsonBridgeDir { get; set; } = "~/LIG_DNA_GUI/JetsonThor.RosCameraBridge";
-
     public string JetsonRecordingDir { get; set; } = "/home/lig/Desktop/video";
-
-    public bool AutoStartBridge { get; set; } = true;
-
-    public bool BuildBridgeOnStart { get; set; }
 
     public int EoUdpPort { get; set; } = 6000;
 
@@ -103,14 +95,10 @@ public sealed class AppNetworkSettings
 
     private void ApplyEnvironmentOverrides()
     {
-        JetsonHost = GetEnvironment("JETSON_SSH_HOST", JetsonHost);
+        JetsonHost = GetEnvironment("JETSON_HOST", JetsonHost);
         PcGuiHost = GetEnvironment("JETSON_GUI_HOST", PcGuiHost);
-        JetsonSshUser = GetEnvironment("JETSON_SSH_USER", JetsonSshUser);
-        JetsonBridgeDir = GetEnvironment("JETSON_BRIDGE_DIR", JetsonBridgeDir);
         JetsonRecordingDir = GetEnvironment("JETSON_RECORDING_DIR", JetsonRecordingDir);
         RecordedVideoUrl = GetEnvironment("JETSON_VIDEO_URL", RecordedVideoUrl);
-        AutoStartBridge = GetBoolEnvironment("JETSON_AUTO_BRIDGE", AutoStartBridge);
-        BuildBridgeOnStart = GetBoolEnvironment("JETSON_BRIDGE_BUILD", BuildBridgeOnStart);
         EoUdpPort = GetIntEnvironment("EO_GUI_PORT", EoUdpPort);
         IrUdpPort = GetIntEnvironment("IR_GUI_PORT", IrUdpPort);
         VlmResultPort = GetIntEnvironment("VLM_RESULT_PORT", VlmResultPort);
@@ -125,8 +113,6 @@ public sealed class AppNetworkSettings
     {
         JetsonHost = Clean(JetsonHost, "192.168.3.143");
         PcGuiHost = Clean(PcGuiHost, "192.168.1.94");
-        JetsonSshUser = Clean(JetsonSshUser, "lig");
-        JetsonBridgeDir = Clean(JetsonBridgeDir, "~/LIG_DNA_GUI/JetsonThor.RosCameraBridge");
         JetsonRecordingDir = Clean(JetsonRecordingDir, "/home/lig/Desktop/video");
         EoUdpPort = ClampPort(EoUdpPort, 6000);
         IrUdpPort = ClampPort(IrUdpPort, 6001);
@@ -173,19 +159,4 @@ public sealed class AppNetworkSettings
         return int.TryParse(value, out var parsed) && parsed is > 0 and <= 65535 ? parsed : fallback;
     }
 
-    private static bool GetBoolEnvironment(string name, bool fallback)
-    {
-        var value = Environment.GetEnvironmentVariable(name);
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            return fallback;
-        }
-
-        return value.Trim().ToLowerInvariant() switch
-        {
-            "1" or "true" or "yes" or "on" => true,
-            "0" or "false" or "no" or "off" => false,
-            _ => fallback
-        };
-    }
 }

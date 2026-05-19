@@ -52,23 +52,30 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double _viewportHeight = 1;
     private double _motorPan;
     private double _motorTilt;
-    private int _autoPanMotorStepSize = DefaultMotorStepSize;
-    private int _autoTiltMotorStepSize = DefaultMotorStepSize;
-    private int _manualPanMotorStepSize = DefaultMotorStepSize;
-    private int _manualTiltMotorStepSize = DefaultMotorStepSize;
+    private ushort _motorPanRaw;
+    private ushort _motorTiltRaw;
+    private ushort? _panMotorFeedbackRaw;
+    private ushort? _tiltMotorFeedbackRaw;
+    private int _autoMotorAngleSize = DefaultMotorAngleSize;
+    private int _manualMotorAngleSize = DefaultMotorAngleSize;
     private double _panMotorPositionDegrees;
     private double _tiltMotorPositionDegrees;
     private bool _isMotorDetailsOpen;
     private UiLanguage _uiLanguage = UiLanguage.English;
-    private string _motorTargetPanText = "0.0";
-    private string _motorTargetTiltText = "0.0";
+    private string _motorTargetPanText = string.Empty;
+    private string _motorTargetTiltText = string.Empty;
     private bool _hasTrackedTarget;
     private bool _isTrackingModeEnabled = true;
     private int _yoloObjectId = -1;
+    private DateTime _lastAutomaticTrackingPacketSentAt = DateTime.MinValue;
     private readonly UdpMotorControlService _motorControlService;
     private const double MotorPanLimitDegrees = 360;
     private const double MotorTiltLimitDegrees = 360;
-    private const int DefaultMotorStepSize = 8;
+    private const int MotorRawMinimum = 0;
+    private const int MotorRawMaximum = 4095;
+    private const double MotorRawResolution = 4096.0;
+    private const int DefaultMotorAngleSize = 8;
+    private const int AutomaticTrackingResendMilliseconds = 250;
     private const int VisibleLogItemLimit = 30;
     private const int StoredLogItemLimit = 100;
     private readonly List<AnalysisItem> _analysisHistory = new();
@@ -286,65 +293,35 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double MotorControlsOpacity => CanUseMotorControls ? 1.0 : 0.38;
 
-    public int AutoPanMotorStepSize
+    public int AutoMotorAngleSize
     {
-        get => _autoPanMotorStepSize;
+        get => _autoMotorAngleSize;
         private set
         {
             var normalized = Math.Clamp(value, 1, 10);
-            if (SetProperty(ref _autoPanMotorStepSize, normalized))
+            if (SetProperty(ref _autoMotorAngleSize, normalized))
             {
-                OnPropertyChanged(nameof(AutoPanMotorStepSizeText));
+                OnPropertyChanged(nameof(AutoMotorAngleSizeText));
             }
         }
     }
 
-    public int AutoTiltMotorStepSize
+    public int ManualMotorAngleSize
     {
-        get => _autoTiltMotorStepSize;
+        get => _manualMotorAngleSize;
         private set
         {
             var normalized = Math.Clamp(value, 1, 10);
-            if (SetProperty(ref _autoTiltMotorStepSize, normalized))
+            if (SetProperty(ref _manualMotorAngleSize, normalized))
             {
-                OnPropertyChanged(nameof(AutoTiltMotorStepSizeText));
+                OnPropertyChanged(nameof(ManualMotorAngleSizeText));
             }
         }
     }
 
-    public int ManualPanMotorStepSize
-    {
-        get => _manualPanMotorStepSize;
-        private set
-        {
-            var normalized = Math.Clamp(value, 1, 10);
-            if (SetProperty(ref _manualPanMotorStepSize, normalized))
-            {
-                OnPropertyChanged(nameof(ManualPanMotorStepSizeText));
-            }
-        }
-    }
+    public string AutoMotorAngleSizeText => $"{AutoMotorAngleSize.ToString(CultureInfo.InvariantCulture)}°";
 
-    public int ManualTiltMotorStepSize
-    {
-        get => _manualTiltMotorStepSize;
-        private set
-        {
-            var normalized = Math.Clamp(value, 1, 10);
-            if (SetProperty(ref _manualTiltMotorStepSize, normalized))
-            {
-                OnPropertyChanged(nameof(ManualTiltMotorStepSizeText));
-            }
-        }
-    }
-
-    public string AutoPanMotorStepSizeText => AutoPanMotorStepSize.ToString(CultureInfo.InvariantCulture);
-
-    public string AutoTiltMotorStepSizeText => AutoTiltMotorStepSize.ToString(CultureInfo.InvariantCulture);
-
-    public string ManualPanMotorStepSizeText => ManualPanMotorStepSize.ToString(CultureInfo.InvariantCulture);
-
-    public string ManualTiltMotorStepSizeText => ManualTiltMotorStepSize.ToString(CultureInfo.InvariantCulture);
+    public string ManualMotorAngleSizeText => $"{ManualMotorAngleSize.ToString(CultureInfo.InvariantCulture)}°";
 
     public bool IsTrackingModeEnabled
     {
@@ -656,15 +633,21 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
     {
-        // 자동 모드에서는 가장 위협적인 객체 ID를 Thor로 보내서 모터가 같은 대상을 계속 추적할 수 있게 한다.
-        // 이 메서드는 화면 표시용 detection 목록이 갱신될 때마다 호출되며, 선택 대상이 바뀐 경우에만 패킷을 다시 보낸다.
-        var hasTrackedTarget = detections.Count > 0;
-        var yoloObjectId = detections
-            .OrderByDescending(detection => GetThreatWeight(detection.ThreatLevel))
-            .ThenByDescending(detection => detection.Score)
+        // tracking=1은 UI 토글만으로 보내지 않는다.
+        // VLM/위험도 판정 결과가 높음인 객체가 있고, tracking 기능도 켜진 경우에만 Zybo로 tracking=1을 보낸다.
+        var highThreatDetections = detections
+            .Where(detection => IsHighThreatLevel(detection.ThreatLevel))
+            .ToArray();
+        var hasTrackedTarget = highThreatDetections.Length > 0;
+        var yoloObjectId = highThreatDetections
+            .OrderByDescending(detection => detection.Score)
             .Select(detection => detection.ObjectId)
             .FirstOrDefault(-1);
-        if (_hasTrackedTarget == hasTrackedTarget && _yoloObjectId == yoloObjectId)
+        var targetChanged = _hasTrackedTarget != hasTrackedTarget || _yoloObjectId != yoloObjectId;
+        var shouldRefreshAutomaticTracking =
+            IsAutoMode &&
+            DateTime.Now - _lastAutomaticTrackingPacketSentAt >= TimeSpan.FromMilliseconds(AutomaticTrackingResendMilliseconds);
+        if (!targetChanged && !shouldRefreshAutomaticTracking)
         {
             return;
         }
@@ -678,20 +661,24 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             return;
         }
 
+        if (IsAutoMode)
+        {
+            _lastAutomaticTrackingPacketSentAt = DateTime.Now;
+        }
     }
 
-    public void SelectYoloObject(int objectId)
+    public void SelectYoloObject(int objectId, string threatLevel)
     {
         // 사용자가 영상에서 특정 바운딩 박스를 클릭했을 때 호출된다.
-        // 자동/수동 여부와 관계없이 YOLO 객체 ID를 저장하고 다음 모터 패킷에 포함한다.
+        // 위험 등급이 높음인 객체일 때만 tracking=1 후보로 저장한다.
         if (!IsSystemPoweredOn || objectId < 0)
         {
             return;
         }
 
-        // 사용자가 영상에서 객체를 직접 찍으면 YOLO가 준 객체 ID를 모터 패킷에 실어 보낸다.
-        _hasTrackedTarget = true;
-        _yoloObjectId = objectId;
+        var isHighThreat = IsHighThreatLevel(threatLevel);
+        _hasTrackedTarget = isHighThreat;
+        _yoloObjectId = isHighThreat ? objectId : -1;
         IsTrackingModeEnabled = true;
 
         if (!TrySendMotorCommandPacket(out var error))
@@ -700,7 +687,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        AppendImportantLog($"YOLO 객체 ID 전송: object {objectId}");
+        AppendImportantLog(isHighThreat
+            ? $"위험 객체 추적 ID 전송: object {objectId}"
+            : $"선택한 객체는 위험 등급 높음이 아니므로 tracking=0을 전송했습니다: object {objectId}");
     }
 
     public void ApplyVlmAnalysisResult(string threatLevel, string analysisMessage)
@@ -747,6 +736,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     {
         _motorPan = NormalizeMotorDegrees(panDegrees, MotorPanLimitDegrees);
         _motorTilt = NormalizeMotorDegrees(tiltDegrees, MotorTiltLimitDegrees);
+        _motorPanRaw = DegreesToDynamixelPosition(_motorPan);
+        _motorTiltRaw = DegreesToDynamixelPosition(_motorTilt);
         _panMotorPositionDegrees = _motorPan;
         _tiltMotorPositionDegrees = _motorTilt;
 
@@ -761,13 +752,21 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         // Thor에서 들어온 36B 모터 상태 패킷을 화면 표시용 항목으로 변환한다.
         // Dynamixel position(0~4095)은 사람이 읽기 쉬운 degree 값으로 함께 표시한다.
         UpdateMotorStatusItems(PanMotorStatusItems, snapshot.Pan);
+        _panMotorFeedbackRaw = ClampMotorRaw((int)Math.Min(snapshot.Pan.PresentPosition, (uint)MotorRawMaximum));
         _panMotorPositionDegrees = DynamixelPositionToDegrees(snapshot.Pan.PresentPosition);
+        _motorPanRaw = _panMotorFeedbackRaw.Value;
+        _motorPan = NormalizeMotorDegrees(_panMotorPositionDegrees, MotorPanLimitDegrees);
         OnPropertyChanged(nameof(PanMotorPositionText));
+        OnPropertyChanged(nameof(MotorPanText));
         if (snapshot.Tilt is { } tilt)
         {
             UpdateMotorStatusItems(TiltMotorStatusItems, tilt);
+            _tiltMotorFeedbackRaw = ClampMotorRaw((int)Math.Min(tilt.PresentPosition, (uint)MotorRawMaximum));
             _tiltMotorPositionDegrees = DynamixelPositionToDegrees(tilt.PresentPosition);
+            _motorTiltRaw = _tiltMotorFeedbackRaw.Value;
+            _motorTilt = NormalizeMotorDegrees(_tiltMotorPositionDegrees, MotorTiltLimitDegrees);
             OnPropertyChanged(nameof(TiltMotorPositionText));
+            OnPropertyChanged(nameof(MotorTiltText));
         }
     }
 
@@ -791,7 +790,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public void UpdateManualButtonState(MotorButtonMask buttons)
     {
         // 수동 방향키/버튼 입력은 UI 표시 각도를 먼저 갱신한 뒤 같은 상태를 UDP 패킷으로 보낸다.
-        // 실제 모터 제어는 Thor가 수행하므로 GUI는 mode, button mask, 목표 각도, step size만 전달한다.
+        // 실제 모터 제어는 Thor가 수행하므로 GUI는 mode, button mask, 목표 각도, 회전 각도 크기만 전달한다.
         if (!IsManualMode)
         {
             return;
@@ -799,7 +798,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         ApplyMotorButtonStateToUi(buttons);
 
-        if (!TrySendMotorCommandPacket(out var modeError, buttons))
+        if (!TrySendMotorCommandPacket(out var modeError, buttons, publishAngleCommand: true))
         {
             AppendImportantLog($"모터 수동 제어 패킷 전송에 실패했습니다: {modeError}");
             return;
@@ -1048,9 +1047,18 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         OnRecordingStateChanged();
 
+        if (IsAutoMode)
+        {
+            SyncMotorRawFromFeedback();
+        }
+
         if (!TrySendMotorCommandPacket(out var modeError))
         {
             AppendImportantLog($"모터 모드 전송에 실패했습니다: {modeError}");
+        }
+        else if (IsAutoMode)
+        {
+            _lastAutomaticTrackingPacketSentAt = DateTime.Now;
         }
 
         AppendImportantLog($"\uCE74\uBA54\uB77C \uC81C\uC5B4 \uBAA8\uB4DC\uAC00 {CurrentMode}(\uC73C)\uB85C \uC804\uD658\uB418\uC5C8\uC2B5\uB2C8\uB2E4.");
@@ -1350,15 +1358,17 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         panDegrees = NormalizeMotorDegrees(panDegrees, MotorPanLimitDegrees);
         tiltDegrees = NormalizeMotorDegrees(tiltDegrees, MotorTiltLimitDegrees);
-        MotorTargetPanText = panDegrees.ToString("0.0", CultureInfo.InvariantCulture);
-        MotorTargetTiltText = tiltDegrees.ToString("0.0", CultureInfo.InvariantCulture);
 
         _motorPan = panDegrees;
         _motorTilt = tiltDegrees;
+        _motorPanRaw = DegreesToDynamixelPosition(panDegrees);
+        _motorTiltRaw = DegreesToDynamixelPosition(tiltDegrees);
+        _panMotorFeedbackRaw = _motorPanRaw;
+        _tiltMotorFeedbackRaw = _motorTiltRaw;
         _panMotorPositionDegrees = _motorPan;
         _tiltMotorPositionDegrees = _motorTilt;
 
-        if (!TrySendMotorCommandPacket(out var error))
+        if (!TrySendMotorCommandPacket(out var error, publishAngleCommand: true))
         {
             AppendImportantLog($"모터 각도 전송에 실패했습니다: {error}");
             return;
@@ -1368,57 +1378,42 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         OnPropertyChanged(nameof(MotorTiltText));
         OnPropertyChanged(nameof(PanMotorPositionText));
         OnPropertyChanged(nameof(TiltMotorPositionText));
+        MotorTargetPanText = string.Empty;
+        MotorTargetTiltText = string.Empty;
         AppendImportantLog($"모터 각도 전송: pan {panDegrees:0.0}°, tilt {tiltDegrees:0.0}°");
     }
 
     private void AdjustMotorStep(object? parameter)
     {
-        if (!TryParseMotorStepParameter(parameter, out var mode, out var axis, out var delta, out var resetToDefault))
+        if (!TryParseMotorAngleParameter(parameter, out var mode, out var delta, out var resetToDefault))
         {
             return;
         }
 
-        if (axis is MotorStepAxis.Pan or MotorStepAxis.Both)
+        if (mode == MotorStepMode.Auto)
         {
-            if (mode == MotorStepMode.Auto)
-            {
-                AutoPanMotorStepSize = resetToDefault ? DefaultMotorStepSize : AutoPanMotorStepSize + delta;
-            }
-            else
-            {
-                ManualPanMotorStepSize = resetToDefault ? DefaultMotorStepSize : ManualPanMotorStepSize + delta;
-            }
+            AutoMotorAngleSize = resetToDefault ? DefaultMotorAngleSize : AutoMotorAngleSize + delta;
         }
-
-        if (axis is MotorStepAxis.Tilt or MotorStepAxis.Both)
+        else
         {
-            if (mode == MotorStepMode.Auto)
-            {
-                AutoTiltMotorStepSize = resetToDefault ? DefaultMotorStepSize : AutoTiltMotorStepSize + delta;
-            }
-            else
-            {
-                ManualTiltMotorStepSize = resetToDefault ? DefaultMotorStepSize : ManualTiltMotorStepSize + delta;
-            }
+            ManualMotorAngleSize = resetToDefault ? DefaultMotorAngleSize : ManualMotorAngleSize + delta;
         }
 
         if (!TrySendMotorCommandPacket(out var error))
         {
-            AppendImportantLog($"모터 step size 전송에 실패했습니다: {error}");
+            AppendImportantLog($"모터 angle size 전송에 실패했습니다: {error}");
             return;
         }
 
     }
 
-    private static bool TryParseMotorStepParameter(
+    private static bool TryParseMotorAngleParameter(
         object? parameter,
         out MotorStepMode mode,
-        out MotorStepAxis axis,
         out int delta,
         out bool resetToDefault)
     {
         mode = MotorStepMode.Auto;
-        axis = MotorStepAxis.Both;
         delta = 0;
         resetToDefault = false;
 
@@ -1430,9 +1425,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 mode = string.Equals(parts[0], "Manual", StringComparison.OrdinalIgnoreCase)
                     ? MotorStepMode.Manual
                     : MotorStepMode.Auto;
-                axis = string.Equals(parts[1], "Tilt", StringComparison.OrdinalIgnoreCase)
-                    ? MotorStepAxis.Tilt
-                    : MotorStepAxis.Pan;
                 if (string.Equals(parts[2], "Reset", StringComparison.OrdinalIgnoreCase))
                 {
                     resetToDefault = true;
@@ -1450,7 +1442,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                     mode = string.Equals(parts[0], "Manual", StringComparison.OrdinalIgnoreCase)
                         ? MotorStepMode.Manual
                         : MotorStepMode.Auto;
-                    axis = MotorStepAxis.Both;
                     if (string.Equals(parts[1], "Reset", StringComparison.OrdinalIgnoreCase))
                     {
                         resetToDefault = true;
@@ -1460,9 +1451,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                     return int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out delta) && delta != 0;
                 }
 
-                axis = string.Equals(parts[0], "Tilt", StringComparison.OrdinalIgnoreCase)
-                    ? MotorStepAxis.Tilt
-                    : MotorStepAxis.Pan;
                 if (string.Equals(parts[1], "Reset", StringComparison.OrdinalIgnoreCase))
                 {
                     resetToDefault = true;
@@ -1472,7 +1460,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
                 return int.TryParse(parts[1], NumberStyles.Integer, CultureInfo.InvariantCulture, out delta) && delta != 0;
             }
 
-            axis = MotorStepAxis.Both;
             return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out delta) && delta != 0;
         }
 
@@ -1484,12 +1471,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         return delta != 0;
     }
-
-    private int GetPanStepSize(MotorStepMode mode) =>
-        mode == MotorStepMode.Auto ? AutoPanMotorStepSize : ManualPanMotorStepSize;
-
-    private int GetTiltStepSize(MotorStepMode mode) =>
-        mode == MotorStepMode.Auto ? AutoTiltMotorStepSize : ManualTiltMotorStepSize;
 
     /// <summary>
     /// 현재 확대 이동 값이 허용 범위를 넘지 않도록 보정한다.
@@ -1618,13 +1599,18 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     private static double DynamixelPositionToDegrees(uint position)
     {
-        return Math.Clamp(position, 0, 4095) * 360.0 / 4095.0;
+        return Math.Min(position, (uint)MotorRawMaximum) / MotorRawResolution * 360.0;
     }
 
     private static ushort DegreesToDynamixelPosition(double degrees)
     {
-        var position = (int)Math.Round(Math.Clamp(degrees, 0, 360) * 4095.0 / 360.0, MidpointRounding.AwayFromZero);
-        return (ushort)Math.Clamp(position, 0, 4095);
+        var position = (int)Math.Round(Math.Clamp(degrees, 0, 360) / 360.0 * MotorRawResolution, MidpointRounding.AwayFromZero);
+        return ClampMotorRaw(position);
+    }
+
+    private static ushort ClampMotorRaw(int position)
+    {
+        return (ushort)Math.Clamp(position, MotorRawMinimum, MotorRawMaximum);
     }
 
     /// <summary>
@@ -1701,20 +1687,49 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         return image;
     }
 
-    private bool TrySendMotorCommandPacket(out string? error, MotorButtonMask buttons = MotorButtonMask.None)
+    private bool TrySendMotorCommandPacket(
+        out string? error,
+        MotorButtonMask buttons = MotorButtonMask.None,
+        bool publishAngleCommand = false)
     {
+        SyncMotorRawFromFeedback();
+
         // GUI의 현재 제어 상태를 Thor가 기대하는 13B 모터 명령 패킷으로 변환한다.
         // 마지막 4B는 YOLO 객체 ID로, 모터 추적 로직이 어느 객체를 따라갈지 판단하는 데 사용한다.
         return _motorControlService.TrySendMotorCommandPacket(
             mode: IsManualMode ? (byte)1 : (byte)0,
-            tracking: IsTrackingModeEnabled ? (byte)1 : (byte)0,
+            tracking: ShouldSendTrackingToZybo ? (byte)1 : (byte)0,
             btnMask: buttons,
-            panPos: DegreesToDynamixelPosition(_motorPan),
-            tiltPos: DegreesToDynamixelPosition(_motorTilt),
-            scanStep: (byte)GetUnifiedStepSize(AutoPanMotorStepSize, AutoTiltMotorStepSize),
-            manualStep: (byte)GetUnifiedStepSize(ManualPanMotorStepSize, ManualTiltMotorStepSize),
+            panPos: _motorPanRaw,
+            tiltPos: _motorTiltRaw,
+            scanStep: (byte)DegreesToMotorStepDelta(AutoMotorAngleSize),
+            manualStep: (byte)DegreesToMotorStepDelta(ManualMotorAngleSize),
             yoloObjectId: _yoloObjectId,
+            publishAngleCommand: publishAngleCommand,
             out error);
+    }
+
+    private bool ShouldSendTrackingToZybo =>
+        IsTrackingModeEnabled &&
+        _hasTrackedTarget &&
+        _yoloObjectId >= 0;
+
+    private bool SyncMotorRawFromFeedback()
+    {
+        if (_panMotorFeedbackRaw is not { } panRaw)
+        {
+            return false;
+        }
+
+        _motorPanRaw = panRaw;
+        _motorPan = NormalizeMotorDegrees(DynamixelPositionToDegrees(panRaw), MotorPanLimitDegrees);
+        if (_tiltMotorFeedbackRaw is { } tiltRaw)
+        {
+            _motorTiltRaw = tiltRaw;
+            _motorTilt = NormalizeMotorDegrees(DynamixelPositionToDegrees(tiltRaw), MotorTiltLimitDegrees);
+        }
+
+        return true;
     }
 
     private static int GetThreatWeight(string threatLevel)
@@ -1727,41 +1742,56 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         };
     }
 
-    private static int GetUnifiedStepSize(int panStepSize, int tiltStepSize)
+    private static bool IsHighThreatLevel(string threatLevel)
     {
-        return Math.Clamp(Math.Max(panStepSize, tiltStepSize), 1, 10);
+        return GetThreatWeight(threatLevel) >= 3;
+    }
+
+    private static int DegreesToMotorStepDelta(int degrees)
+    {
+        var clampedDegrees = Math.Clamp(degrees, 1, 10);
+        var stepDelta = (int)Math.Round(clampedDegrees / 360.0 * MotorRawResolution, MidpointRounding.AwayFromZero);
+        return Math.Clamp(stepDelta, 0, MotorRawMaximum);
     }
 
     private void ApplyMotorButtonStateToUi(MotorButtonMask buttons)
     {
         if ((buttons & MotorButtonMask.Center) == MotorButtonMask.Center)
         {
-            _motorPan = 0;
-            _motorTilt = 0;
+            _motorPanRaw = 0;
+            _motorTiltRaw = 0;
         }
         else
         {
+            var panRaw = _panMotorFeedbackRaw ?? _motorPanRaw;
+            var tiltRaw = _tiltMotorFeedbackRaw ?? _motorTiltRaw;
+
             if ((buttons & MotorButtonMask.Left) == MotorButtonMask.Left)
             {
-                _motorPan = Math.Clamp(_motorPan - ManualPanMotorStepSize, 0, MotorPanLimitDegrees);
+                panRaw = ClampMotorRaw(panRaw - DegreesToMotorStepDelta(ManualMotorAngleSize));
             }
 
             if ((buttons & MotorButtonMask.Right) == MotorButtonMask.Right)
             {
-                _motorPan = Math.Clamp(_motorPan + ManualPanMotorStepSize, 0, MotorPanLimitDegrees);
+                panRaw = ClampMotorRaw(panRaw + DegreesToMotorStepDelta(ManualMotorAngleSize));
             }
 
             if ((buttons & MotorButtonMask.Up) == MotorButtonMask.Up)
             {
-                _motorTilt = Math.Clamp(_motorTilt + ManualTiltMotorStepSize, 0, MotorTiltLimitDegrees);
+                tiltRaw = ClampMotorRaw(tiltRaw + DegreesToMotorStepDelta(ManualMotorAngleSize));
             }
 
             if ((buttons & MotorButtonMask.Down) == MotorButtonMask.Down)
             {
-                _motorTilt = Math.Clamp(_motorTilt - ManualTiltMotorStepSize, 0, MotorTiltLimitDegrees);
+                tiltRaw = ClampMotorRaw(tiltRaw - DegreesToMotorStepDelta(ManualMotorAngleSize));
             }
+
+            _motorPanRaw = panRaw;
+            _motorTiltRaw = tiltRaw;
         }
 
+        _motorPan = NormalizeMotorDegrees(DynamixelPositionToDegrees(_motorPanRaw), MotorPanLimitDegrees);
+        _motorTilt = NormalizeMotorDegrees(DynamixelPositionToDegrees(_motorTiltRaw), MotorTiltLimitDegrees);
         _panMotorPositionDegrees = _motorPan;
         _tiltMotorPositionDegrees = _motorTilt;
 
@@ -1824,13 +1854,6 @@ public sealed record SystemLogItem(string Time, string Message)
     public DateTime CreatedAt { get; init; } = DateTime.Now;
 }
 
-public enum MotorStepAxis
-{
-    Both,
-    Pan,
-    Tilt
-}
-
 public enum MotorStepMode
 {
     Auto,
@@ -1852,7 +1875,7 @@ public sealed class LocalizedTextProvider : INotifyPropertyChanged
         ["RecordingStatus"] = ("Recording Status", "\uC601\uC0C1 \uB179\uD654 \uC0C1\uD0DC"),
         ["Brightness"] = ("Bright", "\uBC1D\uAE30"),
         ["Contrast"] = ("Contrast", "\uB300\uC870\uBE44"),
-        ["AutoMode"] = ("Auto", "\uC790\uB3D9"),
+        ["AutoMode"] = ("Scan", "\uC2A4\uCE94"),
         ["ManualMode"] = ("Manual", "\uC218\uB3D9"),
         ["StartRecording"] = ("Start Rec", "\uB179\uD654 \uC2DC\uC791"),
         ["StopRecording"] = ("Stop Rec", "\uB179\uD654 \uC885\uB8CC"),
@@ -1868,12 +1891,10 @@ public sealed class LocalizedTextProvider : INotifyPropertyChanged
         ["ScreenMode"] = ("Screen Mode", "\uD654\uBA74 \uBAA8\uB4DC"),
         ["WindowMode"] = ("Window Mode", "\uCC3D\uBAA8\uB4DC\uB85C \uC804\uD658"),
         ["FullscreenMode"] = ("Fullscreen", "\uC804\uCCB4\uD654\uBA74\uC73C\uB85C \uC804\uD658"),
-        ["NetworkSettings"] = ("Network Settings", "\uB124\uD2B8\uC6CC\uD06C \uC124\uC815"),
+        ["NetworkSettings"] = ("Network", "\uB124\uD2B8\uC6CC\uD06C"),
         ["JetsonIp"] = ("Jetson IP", "Jetson IP"),
-        ["PcIp"] = ("PC IP", "PC IP"),
-        ["SshUser"] = ("SSH User", "SSH \uC0AC\uC6A9\uC790"),
+        ["PcIp"] = ("GUI IP", "GUI IP"),
         ["RecordedVideoUrl"] = ("Video URL", "\uB179\uD654 URL"),
-        ["AutoStartBridge"] = ("Auto start bridge", "\uBE0C\uB9BF\uC9C0 \uC790\uB3D9 \uC2DC\uC791"),
         ["Details"] = ("Details", "\uC0C1\uC138"),
         ["MotorPosition"] = ("Motor Position", "\uBAA8\uD130 \uC704\uCE58"),
         ["MotorTarget"] = ("Motor Angle Setting", "\uBAA8\uD130 \uAC01\uB3C4 \uC124\uC815"),

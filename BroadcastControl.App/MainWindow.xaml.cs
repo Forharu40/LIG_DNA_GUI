@@ -47,7 +47,6 @@ public partial class MainWindow : Window
     private readonly UdpMotorStatusReceiverService _motorStatusReceiverService;
     private readonly UdpVlmResultReceiverService _vlmResultReceiverService;
     private readonly MobileAlertHubService _mobileAlertHubService;
-    private readonly JetsonBridgeSshService _jetsonBridgeSshService;
     private readonly DispatcherTimer _motorHoldTimer;
     private readonly DispatcherTimer _recordedVideoPositionTimer;
     private readonly DispatcherTimer _recordingMetadataTimer;
@@ -156,7 +155,6 @@ public partial class MainWindow : Window
         _motorStatusReceiverService = new UdpMotorStatusReceiverService(_networkSettings.MotorStatusPort);
         _vlmResultReceiverService = new UdpVlmResultReceiverService(_networkSettings.VlmResultPort);
         _mobileAlertHubService = new MobileAlertHubService();
-        _jetsonBridgeSshService = new JetsonBridgeSshService(_networkSettings);
         _motorHoldTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(50)
@@ -190,7 +188,6 @@ public partial class MainWindow : Window
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
         _viewModel.ManualAnalysisSaveRequested += ViewModel_OnManualAnalysisSaveRequested;
         _viewModel.ManualSystemLogSaveRequested += ViewModel_OnManualSystemLogSaveRequested;
-        _jetsonBridgeSshService.MessageReady += JetsonBridgeSshService_OnMessageReady;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived += OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived += OnYoloStatusReceived;
@@ -221,7 +218,6 @@ public partial class MainWindow : Window
 
         LoadNetworkSettingsEditor();
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
-        await _jetsonBridgeSshService.StartAsync();
 
         if (_eoUdpCaptureService.Start(_networkSettings.EoUdpPort))
         {
@@ -688,7 +684,7 @@ public partial class MainWindow : Window
             return false;
         }
 
-        _viewModel.SelectYoloObject(selectedDetection.Detection.ObjectId);
+        _viewModel.SelectYoloObject(selectedDetection.Detection.ObjectId, selectedDetection.Detection.ThreatLevel);
         return true;
     }
 
@@ -1877,16 +1873,13 @@ public partial class MainWindow : Window
     private void LoadNetworkSettingsEditor()
     {
         JetsonHostTextBox.Text = _networkSettings.JetsonHost;
-        JetsonSshUserTextBox.Text = _networkSettings.JetsonSshUser;
-        RecordedVideoUrlTextBox.Text = _networkSettings.RecordedVideoUrl;
-        AutoStartBridgeCheckBox.IsChecked = _networkSettings.AutoStartBridge;
 
         var localAddresses = AppNetworkSettings.GetLocalIpv4Addresses();
         PcGuiHostComboBox.ItemsSource = localAddresses;
         PcGuiHostComboBox.Text = _networkSettings.PcGuiHost;
         if (localAddresses.Count > 0 && !localAddresses.Contains(_networkSettings.PcGuiHost, StringComparer.Ordinal))
         {
-            _viewModel.AppendImportantLog($"현재 PC IP 후보: {string.Join(", ", localAddresses)}");
+            _viewModel.AppendImportantLog($"현재 GUI IP 후보: {string.Join(", ", localAddresses)}");
         }
     }
 
@@ -1894,15 +1887,14 @@ public partial class MainWindow : Window
     {
         _networkSettings.JetsonHost = JetsonHostTextBox.Text;
         _networkSettings.PcGuiHost = PcGuiHostComboBox.Text;
-        _networkSettings.JetsonSshUser = JetsonSshUserTextBox.Text;
-        _networkSettings.RecordedVideoUrl = RecordedVideoUrlTextBox.Text;
-        _networkSettings.AutoStartBridge = AutoStartBridgeCheckBox.IsChecked == true;
+        _networkSettings.RecordedVideoUrl = $"http://{_networkSettings.JetsonHost.Trim()}:{_networkSettings.RecordingHttpPort.ToString(CultureInfo.InvariantCulture)}/";
         _networkSettings.Save();
+        _motorControlService.ConfigureEndpoint(_networkSettings.JetsonHost, _networkSettings.MotorControlPort);
 
-        _viewModel.AppendImportantLog($"네트워크 설정을 저장했습니다: {AppNetworkSettings.SettingsPath}");
+        _viewModel.AppendImportantLog($"네트워크 설정을 저장하고 즉시 적용했습니다: Jetson {_networkSettings.JetsonHost}, GUI {_networkSettings.PcGuiHost}");
         MessageBox.Show(
-            "네트워크 설정을 저장했습니다. UDP 포트와 Jetson 자동 실행 설정은 GUI를 다시 시작하면 적용됩니다.",
-            "Network Settings",
+            "네트워크 설정을 저장했습니다.\n\n모터 명령과 녹화 영상 주소는 즉시 새 Jetson IP를 사용합니다.\nGUI IP는 Jetson 브릿지의 송출 대상 설정에도 반영되어야 영상 수신 대상이 바뀝니다.",
+            "Network",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
     }
@@ -2293,7 +2285,6 @@ public partial class MainWindow : Window
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _viewModel.ManualAnalysisSaveRequested -= ViewModel_OnManualAnalysisSaveRequested;
         _viewModel.ManualSystemLogSaveRequested -= ViewModel_OnManualSystemLogSaveRequested;
-        _jetsonBridgeSshService.MessageReady -= JetsonBridgeSshService_OnMessageReady;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
         _eoUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
@@ -2311,24 +2302,6 @@ public partial class MainWindow : Window
         _motorStatusReceiverService.Dispose();
         _vlmResultReceiverService.Dispose();
         _motorControlService.Dispose();
-        _ = StopJetsonBridgeAfterCloseAsync();
-    }
-
-    private async Task StopJetsonBridgeAfterCloseAsync()
-    {
-        try
-        {
-            await _jetsonBridgeSshService.StopAsync();
-        }
-        finally
-        {
-            _jetsonBridgeSshService.Dispose();
-        }
-    }
-
-    private void JetsonBridgeSshService_OnMessageReady(string message)
-    {
-        Dispatcher.Invoke(() => _viewModel.AppendImportantLog(message));
     }
 
     private void Button_Click_2(object sender, RoutedEventArgs e)
