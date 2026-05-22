@@ -1,14 +1,11 @@
+// Jetson/Thor에서 오는 모터 상태 UDP 패킷을 수신하고 파싱하는 서비스 파일이다.
+// 8001/udp로 들어오는 pan/tilt 상태를 MotorStatusSnapshot으로 변환해 ViewModel이 각도와 진단 값을 표시할 수 있게 한다.
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
 
 namespace BroadcastControl.App.Services;
 
-/// <summary>
-/// Thor에서 GUI로 보내는 모터 상태 패킷을 8001/udp에서 수신한다.
-/// 현재 명세의 36B 패킷은 pan 18B와 tilt 18B가 이어진 형태이며,
-/// 과거 실험용 32B/64B 패킷도 읽을 수 있게 남겨 두어 현장 테스트 중 버전 차이를 흡수한다.
-/// </summary>
 public sealed class UdpMotorStatusReceiverService : IDisposable
 {
     private const int DefaultPort = 8001;
@@ -63,6 +60,8 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
 
     private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
     {
+        // 수신 루프는 별도 Task에서 계속 대기한다.
+        // 패킷이 정상 파싱되면 StatusReceived 이벤트로 ViewModel 갱신 흐름에 넘긴다.
         while (!cancellationToken.IsCancellationRequested)
         {
             try

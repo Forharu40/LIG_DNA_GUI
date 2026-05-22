@@ -1,3 +1,7 @@
+<!--
+  BroadcastControl.App WPF 프로젝트 설정 파일이다.
+  실행 형식, 대상 .NET 버전, WPF 사용 여부, NuGet 패키지, 배포 시 함께 복사할 설정 JSON을 정의한다.
+-->
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>

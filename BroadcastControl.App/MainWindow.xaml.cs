@@ -19,6 +19,11 @@ using System.IO;
 
 namespace BroadcastControl.App;
 
+// 파일 역할:
+// MainWindow.xaml의 코드 비하인드로, 화면 컨트롤 이벤트와 외부 통신 서비스를 연결한다.
+// UDP 영상/탐지/VLM/모터 상태를 받아 ViewModel에 반영하고, 사용자가 누른 버튼이나 설정 값을 서비스로 전달한다.
+// 화면 상태 자체는 MainViewModel이 관리하므로, 이 파일은 UI 이벤트와 서비스 이벤트를 이어주는 연결 계층으로 보면 된다.
+
 public partial class MainWindow : Window
 {
     // MainWindow는 화면 요소와 서비스들을 연결하는 중심 계층이다.
@@ -37,11 +42,13 @@ public partial class MainWindow : Window
     private const double RecordedVideoMiniMapWidth = 120;
     private const double RecordedVideoMiniMapHeight = 62;
     private static readonly TimeSpan MobileAlertCooldown = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan JetsonConnectionHoldTime = TimeSpan.FromSeconds(10);
     private static readonly HttpClient RecordedVideoHttpClient = new();
     private readonly AppNetworkSettings _networkSettings;
     private readonly MainViewModel _viewModel;
     private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
     private readonly UdpEncodedVideoReceiverService _irUdpCaptureService;
+    private readonly UdpEncodedVideoReceiverService _detectionUdpReceiverService;
     private readonly ViewportRecordingService _viewportRecordingService;
     private readonly UdpMotorControlService _motorControlService;
     private readonly UdpMotorStatusReceiverService _motorStatusReceiverService;
@@ -50,6 +57,7 @@ public partial class MainWindow : Window
     private readonly DispatcherTimer _motorHoldTimer;
     private readonly DispatcherTimer _recordedVideoPositionTimer;
     private readonly DispatcherTimer _recordingMetadataTimer;
+    private readonly DispatcherTimer _jetsonConnectionTimer;
 
     private bool _isDraggingZoom;
     private Point _lastZoomDragPoint;
@@ -79,6 +87,7 @@ public partial class MainWindow : Window
     private string? _lastDetectionAlertSignature;
     private DateTimeOffset _lastMobileAlertAt = DateTimeOffset.MinValue;
     private DateTime _recordingMetadataWindowStart;
+    private DateTime _lastJetsonMessageAt = DateTime.MinValue;
     private string? _lastFilteredOutTargetSignature;
     private string? _lastOverlaySignature;
     // VLM이 보내는 객체별 위험도를 objectId 기준으로 저장한다.
@@ -147,10 +156,14 @@ public partial class MainWindow : Window
         InitializeComponent();
 
         _networkSettings = AppNetworkSettings.Load();
-        _motorControlService = new UdpMotorControlService(_networkSettings.JetsonHost, _networkSettings.MotorControlPort);
+        _motorControlService = new UdpMotorControlService(
+            _networkSettings.JetsonHost,
+            _networkSettings.MotorControlPort,
+            _networkSettings.TrackingRecordingControlPort);
         _viewModel = new MainViewModel(_motorControlService);
         _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
         _irUdpCaptureService = new UdpEncodedVideoReceiverService(applyIrFalseColor: true);
+        _detectionUdpReceiverService = new UdpEncodedVideoReceiverService();
         _viewportRecordingService = new ViewportRecordingService();
         _motorStatusReceiverService = new UdpMotorStatusReceiverService(_networkSettings.MotorStatusPort);
         _vlmResultReceiverService = new UdpVlmResultReceiverService(_networkSettings.VlmResultPort);
@@ -170,6 +183,11 @@ public partial class MainWindow : Window
             Interval = TimeSpan.FromMinutes(1)
         };
         _recordingMetadataTimer.Tick += RecordingMetadataTimer_OnTick;
+        _jetsonConnectionTimer = new DispatcherTimer
+        {
+            Interval = TimeSpan.FromSeconds(1)
+        };
+        _jetsonConnectionTimer.Tick += JetsonConnectionTimer_OnTick;
         DataContext = _viewModel;
 
         Loaded += OnLoaded;
@@ -194,6 +212,8 @@ public partial class MainWindow : Window
         _irUdpCaptureService.FrameReady += OnIrFrameReady;
         _irUdpCaptureService.DetectionsReceived += OnIrDetectionsReceived;
         _irUdpCaptureService.StatusReceived += OnYoloStatusReceived;
+        _detectionUdpReceiverService.DetectionsReceived += OnSharedDetectionsReceived;
+        _detectionUdpReceiverService.StatusReceived += OnYoloStatusReceived;
         _motorStatusReceiverService.StatusReceived += OnMotorStatusReceived;
         _motorStatusReceiverService.ReceiverError += OnMotorStatusReceiverError;
         _vlmResultReceiverService.ResultReceived += OnVlmResultReceived;
@@ -215,6 +235,8 @@ public partial class MainWindow : Window
         UpdateMotorAutomationState();
         _recordingMetadataWindowStart = DateTime.Now;
         _recordingMetadataTimer.Start();
+        _jetsonConnectionTimer.Start();
+        UpdateJetsonConnectionState();
 
         LoadNetworkSettingsEditor();
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
@@ -233,6 +255,15 @@ public partial class MainWindow : Window
         else
         {
             _viewModel.AppendImportantLog($"Failed to start the IR UDP stream receiver on port {_networkSettings.IrUdpPort}.");
+        }
+
+        if (_detectionUdpReceiverService.Start(_networkSettings.DetectionUdpPort))
+        {
+            _viewModel.AppendImportantLog($"EO/IR 탐지 결과 수신 대기 포트: {_networkSettings.DetectionUdpPort}");
+        }
+        else
+        {
+            _viewModel.AppendImportantLog($"EO/IR 탐지 결과 수신 포트 {_networkSettings.DetectionUdpPort}를 열지 못했습니다.");
         }
 
         if (_mobileAlertHubService.Start(_networkSettings.MobileAlertPort))
@@ -269,6 +300,7 @@ public partial class MainWindow : Window
             case nameof(MainViewModel.IsEoPrimary):
             case nameof(MainViewModel.SelectedPrimaryTarget):
                 UpdateRecordingViewportState();
+                RefreshPrimaryTrackingTarget();
                 RenderDetectionOverlay(forceRefresh: true);
                 break;
 
@@ -353,6 +385,7 @@ public partial class MainWindow : Window
 
     private void OnEoFrameReady(ReceivedVideoFrame frame)
     {
+        MarkJetsonMessageReceived();
         _latestEoFrame = frame;
         CacheFrame(frame, _eoFrameCache);
 
@@ -366,17 +399,34 @@ public partial class MainWindow : Window
 
     private void OnEoDetectionsReceived(DetectionPacket detectionPacket)
     {
-        HandleDetectionsReceived(detectionPacket, _eoDetectionCache);
+        MarkJetsonMessageReceived();
+        HandleDetectionsReceived(detectionPacket, _eoDetectionCache, _viewModel.IsEoPrimary);
     }
 
     private void OnIrDetectionsReceived(DetectionPacket detectionPacket)
     {
-        HandleDetectionsReceived(detectionPacket, _irDetectionCache);
+        MarkJetsonMessageReceived();
+        HandleDetectionsReceived(detectionPacket, _irDetectionCache, !_viewModel.IsEoPrimary);
+    }
+
+    private void OnSharedDetectionsReceived(DetectionPacket detectionPacket)
+    {
+        MarkJetsonMessageReceived();
+        switch (detectionPacket.Stream)
+        {
+            case DetectionStream.Eo:
+                HandleDetectionsReceived(detectionPacket, _eoDetectionCache, _viewModel.IsEoPrimary);
+                break;
+            case DetectionStream.Ir:
+                HandleDetectionsReceived(detectionPacket, _irDetectionCache, !_viewModel.IsEoPrimary);
+                break;
+        }
     }
 
     private void HandleDetectionsReceived(
         DetectionPacket detectionPacket,
-        Dictionary<uint, DetectionPacket> detectionCache)
+        Dictionary<uint, DetectionPacket> detectionCache,
+        bool isPrimaryCamera)
     {
         // detection은 영상 프레임보다 조금 늦게 도착할 수 있으므로 frame_id 기준으로 캐시에 보관한다.
         // 렌더링 단계에서 가장 가까운 프레임의 detection을 찾아 박스를 그린다.
@@ -387,7 +437,8 @@ public partial class MainWindow : Window
             _hasReceivedDetectionPacket = true;
         }
 
-        var displayDetections = ApplyThreatLevels(FilterDisplayDetections(detectionPacket.Detections));
+        var displayDetections = EnsureDetectionObjectIds(
+            ApplyThreatLevels(FilterDisplayDetections(detectionPacket.Detections)));
 
         if (!_hasReceivedNonEmptyDetectionPacket && displayDetections.Count > 0)
         {
@@ -408,13 +459,44 @@ public partial class MainWindow : Window
         }
 
         NotifyDetectionAlertIfNeeded(detectionPacket.FrameId, displayDetections);
-        _viewModel.UpdateDetectionSummary(displayDetections);
+        if (isPrimaryCamera)
+        {
+            _viewModel.UpdateDetectionSummary(displayDetections);
+            _viewModel.UpdateDetectionTargets(BuildDetectionTargetItems(
+                displayDetections,
+                _viewModel.IsEoPrimary ? _latestEoFrame : _latestIrFrame,
+                detectionPacket.Width,
+                detectionPacket.Height));
+        }
+
         RenderDetectionOverlay(forceRefresh: true);
         UpdateRiskAndMobileAlert(detectionPacket.FrameId, displayDetections);
     }
 
+    private void RefreshPrimaryTrackingTarget()
+    {
+        // 모터 추적 ID는 현재 큰 화면에 표시되는 카메라의 객체만 기준으로 고른다.
+        // VLM 결과가 늦게 도착해 위험도가 갱신되는 경우에도 캐시된 현재 화면 detection으로 다시 판단한다.
+        if (!TryGetRenderableFrameAndDetection(out var frame, out var detectionPacket))
+        {
+            _viewModel.UpdateDetectionSummary(Array.Empty<DetectionInfo>());
+            _viewModel.UpdateDetectionTargets(Array.Empty<DetectionTargetItem>());
+            return;
+        }
+
+        var displayDetections = EnsureDetectionObjectIds(
+            ApplyThreatLevels(FilterDisplayDetections(detectionPacket.Detections)));
+        _viewModel.UpdateDetectionSummary(displayDetections);
+        _viewModel.UpdateDetectionTargets(BuildDetectionTargetItems(
+            displayDetections,
+            frame,
+            detectionPacket.Width,
+            detectionPacket.Height));
+    }
+
     private void OnYoloStatusReceived(YoloStatusPacket statusPacket)
     {
+        MarkJetsonMessageReceived();
         var signature = $"{statusPacket.Enabled}:{statusPacket.ModelLoaded}:{statusPacket.ConfThreshold}:{statusPacket.LastError}:{statusPacket.Source}";
         if (string.Equals(_lastStatusSignature, signature, StringComparison.Ordinal))
         {
@@ -436,7 +518,11 @@ public partial class MainWindow : Window
 
     private void OnMotorStatusReceived(object? sender, MotorStatusSnapshot snapshot)
     {
-        Dispatcher.Invoke(() => _viewModel.UpdateMotorStatus(snapshot));
+        Dispatcher.Invoke(() =>
+        {
+            MarkJetsonMessageReceived();
+            _viewModel.UpdateMotorStatus(snapshot);
+        });
     }
 
     private void OnMotorStatusReceiverError(object? sender, string message)
@@ -448,6 +534,7 @@ public partial class MainWindow : Window
     {
         Dispatcher.Invoke(() =>
         {
+            MarkJetsonMessageReceived();
             // VLM 결과는 전체 위험도와 객체별 위험도로 나뉜다.
             // 전체 위험도는 시스템 상태창에, 객체별 위험도는 각 바운딩 박스 색상에 반영한다.
             if (!string.IsNullOrWhiteSpace(result.ThreatLevel))
@@ -469,6 +556,7 @@ public partial class MainWindow : Window
                 : $"{result.AnalysisMessage} 탐지 내용: {result.DetectionSummary}";
 
             _viewModel.ApplyVlmAnalysisResult(threatLevel, analysisMessage);
+            RefreshPrimaryTrackingTarget();
             RenderDetectionOverlay(forceRefresh: true);
         });
     }
@@ -480,6 +568,7 @@ public partial class MainWindow : Window
 
     private void OnIrFrameReady(ReceivedVideoFrame frame)
     {
+        MarkJetsonMessageReceived();
         _latestIrFrame = frame;
         CacheFrame(frame, _irFrameCache);
 
@@ -517,6 +606,32 @@ public partial class MainWindow : Window
             _viewModel.ZoomTransformY,
             CameraViewport.ActualWidth,
             CameraViewport.ActualHeight);
+    }
+
+    private void MarkJetsonMessageReceived()
+    {
+        _lastJetsonMessageAt = DateTime.Now;
+        if (Dispatcher.CheckAccess())
+        {
+            UpdateJetsonConnectionState();
+        }
+        else
+        {
+            Dispatcher.BeginInvoke(UpdateJetsonConnectionState);
+        }
+    }
+
+    private void JetsonConnectionTimer_OnTick(object? sender, EventArgs e)
+    {
+        UpdateJetsonConnectionState();
+    }
+
+    private void UpdateJetsonConnectionState()
+    {
+        var isConnected =
+            _lastJetsonMessageAt != DateTime.MinValue &&
+            DateTime.Now - _lastJetsonMessageAt <= JetsonConnectionHoldTime;
+        _viewModel.UpdateJetsonConnectionState(isConnected);
     }
 
     private void RenderDetectionOverlay(bool forceRefresh = false)
@@ -882,6 +997,40 @@ public partial class MainWindow : Window
             .ToArray();
     }
 
+    private static IReadOnlyList<DetectionInfo> EnsureDetectionObjectIds(IReadOnlyList<DetectionInfo> detections)
+    {
+        if (detections.Count == 0)
+        {
+            return detections;
+        }
+
+        var allIdsLookMissing = detections.All(detection => detection.ObjectId <= 0);
+        var usedIds = new HashSet<int>();
+        var nextDummyId = 1;
+        var normalized = new DetectionInfo[detections.Count];
+
+        for (var index = 0; index < detections.Count; index++)
+        {
+            var detection = detections[index];
+            var objectId = detection.ObjectId;
+            if (allIdsLookMissing || objectId < 0 || objectId > 254 || !usedIds.Add(objectId))
+            {
+                while (usedIds.Contains(nextDummyId) && nextDummyId < 255)
+                {
+                    nextDummyId++;
+                }
+
+                objectId = Math.Clamp(nextDummyId, 1, 254);
+                usedIds.Add(objectId);
+                nextDummyId++;
+            }
+
+            normalized[index] = detection with { ObjectId = objectId };
+        }
+
+        return normalized;
+    }
+
     private string GetDetectionThreatLevel(DetectionInfo detection)
     {
         // 우선순위:
@@ -1056,6 +1205,59 @@ public partial class MainWindow : Window
                 .OrderByDescending(d => d.Score)
                 .Take(8)
                 .Select((d, index) => $"{index + 1}. {d.ClassName} object{d.ObjectId} / 위험도 {d.ThreatLevel} / 신뢰도 {d.Score:0.00} / bbox ({d.X1:0}, {d.Y1:0})-({d.X2:0}, {d.Y2:0})"));
+    }
+
+    private static IReadOnlyList<DetectionTargetItem> BuildDetectionTargetItems(
+        IReadOnlyList<DetectionInfo> detections,
+        ReceivedVideoFrame? frame,
+        int sourceWidth,
+        int sourceHeight)
+    {
+        return detections
+            .Take(30)
+            .Select(detection =>
+            {
+                var threatBrush = GetDetectionThreatBrush(detection.ThreatLevel);
+                threatBrush.Freeze();
+                return new DetectionTargetItem(
+                    detection.ObjectId,
+                    detection.ClassName,
+                    $"{detection.Score * 100.0f:0.0}%",
+                    NormalizeThreatLevel(detection.ThreatLevel),
+                    threatBrush,
+                    TryCreateDetectionThumbnail(frame?.Bitmap, detection, sourceWidth, sourceHeight));
+            })
+            .ToArray();
+    }
+
+    private static ImageSource? TryCreateDetectionThumbnail(
+        BitmapSource? bitmap,
+        DetectionInfo detection,
+        int sourceWidth,
+        int sourceHeight)
+    {
+        if (bitmap is null || sourceWidth <= 0 || sourceHeight <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            var scaleX = bitmap.PixelWidth / (double)sourceWidth;
+            var scaleY = bitmap.PixelHeight / (double)sourceHeight;
+            var x = Math.Clamp((int)Math.Floor(detection.X1 * scaleX), 0, Math.Max(0, bitmap.PixelWidth - 1));
+            var y = Math.Clamp((int)Math.Floor(detection.Y1 * scaleY), 0, Math.Max(0, bitmap.PixelHeight - 1));
+            var right = Math.Clamp((int)Math.Ceiling(detection.X2 * scaleX), x + 1, bitmap.PixelWidth);
+            var bottom = Math.Clamp((int)Math.Ceiling(detection.Y2 * scaleY), y + 1, bitmap.PixelHeight);
+            var rect = new Int32Rect(x, y, Math.Max(1, right - x), Math.Max(1, bottom - y));
+            var cropped = new CroppedBitmap(bitmap, rect);
+            cropped.Freeze();
+            return cropped;
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static byte[]? CaptureElementAsPng(FrameworkElement element)
@@ -1355,6 +1557,7 @@ public partial class MainWindow : Window
             var videos = await JsonSerializer.DeserializeAsync<List<RecordedVideoItem>>(
                 stream,
                 new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            MarkJetsonMessageReceived();
             videos ??= new List<RecordedVideoItem>();
 
             foreach (var video in videos)
@@ -1889,7 +2092,10 @@ public partial class MainWindow : Window
         _networkSettings.PcGuiHost = PcGuiHostComboBox.Text;
         _networkSettings.RecordedVideoUrl = $"http://{_networkSettings.JetsonHost.Trim()}:{_networkSettings.RecordingHttpPort.ToString(CultureInfo.InvariantCulture)}/";
         _networkSettings.Save();
-        _motorControlService.ConfigureEndpoint(_networkSettings.JetsonHost, _networkSettings.MotorControlPort);
+        _motorControlService.ConfigureEndpoint(
+            _networkSettings.JetsonHost,
+            _networkSettings.MotorControlPort,
+            _networkSettings.TrackingRecordingControlPort);
 
         _viewModel.AppendImportantLog($"네트워크 설정을 저장하고 즉시 적용했습니다: Jetson {_networkSettings.JetsonHost}, GUI {_networkSettings.PcGuiHost}");
         MessageBox.Show(
@@ -2282,6 +2488,7 @@ public partial class MainWindow : Window
         StopManualMotorInput();
         _recordedVideoPositionTimer.Stop();
         _recordingMetadataTimer.Stop();
+        _jetsonConnectionTimer.Stop();
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
         _viewModel.ManualAnalysisSaveRequested -= ViewModel_OnManualAnalysisSaveRequested;
         _viewModel.ManualSystemLogSaveRequested -= ViewModel_OnManualSystemLogSaveRequested;
@@ -2291,6 +2498,8 @@ public partial class MainWindow : Window
         _irUdpCaptureService.FrameReady -= OnIrFrameReady;
         _irUdpCaptureService.DetectionsReceived -= OnIrDetectionsReceived;
         _irUdpCaptureService.StatusReceived -= OnYoloStatusReceived;
+        _detectionUdpReceiverService.DetectionsReceived -= OnSharedDetectionsReceived;
+        _detectionUdpReceiverService.StatusReceived -= OnYoloStatusReceived;
         _motorStatusReceiverService.StatusReceived -= OnMotorStatusReceived;
         _motorStatusReceiverService.ReceiverError -= OnMotorStatusReceiverError;
         _vlmResultReceiverService.ResultReceived -= OnVlmResultReceived;
@@ -2299,6 +2508,7 @@ public partial class MainWindow : Window
         _viewportRecordingService.Dispose();
         _eoUdpCaptureService.Dispose();
         _irUdpCaptureService.Dispose();
+        _detectionUdpReceiverService.Dispose();
         _motorStatusReceiverService.Dispose();
         _vlmResultReceiverService.Dispose();
         _motorControlService.Dispose();

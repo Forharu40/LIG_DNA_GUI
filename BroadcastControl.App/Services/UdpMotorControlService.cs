@@ -1,28 +1,32 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.Net.Sockets;
 
 namespace BroadcastControl.App.Services;
 
 /// <summary>
-/// GUI에서 Thor로 모터 제어 명령을 보내는 UDP 송신 서비스다.
-/// MainViewModel이 만든 모드/추적/방향/목표 각도/회전 각도 크기/YOLO 객체 ID 값을
-/// Thor가 해석할 수 있는 13B little-endian 패킷으로 직렬화한다.
+/// GUI에서 Jetson으로 모터 제어 UDP 패킷을 보내는 서비스입니다.
+/// 8000/udp 모터 명령은 10바이트 고정 길이이며, 추적 녹화 제어는 8010/udp로 별도 전송합니다.
 /// </summary>
 public sealed class UdpMotorControlService : IDisposable
 {
     private const string DefaultHost = "192.168.3.143";
     private const int DefaultPort = 8000;
-    private const int MotorCommandPacketSize = 13;
+    private const int DefaultTrackingRecordingControlPort = 8010;
+    private const int MotorCommandPacketSize = 10;
+    private const int TrackingRecordingPacketSize = 10;
+    private static readonly byte[] TrackingRecordingPacketMagic = "TRCK"u8.ToArray();
 
     private readonly UdpClient _udpClient = new();
     private readonly object _endpointLock = new();
     private string _host;
     private int _port;
+    private int _trackingRecordingControlPort;
 
-    public UdpMotorControlService(string? host = null, int? port = null)
+    public UdpMotorControlService(string? host = null, int? port = null, int? trackingRecordingControlPort = null)
     {
         _host = ResolveHost(host);
         _port = ResolvePort(port);
+        _trackingRecordingControlPort = ResolveTrackingRecordingControlPort(trackingRecordingControlPort);
     }
 
     public string Host
@@ -47,39 +51,48 @@ public sealed class UdpMotorControlService : IDisposable
         }
     }
 
-    public void ConfigureEndpoint(string? host, int? port = null)
+    public void ConfigureEndpoint(string? host, int? port = null, int? trackingRecordingControlPort = null)
     {
+        // 네트워크 설정이 바뀌면 실행 중인 송신 경로에도 즉시 반영합니다.
         lock (_endpointLock)
         {
             _host = ResolveHost(host);
             _port = ResolvePort(port);
+            _trackingRecordingControlPort = ResolveTrackingRecordingControlPort(trackingRecordingControlPort);
         }
     }
 
     public bool TrySendMotorCommandPacket(
         byte mode,
         byte tracking,
+        byte trackId,
         MotorButtonMask btnMask,
         ushort panPos,
         ushort tiltPos,
         byte scanStep,
         byte manualStep,
-        int yoloObjectId,
-        bool publishAngleCommand,
+        bool isEoPrimary,
         out string? error)
     {
-        // GUI -> Thor 모터 제어 패킷:
-        // 기존 9B 명령 뒤에 YOLO가 발행한 객체 ID(int32)를 붙여 모터가 어떤 객체를 따라갈지 알 수 있게 한다.
+        // GUI -> Jetson 8000/udp 모터 명령 패킷, 총 10바이트.
+        // [0] mode, [1] tracking, [2] track_id, [3] btn_mask,
+        // [4..5] pan_pos LE, [6..7] tilt_pos LE, [8] scan_step, [9] manual_step.
         var packet = new byte[MotorCommandPacketSize];
         packet[0] = mode;
         packet[1] = tracking;
-        packet[2] = EncodeButtonMask(btnMask);
-        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(3, 2), panPos);
-        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(5, 2), tiltPos);
-        packet[7] = EncodeStepSize(scanStep);
-        packet[8] = EncodeStepSize(manualStep);
-        BinaryPrimitives.WriteInt32LittleEndian(packet.AsSpan(9, 4), yoloObjectId);
-        return TrySendPacket(packet, out error);
+        packet[2] = trackId;
+        packet[3] = EncodeButtonMask(btnMask);
+        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(4, 2), panPos);
+        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(6, 2), tiltPos);
+        packet[8] = EncodeStepSize(scanStep);
+        packet[9] = EncodeStepSize(manualStep);
+        if (!TrySendPacket(packet, out error))
+        {
+            return false;
+        }
+
+        TrySendTrackingRecordingPacket(tracking != 0, isEoPrimary, trackId == 0xFF ? -1 : trackId);
+        return true;
     }
 
     public void Dispose()
@@ -110,14 +123,39 @@ public sealed class UdpMotorControlService : IDisposable
         }
     }
 
+    private void TrySendTrackingRecordingPacket(bool tracking, bool isEoPrimary, int yoloObjectId)
+    {
+        try
+        {
+            string host;
+            int port;
+            lock (_endpointLock)
+            {
+                host = _host;
+                port = _trackingRecordingControlPort;
+            }
+
+            var packet = new byte[TrackingRecordingPacketSize];
+            TrackingRecordingPacketMagic.CopyTo(packet, 0);
+            packet[4] = tracking && yoloObjectId >= 0 ? (byte)1 : (byte)0;
+            packet[5] = isEoPrimary ? (byte)1 : (byte)2;
+            BinaryPrimitives.WriteInt32LittleEndian(packet.AsSpan(6, 4), yoloObjectId);
+            _udpClient.Send(packet, packet.Length, host, port);
+        }
+        catch
+        {
+            // 추적 녹화 제어는 보조 기능이므로 실패해도 모터 명령 전송 결과를 실패로 바꾸지 않습니다.
+        }
+    }
+
     private static byte EncodeStepSize(int stepSize)
     {
-        return (byte)Math.Clamp(stepSize, 0, byte.MaxValue);
+        return (byte)Math.Clamp(stepSize, 1, 10);
     }
 
     private static byte EncodeButtonMask(MotorButtonMask buttons)
     {
-        return (byte)((byte)buttons & 0x1F);
+        return (byte)((byte)buttons & 0x0F);
     }
 
     private static string ResolveHost(string? host)
@@ -144,5 +182,18 @@ public sealed class UdpMotorControlService : IDisposable
         return int.TryParse(envPort, out var parsedPort) && parsedPort > 0 && parsedPort <= 65535
             ? parsedPort
             : DefaultPort;
+    }
+
+    private static int ResolveTrackingRecordingControlPort(int? port)
+    {
+        if (port is > 0 and <= 65535)
+        {
+            return port.Value;
+        }
+
+        var envPort = Environment.GetEnvironmentVariable("TRACKING_RECORDING_CONTROL_PORT");
+        return int.TryParse(envPort, out var parsedPort) && parsedPort > 0 && parsedPort <= 65535
+            ? parsedPort
+            : DefaultTrackingRecordingControlPort;
     }
 }

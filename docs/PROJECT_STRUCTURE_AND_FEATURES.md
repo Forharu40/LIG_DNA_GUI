@@ -90,7 +90,7 @@ PC GUI와 Jetson Thor 사이의 UDP 포트는 기능별로 분리합니다. 이�
 | `6000/udp` | Jetson -> GUI | EO 영상 JPEG 청크 + EO 디텍션 |
 | `6001/udp` | Jetson -> GUI | IR 영상 JPEG 청크 |
 | `6002/udp` | 외부/VLM -> GUI | VLM 분석 결과 |
-| `8000/udp` | GUI -> Jetson | 모터 커맨드 13B |
+| `8000/udp` | GUI -> Jetson | 모터 커맨드 10B |
 | `8001/udp` | Jetson -> GUI | 모터 상태 36B |
 | `8088/tcp` | 모바일 브라우저 -> GUI | 모바일 위험 알림 웹앱 |
 | `8090/tcp` | GUI -> Jetson bridge | Jetson 저장 영상 목록/재생 HTTP 서버 |
@@ -188,18 +188,18 @@ GUI는 `track_id`를 객체 ID로 사용합니다. 이 값은 화면 표시와 �
 
 ### 8.1 GUI -> Thor 모터 명령
 
-GUI는 `8000/udp`로 13B 패킷을 보냅니다.
+GUI는 `8000/udp`로 10B 패킷을 보냅니다.
 
 | offset | 크기 | 필드 | 설명 |
 | --- | --- | --- | --- |
 | `0` | 1B | `mode` | `0` scan/auto, `1` manual |
 | `1` | 1B | `tracking` | `0` off, `1` on |
-| `2` | 1B | `btn_mask` | 방향 버튼 bit mask |
-| `3` | 2B | `pan_pos` | uint16 little-endian, Dynamixel 0~4095 |
-| `5` | 2B | `tilt_pos` | uint16 little-endian, Dynamixel 0~4095 |
-| `7` | 1B | `scan_step` | uint8, 1~10 |
-| `8` | 1B | `manual_step` | uint8, 1~10 |
-| `9` | 4B | `yolo_object_id` | int32 little-endian, GUI가 선택한 YOLO 객체 ID |
+| `2` | 1B | `track_id` | `0~254` object id, `0xff` auto |
+| `3` | 1B | `btn_mask` | 방향 버튼 bit mask |
+| `4` | 2B | `pan_pos` | uint16 little-endian, Dynamixel 0~4095 |
+| `6` | 2B | `tilt_pos` | uint16 little-endian, Dynamixel 0~4095 |
+| `8` | 1B | `scan_step` | uint8, 1~10 |
+| `9` | 1B | `manual_step` | uint8, 1~10 |
 
 `btn_mask` 비트:
 
@@ -211,8 +211,8 @@ GUI는 `8000/udp`로 13B 패킷을 보냅니다.
 | `0x08` | TILT -, 아래 |
 
 GUI의 pan/tilt 각도 입력값은 내부에서 Dynamixel 위치값 `0~4095`로 변환되어 전송됩니다.
-자동 추적 상태에서는 GUI가 현재 화면에서 가장 위험도가 높은 YOLO 객체 ID를 `yolo_object_id`로 전송합니다.
-사용자가 큰 영상 화면의 바운딩 박스 안을 클릭하면 해당 좌표에 있는 YOLO 객체 ID가 즉시 `yolo_object_id`로 전송되어 모터가 그 객체를 추적할 수 있습니다.
+자동 추적 상태에서는 GUI가 현재 화면에서 가장 위험도가 높은 YOLO 객체 ID를 `track_id`로 전송합니다.
+사용자가 큰 영상 화면의 바운딩 박스 안을 클릭하면 해당 좌표에 있는 YOLO 객체 ID가 즉시 `track_id`로 전송되어 모터가 그 객체를 추적할 수 있습니다.
 
 ### 8.2 Thor -> GUI 모터 상태
 

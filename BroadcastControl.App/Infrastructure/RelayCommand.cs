@@ -1,3 +1,5 @@
+// WPF MVVM에서 버튼과 ViewModel 메서드를 연결하기 위한 공통 Command 파일이다.
+// XAML Button.Command가 이 객체를 호출하면 ViewModel 안의 실제 동작 메서드가 실행된다.
 using System.Windows.Input;
 
 namespace BroadcastControl.App.Infrastructure;

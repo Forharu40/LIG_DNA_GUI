@@ -1,3 +1,5 @@
+// 외부 VLM 분석 결과를 UDP로 받는 서비스 파일이다.
+// 6002/udp에서 JSON 또는 일반 텍스트 메시지를 받아 전체 위험도, 분석 문장, 객체별 위험도 맵으로 정리한다.
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -5,14 +7,9 @@ using System.Text.Json;
 
 namespace BroadcastControl.App.Services;
 
-/// <summary>
-/// 외부 VLM 프로세스가 GUI로 보내는 분석 결과를 6002/udp에서 받는 서비스다.
-/// VLM은 영상보다 늦게 도착할 수 있으므로 영상 수신 포트와 분리하고,
-/// 전체 위험도와 객체별 위험도를 함께 읽어 MainWindow가 시스템 위험도와 박스 색상을 계산할 수 있게 한다.
-/// </summary>
 public sealed class UdpVlmResultReceiverService : IDisposable
 {
-    private const int DefaultPort = 6002;
+    private const int DefaultPort = 6003;
 
     private readonly UdpClient _udpClient;
     private CancellationTokenSource? _cancellationTokenSource;

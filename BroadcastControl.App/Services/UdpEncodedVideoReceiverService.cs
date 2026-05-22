@@ -1,3 +1,6 @@
+// Jetson bridge가 보내는 EO/IR 영상 UDP 패킷을 수신하고 디코딩하는 서비스 파일이다.
+// 영상 JPEG fragment를 조립하고, 같은 포트로 들어오는 detection/status 패킷을 파싱해 MainWindow 이벤트로 전달한다.
+// GUI 내부 녹화 기능을 위해 현재 표시 상태의 영상 프레임을 OpenCV VideoWriter로 저장하는 기능도 포함한다.
 using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
@@ -11,11 +14,6 @@ using OpenCvSharp;
 
 namespace BroadcastControl.App.Services;
 
-/// <summary>
-/// Jetson bridge가 GUI로 보내는 EO/IR UDP 패킷을 수신하는 서비스다.
-/// 영상은 여러 UDP 청크로 나뉘어 오기 때문에 frame_id 기준으로 조립한 뒤 JPEG를 디코딩하고,
-/// 같은 포트로 들어오는 detection/status 패킷은 별도 이벤트로 MainWindow에 전달한다.
-/// </summary>
 public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
     private const int DefaultPort = 6000;
@@ -1176,17 +1174,16 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     {
         detectionPacket = default;
 
-        // SNTL detection 패킷은 EO 영상 포트(6000)로 들어오며 type 0x10으로 영상 청크와 구분한다.
-        // TrackedDetection2D의 track_id는 GUI 내부에서 ObjectId로 보관하고, 모터 추적 대상 ID로도 사용한다.
         if (!HasPacketMagic(packet, SentinelPacketMagic) ||
             packet.Length < SentinelDetectionHeaderSize + 2 ||
-            packet[4] != 0x10)
+            packet[4] is not (0x10 or 0x11))
         {
             return false;
         }
 
         try
         {
+            var stream = packet[4] == 0x11 ? DetectionStream.Ir : DetectionStream.Eo;
             var frameId = BinaryPrimitives.ReadUInt32LittleEndian(packet.AsSpan(5, 4));
             var stampSec = BinaryPrimitives.ReadUInt32LittleEndian(packet.AsSpan(9, 4));
             var stampNsec = BinaryPrimitives.ReadUInt32LittleEndian(packet.AsSpan(13, 4));
@@ -1194,12 +1191,29 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
             var offset = SentinelDetectionHeaderSize;
             var detections = new List<DetectionInfo>();
 
-            if (!TryReadUInt16(packet, ref offset, out var detectionCount))
+            if (!TryReadUInt16(packet, ref offset, out var firstCount))
             {
                 return false;
             }
 
-            for (var index = 0; index < detectionCount; index++)
+            if (packet.Length == offset + firstCount * SentinelTrackedDetectionRecordSize)
+            {
+                for (var index = 0; index < firstCount; index++)
+                {
+                    if (!TryReadTrackedDetection(packet, ref offset, out var detection))
+                    {
+                        return false;
+                    }
+
+                    detections.Add(detection);
+                }
+
+                detectionPacket = new DetectionPacket(stampNs, frameId, 0, 0, detections, stream);
+                return true;
+            }
+
+            offset = SentinelDetectionHeaderSize + 2;
+            for (var index = 0; index < firstCount; index++)
             {
                 if (packet.Length < offset + SentinelDetectionRecordSize)
                 {
@@ -1223,29 +1237,41 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
             for (var index = 0; index < trackedCount; index++)
             {
-                if (packet.Length < offset + SentinelTrackedDetectionRecordSize)
+                if (!TryReadTrackedDetection(packet, ref offset, out var detection))
                 {
                     return false;
                 }
 
-                var trackId = BinaryPrimitives.ReadInt32LittleEndian(packet.AsSpan(offset, 4));
-                var className = ReadFixedUtf8(packet.AsSpan(offset + 8, 16));
-                var score = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 24, 4));
-                var x1 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 28, 4));
-                var y1 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 32, 4));
-                var x2 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 36, 4));
-                var y2 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 40, 4));
-                detections.Add(new DetectionInfo(className, score, x1, y1, x2, y2, trackId));
-                offset += SentinelTrackedDetectionRecordSize;
+                detections.Add(detection);
             }
 
-            detectionPacket = new DetectionPacket(stampNs, frameId, 0, 0, detections);
+            detectionPacket = new DetectionPacket(stampNs, frameId, 0, 0, detections, stream);
             return true;
         }
         catch
         {
             return false;
         }
+    }
+
+    private static bool TryReadTrackedDetection(byte[] packet, ref int offset, out DetectionInfo detection)
+    {
+        detection = default;
+        if (packet.Length < offset + SentinelTrackedDetectionRecordSize)
+        {
+            return false;
+        }
+
+        var trackId = BinaryPrimitives.ReadInt32LittleEndian(packet.AsSpan(offset, 4));
+        var className = ReadFixedUtf8(packet.AsSpan(offset + 8, 16));
+        var score = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 24, 4));
+        var x1 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 28, 4));
+        var y1 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 32, 4));
+        var x2 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 36, 4));
+        var y2 = BinaryPrimitives.ReadSingleLittleEndian(packet.AsSpan(offset + 40, 4));
+        detection = new DetectionInfo(className, score, x1, y1, x2, y2, trackId);
+        offset += SentinelTrackedDetectionRecordSize;
+        return true;
     }
 
     private static bool TryReadUInt16(byte[] packet, ref int offset, out ushort value)

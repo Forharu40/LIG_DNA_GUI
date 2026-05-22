@@ -34,23 +34,24 @@ GUI에서 Jetson 브릿지를 SSH로 자동 실행하는 기능은 제거했습�
 | `6002/udp` | Jetson/VLM -> GUI | VLM 분석 결과 |
 | `8000/udp` | GUI -> Jetson | 모터 제어 명령 패킷 |
 | `8001/udp` | Jetson -> GUI | 모터 상태 패킷 |
+| `8010/udp` | GUI -> Jetson camera bridge | VLM 위험 객체 tracking 녹화 시작/종료 제어 |
 | `8088/tcp` | Mobile -> GUI | 모바일 위험 알림 HTTP/SSE |
 | `8090/tcp` | GUI -> Jetson | 녹화 영상 목록/다운로드 HTTP 서버 |
 
 ## 모터 제어 패킷
 
-GUI는 `8000/udp`로 13바이트 little-endian 패킷을 보냅니다.
+GUI는 `8000/udp`로 10바이트 little-endian 패킷을 보냅니다.
 
 | 바이트 | 필드 | 설명 |
 | --- | --- | --- |
 | `0` | mode | 자동/수동 모드 |
 | `1` | tracking | 추적 명령. 추적 상태가 켜져 있고 위험 객체가 선택된 경우에만 `1` |
-| `2` | btn_mask | 방향 버튼 비트 |
-| `3~4` | pan_pos | pan raw 위치 `0~4095` |
-| `5~6` | tilt_pos | tilt raw 위치 `0~4095` |
-| `7` | scan_step | 자동 스캔 step size |
-| `8` | manual_step | 수동 조작 step size |
-| `9~12` | yolo_object_id | 추적 대상 YOLO/track 객체 ID |
+| `2` | track_id | 추적 대상 객체 ID. `0~254`, `0xff`는 auto |
+| `3` | btn_mask | 방향 버튼 비트 |
+| `4~5` | pan_pos | pan raw 위치 `0~4095` |
+| `6~7` | tilt_pos | tilt raw 위치 `0~4095` |
+| `8` | scan_step | 자동 스캔 step size |
+| `9` | manual_step | 수동 조작 step size |
 
 GUI의 step size 표시는 1도부터 10도까지 사용합니다. 모터로 보낼 때는 `deg / 360.0 * 4096.0` 기준으로 raw step 값으로 변환합니다.
 
@@ -67,6 +68,9 @@ http://{Jetson IP}:8090/api/videos
 ```
 
 따라서 GUI 목록에 녹화 영상이 뜨려면 Jetson 쪽에서 `8090/tcp` HTTP 서버가 실행 중이어야 하고, PC에서 해당 Jetson IP로 접근 가능해야 합니다.
+
+VLM이 위험 등급 객체를 감지해 GUI가 tracking=1을 보내면, GUI는 같은 Jetson IP의 `8010/udp`로 추적 녹화 제어 패킷도 함께 보냅니다.
+Jetson camera bridge는 이 신호를 받아 `/home/lig/Desktop/video/Tracked` 폴더에 `Tracking_YYYYMMDD_HHMMSS.mp4` 형식의 별도 영상을 저장합니다.
 
 ## GUI IP 적용
 
@@ -93,7 +97,7 @@ bash ./run_camera_udp_bridge.sh
 | `BroadcastControl.App/Services/AppNetworkSettings.cs` | `LigDnaGui.config.json` 기반 네트워크 설정 로드/저장, 로컬 PC IPv4 목록 조회 |
 | `BroadcastControl.App/Services/MobileAlertHubService.cs` | 모바일 브라우저용 위험 알림 HTTP/SSE 서버 |
 | `BroadcastControl.App/Services/UdpEncodedVideoReceiverService.cs` | EO/IR UDP 영상 조각 조립, JPEG 디코딩, detection/status 패킷 전달 |
-| `BroadcastControl.App/Services/UdpMotorControlService.cs` | GUI의 모터 제어 상태를 13바이트 UDP 패킷으로 직렬화해 Jetson으로 송신 |
+| `BroadcastControl.App/Services/UdpMotorControlService.cs` | GUI의 모터 제어 상태를 10바이트 UDP 패킷으로 직렬화해 Jetson으로 송신 |
 | `BroadcastControl.App/Services/UdpMotorStatusReceiverService.cs` | Jetson에서 오는 모터 상태 패킷을 수신하고 pan/tilt 상태로 파싱 |
 | `BroadcastControl.App/Services/UdpVlmResultReceiverService.cs` | VLM 분석 결과 UDP 수신, 전체 위험도와 객체별 위험도 파싱 |
 | `BroadcastControl.App/Services/ViewportRecordingService.cs` | 현재 GUI 화면 영역을 로컬 동영상 파일로 저장 |

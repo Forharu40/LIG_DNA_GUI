@@ -1,3 +1,5 @@
+// 위험 상황을 같은 네트워크의 모바일 브라우저로 전달하는 작은 HTTP/SSE 서버 파일이다.
+// 별도 앱 설치 없이 휴대폰에서 GUI PC 주소로 접속하면 최신 위험 이벤트, VLM 분석, 증거 이미지를 볼 수 있다.
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
@@ -7,11 +9,6 @@ using System.Text.Json;
 
 namespace BroadcastControl.App.Services;
 
-/// <summary>
-/// 위험 상황을 모바일 브라우저로 알려주기 위한 작은 HTTP/SSE 서버다.
-/// GUI가 위험 알림을 발행하면 현재 화면 캡처, VLM 분석, 탐지 요약을 웹앱에 전달하고
-/// 모바일 기기는 브라우저의 알림/진동/소리 기능으로 운용자에게 알려준다.
-/// </summary>
 public sealed class MobileAlertHubService : IDisposable
 {
     private const int DefaultPort = 8088;
@@ -154,6 +151,8 @@ public sealed class MobileAlertHubService : IDisposable
 
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
+        // 접속한 모바일 브라우저마다 별도 작업을 만들어 처리한다.
+        // 한 사용자의 느린 네트워크가 다른 사용자 알림 전송을 막지 않게 하기 위한 구조다.
         while (!cancellationToken.IsCancellationRequested && _listener is not null)
         {
             TcpClient? client = null;
@@ -176,6 +175,8 @@ public sealed class MobileAlertHubService : IDisposable
 
     private async Task HandleClientAsync(TcpClient tcpClient, CancellationToken cancellationToken)
     {
+        // 매우 작은 내장 HTTP 라우터다.
+        // /events는 SSE 연결, /latest는 최신 알림 JSON, /evidence/*.png는 증거 이미지, 나머지는 모바일 HTML을 반환한다.
         using var client = tcpClient;
         try
         {
@@ -230,6 +231,8 @@ public sealed class MobileAlertHubService : IDisposable
 
     private async Task HandleSseClientAsync(TcpClient client, NetworkStream stream, CancellationToken cancellationToken)
     {
+        // SSE 연결은 끊기지 않는 HTTP 응답으로 유지된다.
+        // 새 알림이 PublishAlertAsync에서 발생하면 이 writer 목록으로 event: alert를 보낸다.
         var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true)
         {
             AutoFlush = true

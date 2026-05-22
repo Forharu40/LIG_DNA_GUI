@@ -44,6 +44,7 @@ GUI에서 별도 수신하는 UDP 포트:
 | VLM result | `6002/udp` |
 | Motor command | `8000/udp` |
 | Motor status | `8001/udp` |
+| Tracking recording control | `8010/udp` |
 
 주의:
 
@@ -52,7 +53,7 @@ GUI에서 별도 수신하는 UDP 포트:
 - 두 포트는 서로 다른 구간입니다.
 - VLM 결과는 영상 패킷에 묶지 않고 `6002/udp`로 분리해 GUI가 별도 스레드에서 받을 수 있게 둡니다.
 - 모터는 `8000/udp` 명령, `8001/udp` 상태 피드백을 사용합니다.
-- GUI -> Thor 모터 패킷은 기존 9B 제어값 뒤에 yolo_object_id 4B를 붙인 13B이고, Thor -> GUI 모터 상태 패킷은 36B입니다.
+- GUI -> Thor 모터 패킷은 10B입니다: mode, tracking, track_id, btn_mask, pan_pos, tilt_pos, scan_step, manual_step. Thor -> GUI 모터 상태 패킷은 36B입니다.
 
 ## 파일 구성
 
@@ -151,7 +152,12 @@ FASTDDS_NO_SHM=false GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh
     EO_20260513_145200.mp4
     system_log_20260513_145200.txt
     vlm_analysis_20260513_145200.txt
+  Tracked/
+    Tracking_20260513_145230.mp4
 ```
+
+`Tracked` 폴더에는 GUI에서 VLM 위험 객체 tracking 상태가 켜진 동안의 별도 영상이 저장됩니다.
+파일명은 `Tracking_촬영시작날짜및시간.mp4` 형식입니다.
 
 녹화 기능을 끄고 브릿지만 실험:
 

@@ -1,3 +1,6 @@
+// 애플리케이션 전체 시작점과 테마 리소스를 관리하는 파일이다.
+// 프로그램이 실행될 때 시스템 테마를 읽어 Material Design 테마와 앱 전용 색상 브러시를 맞추고,
+// MainWindow를 직접 생성해 GUI 화면을 띄운다.
 using System.Windows;
 using System.Windows.Media;
 using MaterialDesignThemes.Wpf;

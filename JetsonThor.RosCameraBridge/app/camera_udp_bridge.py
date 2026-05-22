@@ -95,6 +95,9 @@ RECORDING_SEGMENT_SECONDS = getenv_int("RECORDING_SEGMENT_SECONDS", 60)
 RECORDING_FPS = getenv_int("RECORDING_FPS", 15)
 RECORDING_HTTP_ENABLED = getenv_bool("RECORDING_HTTP_ENABLED", True)
 RECORDING_HTTP_PORT = getenv_int("RECORDING_HTTP_PORT", 8090)
+TRACKING_RECORDING_ENABLED = getenv_bool("TRACKING_RECORDING_ENABLED", RECORDING_ENABLED)
+TRACKING_RECORDING_CONTROL_PORT = getenv_int("TRACKING_RECORDING_CONTROL_PORT", 8010)
+TRACKING_RECORDING_DIR = os.getenv("TRACKING_RECORDING_DIR", str(Path(RECORDING_DIR) / "Tracked"))
 LATEST_RECORDING_SEGMENT_NAME = ""
 LATEST_RECORDING_SEGMENT_LOCK = threading.Lock()
 
@@ -486,6 +489,102 @@ class VideoSegmentRecorder:
         print(f"Recording segment started: {self._current_path}", flush=True)
 
 
+class TrackingVideoRecorder:
+    def __init__(self, directory: str, fps: int) -> None:
+        self.directory = Path(directory)
+        self.fps = max(1, fps)
+        self._lock = threading.Lock()
+        self._writer: cv2.VideoWriter | None = None
+        self._frame_size: tuple[int, int] | None = None
+        self._current_path: Path | None = None
+        self._active = False
+        self._source = "eo"
+        self._object_id = -1
+        self.directory.mkdir(parents=True, exist_ok=True)
+
+    def set_state(self, active: bool, source: str, object_id: int) -> bool:
+        source = "ir" if source.lower() == "ir" else "eo"
+        active = active and object_id >= 0
+        with self._lock:
+            changed = (
+                self._active != active
+                or self._source != source
+                or self._object_id != object_id
+            )
+            if not changed:
+                return False
+
+            if self._writer is not None:
+                self._close_locked()
+
+            self._active = active
+            self._source = source
+            self._object_id = object_id if active else -1
+            return True
+
+    def write(self, source: str, frame: np.ndarray) -> None:
+        if frame.size == 0:
+            return
+
+        source = "ir" if source.lower() == "ir" else "eo"
+        height, width = frame.shape[:2]
+        with self._lock:
+            if not self._active or source != self._source:
+                return
+
+            if self._writer is None or self._frame_size != (width, height):
+                try:
+                    self._start_locked(width, height)
+                except Exception as exc:
+                    print(f"Tracking recording failed to start: {exc}", flush=True)
+                    return
+
+            if self._writer is not None:
+                self._writer.write(frame)
+
+    def close(self) -> None:
+        with self._lock:
+            self._active = False
+            self._object_id = -1
+            self._close_locked()
+
+    def _start_locked(self, width: int, height: int) -> None:
+        if self._writer is not None:
+            self._close_locked()
+
+        self.directory.mkdir(parents=True, exist_ok=True)
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        path = self.directory / f"Tracking_{timestamp}.mp4"
+        suffix = 1
+        while path.exists():
+            path = self.directory / f"Tracking_{timestamp}_{suffix}.mp4"
+            suffix += 1
+
+        fourcc = cv2.VideoWriter_fourcc(*"mp4v")
+        writer = cv2.VideoWriter(str(path), fourcc, self.fps, (width, height))
+        if not writer.isOpened():
+            writer.release()
+            self._writer = None
+            raise RuntimeError(f"Failed to open tracking recording file: {path}")
+
+        self._writer = writer
+        self._frame_size = (width, height)
+        self._current_path = path
+        print(
+            f"Tracking recording started: {path} "
+            f"(source={self._source}, object_id={self._object_id})",
+            flush=True,
+        )
+
+    def _close_locked(self) -> None:
+        if self._writer is not None:
+            self._writer.release()
+            print(f"Tracking recording saved: {self._current_path}", flush=True)
+        self._writer = None
+        self._frame_size = None
+        self._current_path = None
+
+
 class RecordingSegmentScheduler:
     def __init__(self, directory: str, segment_seconds: int) -> None:
         self.directory = Path(directory)
@@ -690,15 +789,72 @@ class RecordingVideoHandler(SimpleHTTPRequestHandler):
         self.wfile.write(encoded)
 
 
+class TrackingRecordingControlReceiver:
+    PACKET_MAGIC = b"TRCK"
+    PACKET_SIZE = 10
+
+    def __init__(self, node: Node, port: int, recorder: TrackingVideoRecorder) -> None:
+        self.node = node
+        self.port = port
+        self.recorder = recorder
+        self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        self.sock.bind(("0.0.0.0", port))
+        self.sock.settimeout(0.5)
+        self._stop_event = threading.Event()
+        self.thread = threading.Thread(target=self._receive_loop, name="tracking-recording-control", daemon=True)
+        self.thread.start()
+        self.node.get_logger().info(f"Listening for tracking recording control on UDP port {port}")
+
+    def _receive_loop(self) -> None:
+        while not self._stop_event.is_set():
+            try:
+                packet, _ = self.sock.recvfrom(1024)
+            except socket.timeout:
+                continue
+            except OSError:
+                return
+
+            if len(packet) < self.PACKET_SIZE or packet[:4] != self.PACKET_MAGIC:
+                continue
+
+            active = packet[4] != 0
+            source = "eo" if packet[5] == 1 else "ir"
+            object_id = struct.unpack_from("<i", packet, 6)[0]
+            try:
+                changed = self.recorder.set_state(active, source, object_id)
+                if changed:
+                    state = "started" if active and object_id >= 0 else "stopped"
+                    self.node.get_logger().info(
+                        f"Tracking recording {state}: source={source}, object_id={object_id}"
+                    )
+            except Exception as exc:
+                self.node.get_logger().error(f"Failed to update tracking recording state: {exc}")
+
+    def close(self) -> None:
+        self._stop_event.set()
+        self.sock.close()
+        self.thread.join(timeout=1.0)
+
+
 class StreamBridge:
     # EO 또는 IR 한 스트림을 담당하는 객체다.
     # ROS2 image topic을 JPEG UDP 패킷으로 바꾸고, 필요하면 같은 프레임을 녹화 파일에도 저장한다.
-    def __init__(self, name: str, image_topic: str, detection_topic: str, host: str, port: int) -> None:
+    def __init__(
+        self,
+        name: str,
+        image_topic: str,
+        detection_topic: str,
+        host: str,
+        port: int,
+        tracking_recorder: TrackingVideoRecorder | None = None,
+    ) -> None:
         self.name = name
         self.image_topic = image_topic
         self.detection_topic = detection_topic
         self.host = host
         self.port = port
+        self._tracking_recorder = tracking_recorder
         self.frame_index = 0
         self.first_image_logged = False
         self.first_detection_logged = False
@@ -737,6 +893,10 @@ class StreamBridge:
                 self._recorders[1].write(create_ir_grayscale_frame(stream_frame))
             else:
                 self._recorders[0].write(stream_frame)
+
+        if self._tracking_recorder is not None:
+            tracking_frame = create_ir_false_color_frame(stream_frame) if self.name.lower() == "ir" else stream_frame
+            self._tracking_recorder.write(self.name, tracking_frame)
 
         ok, encoded = cv2.imencode(
             ".jpg",
@@ -825,8 +985,7 @@ class StreamBridge:
 
 
 class MotorCommandUdpReceiver:
-    COMMAND_PACKET_SIZE = 13
-    ANGLE_COMMAND_FLAG = 0x80
+    COMMAND_PACKET_SIZE = 10
 
     def __init__(self, node: Node, port: int, topic: str) -> None:
         self.node = node
@@ -867,12 +1026,12 @@ class MotorCommandUdpReceiver:
                 continue
 
             try:
-                button_mask = packet[2]
-                if (button_mask & self.ANGLE_COMMAND_FLAG) == 0:
+                button_mask = packet[3]
+                if button_mask != 0:
                     continue
 
-                pan = self._clamp_raw(struct.unpack_from("<H", packet, 3)[0])
-                tilt = self._clamp_raw(struct.unpack_from("<H", packet, 5)[0])
+                pan = self._clamp_raw(struct.unpack_from("<H", packet, 4)[0])
+                tilt = self._clamp_raw(struct.unpack_from("<H", packet, 6)[0])
                 self._publish_motor_angle(pan, tilt)
             except Exception as exc:
                 self.node.get_logger().error(f"Failed to publish GUI motor command: {exc}")
@@ -903,8 +1062,18 @@ class CameraUdpBridge(Node):
         super().__init__("camera_udp_bridge")
         # ROS2 topic 구독은 Jetson 컨테이너 내부에서 수행하고, PC GUI는 ROS2를 직접 보지 않는다.
         # 이 노드가 topic 데이터를 GUI 전용 UDP 프로토콜로 변환하는 경계 역할을 한다.
-        self._eo = StreamBridge("eo", EO_IMAGE_TOPIC, EO_DETECTION_TOPIC, GUI_HOST, EO_GUI_PORT)
-        self._ir = StreamBridge("ir", IR_IMAGE_TOPIC, IR_DETECTION_TOPIC, GUI_HOST, IR_GUI_PORT)
+        self._tracking_recorder = (
+            TrackingVideoRecorder(TRACKING_RECORDING_DIR, RECORDING_FPS)
+            if TRACKING_RECORDING_ENABLED
+            else None
+        )
+        self._tracking_control = (
+            TrackingRecordingControlReceiver(self, TRACKING_RECORDING_CONTROL_PORT, self._tracking_recorder)
+            if self._tracking_recorder is not None
+            else None
+        )
+        self._eo = StreamBridge("eo", EO_IMAGE_TOPIC, EO_DETECTION_TOPIC, GUI_HOST, EO_GUI_PORT, self._tracking_recorder)
+        self._ir = StreamBridge("ir", IR_IMAGE_TOPIC, IR_DETECTION_TOPIC, GUI_HOST, IR_GUI_PORT, self._tracking_recorder)
         self._motor = (
             MotorCommandUdpReceiver(self, MOTOR_CONTROL_PORT, MOTOR_ANGLE_SET_TOPIC)
             if MOTOR_ANGLE_BRIDGE_ENABLED
@@ -936,6 +1105,10 @@ class CameraUdpBridge(Node):
         if RECORDING_ENABLED:
             self.get_logger().info(
                 f"Recording EO/IR videos to {RECORDING_DIR} every {RECORDING_SEGMENT_SECONDS} seconds"
+            )
+        if TRACKING_RECORDING_ENABLED:
+            self.get_logger().info(
+                f"Tracking recordings to {TRACKING_RECORDING_DIR} controlled by UDP {TRACKING_RECORDING_CONTROL_PORT}"
             )
         self._start_recording_http_server()
 
@@ -982,6 +1155,10 @@ class CameraUdpBridge(Node):
             self._motor.close()
         if self._recording_segment_scheduler is not None:
             self._recording_segment_scheduler.close()
+        if self._tracking_control is not None:
+            self._tracking_control.close()
+        if self._tracking_recorder is not None:
+            self._tracking_recorder.close()
         if self._recording_http_server is not None:
             self._recording_http_server.shutdown()
             self._recording_http_server.server_close()
