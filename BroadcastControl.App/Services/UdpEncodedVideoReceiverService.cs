@@ -1175,7 +1175,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
         detectionPacket = default;
 
         if (!HasPacketMagic(packet, SentinelPacketMagic) ||
-            packet.Length < SentinelDetectionHeaderSize + 2 ||
+            packet.Length < SentinelDetectionHeaderSize + 3 ||
             packet[4] is not (0x10 or 0x11))
         {
             return false;
@@ -1196,6 +1196,9 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 return false;
             }
 
+            var activeTrackId = packet[offset];
+            offset += 1;
+
             if (packet.Length == offset + firstCount * SentinelTrackedDetectionRecordSize)
             {
                 for (var index = 0; index < firstCount; index++)
@@ -1208,7 +1211,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                     detections.Add(detection);
                 }
 
-                detectionPacket = new DetectionPacket(stampNs, frameId, 0, 0, detections, stream);
+                detectionPacket = new DetectionPacket(stampNs, frameId, 0, 0, detections, stream, activeTrackId);
                 return true;
             }
 
@@ -1245,7 +1248,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 detections.Add(detection);
             }
 
-            detectionPacket = new DetectionPacket(stampNs, frameId, 0, 0, detections, stream);
+            detectionPacket = new DetectionPacket(stampNs, frameId, 0, 0, detections, stream, activeTrackId);
             return true;
         }
         catch

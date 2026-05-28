@@ -1,4 +1,4 @@
-﻿using System.ComponentModel;
+using System.ComponentModel;
 using System.Globalization;
 using System.Net.Http;
 using System.Text;
@@ -423,6 +423,16 @@ public partial class MainWindow : Window
         }
     }
 
+    private void DetectionTargetList_OneSelctionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (sender is not ListBox listBox || listBox.SelectedItem is not DetectionTargetItem item)
+        {
+            return;
+        }
+
+        _viewModel.SelectYoloObject(item.ObjectId, item.ThreatLevel);
+        listBox.SelectedItem = null;
+    }
     private void HandleDetectionsReceived(
         DetectionPacket detectionPacket,
         Dictionary<uint, DetectionPacket> detectionCache,
@@ -686,8 +696,8 @@ public partial class MainWindow : Window
             var rotatedDetections = displayDetections
                 .Select(d => RotateDetectionForDisplay(d, originalSourceWidth, originalSourceHeight, rotation))
                 .ToArray();
-
-            var overlaySignature = $"{rotation}:{BuildOverlaySignature(rotatedDetections)}";
+            var activeTrackId = detectionPacket.ActiveTrackId;
+            var overlaySignature = $"{rotation}:{activeTrackId}:{BuildOverlaySignature(rotatedDetections)}";
             if (!forceRefresh && string.Equals(_lastOverlaySignature, overlaySignature, StringComparison.Ordinal))
             {
                 return;
@@ -697,7 +707,7 @@ public partial class MainWindow : Window
 
             var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
             var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
-            var baseScale = Math.Max(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
+            var baseScale = Math.Min(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
             var scaleX = baseScale;
             var scaleY = baseScale;
             var scaledWidth = rotatedSourceWidth * scaleX;
@@ -717,7 +727,8 @@ public partial class MainWindow : Window
                     continue;
                 }
 
-                AddDetectionVisualToCanvas(rectLeft, rectTop, rectWidth, rectHeight, detection);
+                var isTrackId = detection.ObjectId == activeTrackId && activeTrackId != 0xFF;
+                AddDetectionVisualToCanvas(rectLeft, rectTop, rectWidth, rectHeight, detection, isTrackId);
             }
 
             if (!_hasRenderedDetectionOverlay)
@@ -763,7 +774,7 @@ public partial class MainWindow : Window
         var rotatedSourceHeight = GetRotatedHeight(originalSourceWidth, originalSourceHeight, rotation);
         var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
         var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
-        var baseScale = Math.Max(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
+        var baseScale = Math.Min(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
         var scaledWidth = rotatedSourceWidth * baseScale;
         var scaledHeight = rotatedSourceHeight * baseScale;
         var baseLeft = (viewportWidth - scaledWidth) / 2.0;
@@ -1303,7 +1314,8 @@ public partial class MainWindow : Window
         double rectTop,
         double rectWidth,
         double rectHeight,
-        DetectionInfo detection)
+        DetectionInfo detection,
+        bool isTracked)
     {
         var accentBrush = GetDetectionThreatBrush(detection.ThreatLevel);
         accentBrush.Freeze();
@@ -1312,20 +1324,23 @@ public partial class MainWindow : Window
             Width = rectWidth,
             Height = rectHeight,
             Stroke = accentBrush,
-            StrokeThickness = 2,
+            StrokeThickness = isTracked ? 4 : 2,
             RadiusX = 2,
             RadiusY = 2,
-            Fill = Brushes.Transparent
+            Fill = isTracked
+                ? new SolidColorBrush(Color.FromArgb(35,255,70,70))
+                : Brushes.Transparent
         };
         Canvas.SetLeft(mainRectangle, rectLeft);
         Canvas.SetTop(mainRectangle, rectTop);
         DetectionOverlayCanvas.Children.Add(mainRectangle);
 
         var cornerLength = Math.Max(12, Math.Min(rectWidth, rectHeight) * 0.18);
-        AddCornerToCanvas(rectLeft, rectTop, cornerLength, true, true, accentBrush);
-        AddCornerToCanvas(rectLeft + rectWidth, rectTop, cornerLength, false, true, accentBrush);
-        AddCornerToCanvas(rectLeft, rectTop + rectHeight, cornerLength, true, false, accentBrush);
-        AddCornerToCanvas(rectLeft + rectWidth, rectTop + rectHeight, cornerLength, false, false, accentBrush);
+        var cornerThickness = isTracked ? 5 : 3;
+        AddCornerToCanvas(rectLeft, rectTop, cornerLength, true, true, accentBrush, cornerThickness);
+        AddCornerToCanvas(rectLeft + rectWidth, rectTop, cornerLength, false, true, accentBrush, cornerThickness);
+        AddCornerToCanvas(rectLeft, rectTop + rectHeight, cornerLength, true, false, accentBrush, cornerThickness);
+        AddCornerToCanvas(rectLeft + rectWidth, rectTop + rectHeight, cornerLength, false, false, accentBrush, cornerThickness);
 
         var labelText = new TextBlock
         {
@@ -1362,7 +1377,8 @@ public partial class MainWindow : Window
         double length,
         bool isLeft,
         bool isTop,
-        Brush strokeBrush)
+        Brush strokeBrush,
+        double strokeThickness)
     {
         var horizontal = new Line
         {
@@ -1371,7 +1387,7 @@ public partial class MainWindow : Window
             X2 = anchorX + (isLeft ? length : -length),
             Y2 = anchorY,
             Stroke = strokeBrush,
-            StrokeThickness = 3,
+            StrokeThickness = strokeThickness,
             StrokeStartLineCap = PenLineCap.Square,
             StrokeEndLineCap = PenLineCap.Square
         };
@@ -1383,7 +1399,7 @@ public partial class MainWindow : Window
             X2 = anchorX,
             Y2 = anchorY + (isTop ? length : -length),
             Stroke = strokeBrush,
-            StrokeThickness = 3,
+            StrokeThickness = strokeThickness,
             StrokeStartLineCap = PenLineCap.Square,
             StrokeEndLineCap = PenLineCap.Square
         };
@@ -2519,4 +2535,3 @@ public partial class MainWindow : Window
 
     }
 }
-

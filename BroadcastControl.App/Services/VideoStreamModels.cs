@@ -42,7 +42,8 @@ public readonly record struct DetectionPacket(
     int Width,
     int Height,
     IReadOnlyList<DetectionInfo> Detections,
-    DetectionStream Stream = DetectionStream.Unknown);
+    DetectionStream Stream = DetectionStream.Unknown,
+    int ActiveTrackId = 0xFF);
 
 // YOLO 또는 bridge 쪽 상태 진단 패킷이다.
 // 모델 로딩 여부, confidence threshold, 마지막 오류를 시스템 로그에 표시할 수 있게 한다.

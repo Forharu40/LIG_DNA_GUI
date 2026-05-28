@@ -810,7 +810,7 @@
                           MouseWheel="CameraViewport_OnMouseWheel"
                           MouseMove="CameraViewport_OnMouseMove"
                           MouseLeftButtonUp="CameraViewport_OnMouseLeftButtonUp">
-                                <Rectangle Fill="{DynamicResource SurfaceAltBrush}" />
+                                <Rectangle Fill="#FF000000" />
 
                                 <!-- LargeFeedImage는 크게 보여줄 카메라 영상 바인딩이다.
                              EO/IR 전환 상태에 따라 표시 영상이 달라진다. -->
@@ -925,7 +925,7 @@
                                     BorderBrush="Transparent"
                                     BorderThickness="0"
                                     CornerRadius="1">
-                                        <Grid ClipToBounds="True">
+                                        <Grid ClipToBounds="True" Background="#FF000000">
                                             <Image Source="{Binding InsetFeedImage}"
                                            Stretch="{Binding InsetFeedStretch}"
                                            RenderOptions.BitmapScalingMode="HighQuality"
@@ -1491,7 +1491,9 @@
                                      Margin="0,10,0,0"
                                      ItemsSource="{Binding DetectionTargets}"
                                      Background="Transparent"
-                                     BorderThickness="0">
+                                     BorderThickness="0"
+                                     SelectionChanged="DetectionTargetList_OneSelctionChanged">
+                                     
                                     <ListBox.ItemTemplate>
                                         <DataTemplate>
                                             <Border Margin="0,0,0,10"

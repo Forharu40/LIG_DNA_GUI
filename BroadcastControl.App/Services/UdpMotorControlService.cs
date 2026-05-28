@@ -1,4 +1,5 @@
-﻿using System.Buffers.Binary;
+using System.Buffers.Binary;
+using System.IO;
 using System.Net.Sockets;
 
 namespace BroadcastControl.App.Services;
@@ -12,8 +13,8 @@ public sealed class UdpMotorControlService : IDisposable
     private const string DefaultHost = "192.168.3.143";
     private const int DefaultPort = 8000;
     private const int DefaultTrackingRecordingControlPort = 8010;
-    private const int MotorCommandPacketSize = 10;
-    private const int TrackingRecordingPacketSize = 10;
+    private const int MotorCommandPacketSize = 11;
+    private const int TrackingRecordingPacketSize = 11;
     private static readonly byte[] TrackingRecordingPacketMagic = "TRCK"u8.ToArray();
 
     private readonly UdpClient _udpClient = new();
@@ -81,11 +82,14 @@ public sealed class UdpMotorControlService : IDisposable
         packet[0] = mode;
         packet[1] = tracking;
         packet[2] = trackId;
-        packet[3] = EncodeButtonMask(btnMask);
-        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(4, 2), panPos);
-        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(6, 2), tiltPos);
-        packet[8] = EncodeStepSize(scanStep);
-        packet[9] = EncodeStepSize(manualStep);
+        packet[3] = (byte)(isEoPrimary ? 0 : 1);
+        packet[4] = EncodeButtonMask(btnMask);
+        
+        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(5, 2), panPos);
+        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(7, 2), tiltPos);
+        packet[9] = EncodeStepSize(scanStep);
+        packet[10] = EncodeStepSize(manualStep);
+      
         if (!TrySendPacket(packet, out error))
         {
             return false;

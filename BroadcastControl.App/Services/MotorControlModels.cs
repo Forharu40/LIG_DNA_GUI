@@ -8,13 +8,13 @@ public enum MotorButtonMask : byte
     // 버튼을 누르지 않은 상태다.
     None = 0,
     // Pan 오른쪽 이동.
-    Right = 0x01,
+    Right = 0x02,
     // Pan 왼쪽 이동.
-    Left = 0x02,
+    Left = 0x01,
     // Tilt 위쪽 이동.
-    Up = 0x04,
+    Up = 0x08,
     // Tilt 아래쪽 이동.
-    Down = 0x08,
+    Down = 0x04,
     // 중앙/정지/홈 계열 명령에 사용하는 비트다.
     Center = 0x10
 }

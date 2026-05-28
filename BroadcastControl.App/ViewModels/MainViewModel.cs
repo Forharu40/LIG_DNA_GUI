@@ -1,4 +1,4 @@
-﻿using System.Collections.ObjectModel;
+using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
@@ -372,9 +372,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         ? (IsTrackingModeEnabled ? 1.0 : 0.42)
         : 0.32;
 
-    public string PanMotorPositionText => _panMotorPositionDegrees.ToString("0.0", CultureInfo.InvariantCulture);
+    public string PanMotorPositionText => (_panMotorPositionDegrees - 180).ToString("0.0", CultureInfo.InvariantCulture);
 
-    public string TiltMotorPositionText => _tiltMotorPositionDegrees.ToString("0.0", CultureInfo.InvariantCulture);
+    public string TiltMotorPositionText => (_tiltMotorPositionDegrees - 90).ToString("0.0", CultureInfo.InvariantCulture);
 
     public bool IsMotorDetailsOpen
     {
@@ -495,9 +495,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double InsetFeedRotationAngle => _isEoPrimary ? _irDisplayRotationAngle : _eoDisplayRotationAngle;
 
-    public Stretch LargeFeedStretch => Stretch.UniformToFill;
+    public Stretch LargeFeedStretch => Stretch.Uniform;
 
-    public Stretch InsetFeedStretch => Stretch.UniformToFill;
+    public Stretch InsetFeedStretch => Stretch.Uniform;
 
     public string LargeFeedSubtitle => _isEoPrimary ? EoSubtitle : IrSubtitle;
 
@@ -746,10 +746,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         }
 
         var isHighThreat = IsHighThreatLevel(threatLevel);
-        _hasTrackedTarget = isHighThreat;
-        _yoloObjectId = isHighThreat ? objectId : -1;
-        _isUserSelectedTrackId = isHighThreat;
-        IsTrackingModeEnabled = true;
+        //_hasTrackedTarget = isHighThreat;
+        //_yoloObjectId = isHighThreat ?
+        //_isUserSelectedTrackId = isHighThreat;
+        //IsTrackingModeEnabled = true;
+        _hasTrackedTarget = true;
+        _yoloObjectId = objectId;
+        _isUserSelectedTrackId = true;
 
         if (!TrySendMotorCommandPacket(out var error))
         {
@@ -1762,7 +1765,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         // GUI의 현재 제어 상태를 Jetson이 기대하는 10B 모터 명령 패킷으로 변환한다.
         return _motorControlService.TrySendMotorCommandPacket(
             mode: forcedMode ?? (IsManualMode ? (byte)1 : (byte)0),
-            tracking: ShouldSendTrackingToZybo ? (byte)1 : (byte)0,
+            tracking: IsTrackingModeEnabled ? (byte)1 : (byte)0,
             trackId: EncodeTrackId(),
             btnMask: buttons,
             panPos: _motorPanRaw,
@@ -1777,12 +1780,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     {
         if (!ShouldSendTrackingToZybo)
         {
-            return 0;
+            return 0xFF;
         }
 
         if (_isUserSelectedTrackId && _yoloObjectId is >= 0 and <= 254)
         {
-            return (byte)_yoloObjectId;
+            return 0xFF;
+            //return (byte)_yoloObjectId;
         }
 
         return 0xFF;
