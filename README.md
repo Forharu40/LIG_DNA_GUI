@@ -114,7 +114,6 @@ BroadcastControl.App/
     Camera/
       CameraView.xaml
       CameraView.xaml.cs
-      CameraView.MainWindow.cs
     Monitoring/
       MonitoringView.xaml
       MonitoringView.xaml.cs
@@ -151,7 +150,7 @@ BroadcastControl.App/
 | `MainWindow.xaml` | active view를 올려 배치하는 shell 레이아웃 |
 | `MainWindow.xaml.cs` | 공통 필드, 생성자, active view 이벤트 연결만 담당 |
 | `Views/Monitoring/MonitoringView.MainWindow.cs` | 앱 로딩/종료, ViewModel 이벤트, UDP 프레임/탐지/VLM/모터 상태 수신 연결 |
-| `Views/Camera/CameraView.MainWindow.cs` | EO/IR 화면, 탐지 오버레이, 박스 선택, 줌/회전, 위협도 표시 |
+| `Views/Camera/CameraView.xaml.cs` | CameraView 이벤트 연결과 EO/IR 화면, 탐지 오버레이, 박스 선택, 줌/회전, 위협도 표시 |
 | `Views/Motor/MotorControlView.MainWindow.cs` | 모터 방향키, 키보드 입력, 반복 전송, 버튼 시각 상태 |
 | `Views/Motor/MotorDetailsView.MainWindow.cs` | 모터 상세창 backdrop 처리 |
 | `Views/Operation/OperationControlView.MainWindow.cs` | 하단 조작 패널의 네트워크 설정 로드/저장 |
