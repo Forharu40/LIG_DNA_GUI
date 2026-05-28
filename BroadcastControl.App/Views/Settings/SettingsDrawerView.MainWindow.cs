@@ -28,53 +28,8 @@ public partial class MainWindow : Window
         }
     }
 
-    private void MotorDetailsBackdrop_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
-    {
-        if (_viewModel.IsMotorDetailsOpen)
-        {
-            _viewModel.IsMotorDetailsOpen = false;
-            e.Handled = true;
-        }
-    }
-
-    private void Button_Click(object sender, RoutedEventArgs e)
-    {
-    }
-
     private void Button_Click_1(object sender, RoutedEventArgs e)
     {
-    }
-
-    private void LoadNetworkSettingsEditor()
-    {
-        OperationActiveView.JetsonHostTextBoxElement.Text = _networkSettings.JetsonHost;
-
-        var localAddresses = AppNetworkSettings.GetLocalIpv4Addresses();
-        OperationActiveView.PcGuiHostComboBoxElement.ItemsSource = localAddresses;
-        OperationActiveView.PcGuiHostComboBoxElement.Text = _networkSettings.PcGuiHost;
-        if (localAddresses.Count > 0 && !localAddresses.Contains(_networkSettings.PcGuiHost, StringComparer.Ordinal))
-        {
-            _viewModel.AppendImportantLog($"?꾩옱 GUI IP ?꾨낫: {string.Join(", ", localAddresses)}");
-        }
-    }
-
-    private void SaveNetworkSettingsButton_OnClick(object sender, RoutedEventArgs e)
-    {
-        _networkSettings.JetsonHost = OperationActiveView.JetsonHostTextBoxElement.Text;
-        _networkSettings.PcGuiHost = OperationActiveView.PcGuiHostComboBoxElement.Text;
-        _networkSettings.RecordedVideoUrl = $"http://{_networkSettings.JetsonHost.Trim()}:{_networkSettings.RecordingHttpPort.ToString(CultureInfo.InvariantCulture)}/";
-        _networkSettings.Save();
-        _motorControlService.ConfigureEndpoint(
-            _networkSettings.JetsonHost,
-            _networkSettings.MotorControlPort,
-            _networkSettings.TrackingRecordingControlPort);
-
-        _viewModel.AppendImportantLog($"?ㅽ듃?뚰겕 ?ㅼ젙????ν븯怨?利됱떆 ?곸슜?덉뒿?덈떎: Jetson {_networkSettings.JetsonHost}, GUI {_networkSettings.PcGuiHost}");
-        MessageBox.Show(
-            "?ㅽ듃?뚰겕 ?ㅼ젙????ν뻽?듬땲??\n\n紐⑦꽣 紐낅졊怨??뱁솕 ?곸긽 二쇱냼??利됱떆 ??Jetson IP瑜??ъ슜?⑸땲??\nGUI IP??Jetson 釉뚮┸吏???≪텧 ????ㅼ젙?먮룄 諛섏쁺?섏뼱???곸긽 ?섏떊 ??곸씠 諛붾앸땲??",
-            "Network",
-            MessageBoxButton.OK,
-            MessageBoxImage.Information);
     }
 
     private void WindowModeToggleButton_OnClick(object sender, RoutedEventArgs e)

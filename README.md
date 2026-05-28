@@ -7,7 +7,7 @@
 ## 2026-05-28 ver2 리팩토링 요약
 
 - `MainWindow.xaml`은 전체 화면을 직접 그리지 않고 active view를 배치하는 shell 역할만 맡습니다.
-- `MainWindow.xaml.cs`도 기능별 partial code-behind 파일로 분리했습니다.
+- `MainWindow.xaml.cs`도 각 active view가 있는 `Views/<기능>` 폴더의 기능별 partial 파일로 분리했습니다.
 - `Views`는 화면 영역 기준으로 `Camera`, `Motor`, `Operation`, `Monitoring`, `Recording`, `Settings`, `Vlm`으로 분리했습니다.
 - `ViewModels`는 View와 같은 기능별 폴더 구조를 갖도록 기본 구조를 만들었습니다.
 - `Models`는 카메라, 모터, 네트워크, 모바일 알림, VLM 데이터 계약을 명확히 드러내도록 분리했습니다.
@@ -30,7 +30,6 @@ Camera / Sensor
 | 경로 | 역할 |
 | --- | --- |
 | `BroadcastControl.App` | Windows WPF GUI 애플리케이션 |
-| `BroadcastControl.App/CodeBehind` | `MainWindow.xaml.cs`에서 분리한 기능별 partial code-behind |
 | `BroadcastControl.App/Models` | UDP/HTTP/화면 상태에 쓰이는 데이터 모델 |
 | `BroadcastControl.App/Services` | UDP 송수신, 모터 명령, 녹화, 모바일 알림, VLM 수신 서비스 |
 | `BroadcastControl.App/ViewModels` | 화면 상태와 명령을 기능별로 관리하는 MVVM 계층 |
@@ -48,12 +47,6 @@ BroadcastControl.App/
   MainWindow.xaml
   MainWindow.xaml.cs
   LigDnaGui.config.json
-  CodeBehind/
-    MainWindow.Camera.cs
-    MainWindow.Lifecycle.cs
-    MainWindow.Motor.cs
-    MainWindow.Recording.cs
-    MainWindow.Settings.cs
   Infrastructure/
     RelayCommand.cs
   Models/
@@ -121,23 +114,30 @@ BroadcastControl.App/
     Camera/
       CameraView.xaml
       CameraView.xaml.cs
+      CameraView.MainWindow.cs
     Monitoring/
       MonitoringView.xaml
       MonitoringView.xaml.cs
+      MonitoringView.MainWindow.cs
     Motor/
       MotorControlView.xaml
       MotorControlView.xaml.cs
+      MotorControlView.MainWindow.cs
       MotorDetailsView.xaml
       MotorDetailsView.xaml.cs
+      MotorDetailsView.MainWindow.cs
     Operation/
       OperationControlView.xaml
       OperationControlView.xaml.cs
+      OperationControlView.MainWindow.cs
     Recording/
       RecordedVideosView.xaml
       RecordedVideosView.xaml.cs
+      RecordedVideosView.MainWindow.cs
     Settings/
       SettingsDrawerView.xaml
       SettingsDrawerView.xaml.cs
+      SettingsDrawerView.MainWindow.cs
     Vlm/
       VlmPanelView.xaml
       VlmPanelView.xaml.cs
@@ -150,11 +150,13 @@ BroadcastControl.App/
 | `App.xaml`, `App.xaml.cs` | WPF 앱 시작, 테마 적용, 전역 리소스 초기화 |
 | `MainWindow.xaml` | active view를 올려 배치하는 shell 레이아웃 |
 | `MainWindow.xaml.cs` | 공통 필드, 생성자, active view 이벤트 연결만 담당 |
-| `CodeBehind/MainWindow.Lifecycle.cs` | 앱 로딩/종료, ViewModel 이벤트, UDP 프레임/탐지/VLM/모터 상태 수신 연결 |
-| `CodeBehind/MainWindow.Camera.cs` | EO/IR 화면, 탐지 오버레이, 박스 선택, 줌/회전, 위협도 표시 |
-| `CodeBehind/MainWindow.Motor.cs` | 모터 방향키, 키보드 입력, 반복 전송, 버튼 시각 상태 |
-| `CodeBehind/MainWindow.Recording.cs` | 화면 녹화, 녹화 영상 목록, 재생 오버레이, 녹화 파일 메타데이터 |
-| `CodeBehind/MainWindow.Settings.cs` | 설정 drawer, 모터 상세창, 네트워크 설정 저장, 창 모드 전환 |
+| `Views/Monitoring/MonitoringView.MainWindow.cs` | 앱 로딩/종료, ViewModel 이벤트, UDP 프레임/탐지/VLM/모터 상태 수신 연결 |
+| `Views/Camera/CameraView.MainWindow.cs` | EO/IR 화면, 탐지 오버레이, 박스 선택, 줌/회전, 위협도 표시 |
+| `Views/Motor/MotorControlView.MainWindow.cs` | 모터 방향키, 키보드 입력, 반복 전송, 버튼 시각 상태 |
+| `Views/Motor/MotorDetailsView.MainWindow.cs` | 모터 상세창 backdrop 처리 |
+| `Views/Operation/OperationControlView.MainWindow.cs` | 하단 조작 패널의 네트워크 설정 로드/저장 |
+| `Views/Recording/RecordedVideosView.MainWindow.cs` | 화면 녹화, 녹화 영상 목록, 재생 오버레이, 녹화 파일 메타데이터 |
+| `Views/Settings/SettingsDrawerView.MainWindow.cs` | 설정 drawer, 창 모드 전환 |
 | `Infrastructure/RelayCommand.cs` | ViewModel 명령을 WPF `ICommand`로 연결 |
 | `Models/Camera/VideoStreamModels.cs` | 수신 프레임, 탐지 결과, YOLO 상태, 녹화 segment 모델 |
 | `Models/Motor/MotorControlModels.cs` | 방향키 버튼 비트마스크와 모터 제어 모델 |
