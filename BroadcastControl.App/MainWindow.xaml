@@ -1,10 +1,4 @@
-﻿<!--
-    GUI???ㅼ젣 ?붾㈃ 援ъ“瑜??뺤쓽?섎뒗 XAML ?뚯씪?대떎.
-    ?곷떒 諛? 醫뚯륫 紐⑦꽣/媛곷룄 ?⑤꼸, 以묒븰 EO/IR 移대찓???붾㈃, ?섎떒 Network/System Status ?곸뿭,
-    ?곗륫 遺꾩꽍/濡쒓렇 ?⑤꼸怨??ㅼ젙 drawer??諛곗튂瑜??대떦?쒕떎.
-    踰꾪듉 ?숈옉怨??ㅽ듃?뚰겕 ?대깽??泥섎━??MainWindow.xaml.cs? MainViewModel.cs???곌껐?섏뼱 ?덈떎.
--->
-<Window x:Class="BroadcastControl.App.MainWindow"
+﻿<Window x:Class="BroadcastControl.App.MainWindow"
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes"
