@@ -9,7 +9,16 @@ using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using BroadcastControl.App.Infrastructure;
+using BroadcastControl.App.Models.Camera;
+using BroadcastControl.App.Models.Motor;
 using BroadcastControl.App.Services;
+using BroadcastControl.App.ViewModels.Camera;
+using BroadcastControl.App.ViewModels.Mobile;
+using BroadcastControl.App.ViewModels.Monitoring;
+using BroadcastControl.App.ViewModels.Motor;
+using BroadcastControl.App.ViewModels.Operation;
+using BroadcastControl.App.ViewModels.Recording;
+using BroadcastControl.App.ViewModels.Vlm;
 
 namespace BroadcastControl.App.ViewModels;
 
@@ -97,6 +106,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     {
         _motorControlService = motorControlService ?? new UdpMotorControlService();
         Text = new LocalizedTextProvider(() => _uiLanguage);
+        Camera = new CameraViewModel();
+        Motor = new MotorControlViewModel();
+        Operation = new OperationControlViewModel();
+        Monitoring = new MonitoringViewModel();
+        Recording = new RecordingViewModel();
+        Vlm = new VlmViewModel();
+        Mobile = new MobileWebAppViewModel();
 
         // ?깆씠 ?꾩옱 ?ъ슜 以묒씤 ?뚮쭏瑜??쎌뼱???ㅼ젙 李?踰꾪듉 ?곹깭? 留욎텣??
         if (Application.Current is App app)
@@ -156,6 +172,20 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<PrimaryTargetOption> PrimaryTargets { get; }
 
     public LocalizedTextProvider Text { get; }
+
+    public CameraViewModel Camera { get; }
+
+    public MotorControlViewModel Motor { get; }
+
+    public OperationControlViewModel Operation { get; }
+
+    public MonitoringViewModel Monitoring { get; }
+
+    public RecordingViewModel Recording { get; }
+
+    public VlmViewModel Vlm { get; }
+
+    public MobileWebAppViewModel Mobile { get; }
 
     public ICommand TogglePowerCommand { get; }
 

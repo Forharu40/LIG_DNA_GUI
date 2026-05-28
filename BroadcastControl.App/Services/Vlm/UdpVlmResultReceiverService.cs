@@ -4,6 +4,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using BroadcastControl.App.Models.Vlm;
 
 namespace BroadcastControl.App.Services;
 

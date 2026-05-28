@@ -7,7 +7,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Text.Json;
 
-namespace BroadcastControl.App.Services;
+namespace BroadcastControl.App.Models.Network;
 
 public sealed class AppNetworkSettings
 {

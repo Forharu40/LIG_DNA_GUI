@@ -1,6 +1,6 @@
 // Jetson/Thor에서 GUI로 들어오는 모터 상태 패킷을 화면 표시용으로 담는 모델 파일이다.
 // Pan과 Tilt 모터의 원본 Dynamixel 값, 온도, 전압, 속도, 목표 위치 등을 구조화해서 ViewModel이 읽기 쉽게 만든다.
-namespace BroadcastControl.App.Services;
+namespace BroadcastControl.App.Models.Motor;
 
 // 한 번 수신한 모터 상태 묶음이다. Tilt가 아직 오지 않은 구버전 패킷도 허용하기 위해 nullable로 둔다.
 public readonly record struct MotorStatusSnapshot(

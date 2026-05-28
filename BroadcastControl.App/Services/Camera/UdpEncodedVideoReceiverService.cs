@@ -10,6 +10,7 @@ using System.Text;
 using System.Text.Json;
 using System.Windows.Media.Imaging;
 using System.Windows.Threading;
+using BroadcastControl.App.Models.Camera;
 using OpenCvSharp;
 
 namespace BroadcastControl.App.Services;

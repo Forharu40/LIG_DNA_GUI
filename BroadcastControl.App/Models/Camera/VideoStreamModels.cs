@@ -2,7 +2,7 @@
 // UDP에서 파싱된 프레임, 바운딩 박스, YOLO 상태, 녹화 segment 정보를 한곳에 정의한다.
 using System.Windows.Media.Imaging;
 
-namespace BroadcastControl.App.Services;
+namespace BroadcastControl.App.Models.Camera;
 
 public readonly record struct ReceivedVideoFrame(
     ulong StampNs,

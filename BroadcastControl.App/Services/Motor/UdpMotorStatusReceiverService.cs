@@ -3,6 +3,7 @@
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
+using BroadcastControl.App.Models.Motor;
 
 namespace BroadcastControl.App.Services;
 

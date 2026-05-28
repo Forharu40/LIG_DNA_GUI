@@ -6,6 +6,7 @@ using System.Net;
 using System.Net.Sockets;
 using System.Text;
 using System.Text.Json;
+using BroadcastControl.App.Models.Mobile;
 
 namespace BroadcastControl.App.Services;
 

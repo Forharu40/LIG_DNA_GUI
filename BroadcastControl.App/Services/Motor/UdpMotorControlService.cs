@@ -1,6 +1,7 @@
 using System.Buffers.Binary;
 using System.IO;
 using System.Net.Sockets;
+using BroadcastControl.App.Models.Motor;
 
 namespace BroadcastControl.App.Services;
 
@@ -13,7 +14,6 @@ public sealed class UdpMotorControlService : IDisposable
     private const string DefaultHost = "192.168.3.143";
     private const int DefaultPort = 8000;
     private const int DefaultTrackingRecordingControlPort = 8010;
-    private const int MotorCommandPacketSize = 11;
     private const int TrackingRecordingPacketSize = 11;
     private static readonly byte[] TrackingRecordingPacketMagic = "TRCK"u8.ToArray();
 
@@ -54,7 +54,6 @@ public sealed class UdpMotorControlService : IDisposable
 
     public void ConfigureEndpoint(string? host, int? port = null, int? trackingRecordingControlPort = null)
     {
-        // 네트워크 설정이 바뀌면 실행 중인 송신 경로에도 즉시 반영합니다.
         lock (_endpointLock)
         {
             _host = ResolveHost(host);
@@ -75,21 +74,16 @@ public sealed class UdpMotorControlService : IDisposable
         bool isEoPrimary,
         out string? error)
     {
-        // GUI -> Jetson 8000/udp 모터 명령 패킷, 총 10바이트.
-        // [0] mode, [1] tracking, [2] track_id, [3] btn_mask,
-        // [4..5] pan_pos LE, [6..7] tilt_pos LE, [8] scan_step, [9] manual_step.
-        var packet = new byte[MotorCommandPacketSize];
-        packet[0] = mode;
-        packet[1] = tracking;
-        packet[2] = trackId;
-        packet[3] = (byte)(isEoPrimary ? 0 : 1);
-        packet[4] = EncodeButtonMask(btnMask);
-        
-        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(5, 2), panPos);
-        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(7, 2), tiltPos);
-        packet[9] = EncodeStepSize(scanStep);
-        packet[10] = EncodeStepSize(manualStep);
-      
+        var packet = MotorPacketSerializer.CreateCommandPacket(
+            mode,
+            tracking,
+            trackId,
+            btnMask,
+            panPos,
+            tiltPos,
+            scanStep,
+            manualStep);
+
         if (!TrySendPacket(packet, out error))
         {
             return false;
@@ -148,18 +142,8 @@ public sealed class UdpMotorControlService : IDisposable
         }
         catch
         {
-            // 추적 녹화 제어는 보조 기능이므로 실패해도 모터 명령 전송 결과를 실패로 바꾸지 않습니다.
+            // Tracking recording is auxiliary. Motor command success should not depend on this packet.
         }
-    }
-
-    private static byte EncodeStepSize(int stepSize)
-    {
-        return (byte)Math.Clamp(stepSize, 1, 10);
-    }
-
-    private static byte EncodeButtonMask(MotorButtonMask buttons)
-    {
-        return (byte)((byte)buttons & 0x0F);
     }
 
     private static string ResolveHost(string? host)

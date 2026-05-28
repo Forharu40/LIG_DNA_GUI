@@ -1,6 +1,6 @@
 // GUI에서 Jetson/Thor로 보내는 모터 수동 조작 버튼 값을 정의하는 모델 파일이다.
 // 각 방향 버튼은 하나의 비트로 표현되며, UdpMotorControlService가 이 값을 10B 모터 명령 패킷에 넣어 전송한다.
-namespace BroadcastControl.App.Services;
+namespace BroadcastControl.App.Models.Motor;
 
 [Flags]
 public enum MotorButtonMask : byte
