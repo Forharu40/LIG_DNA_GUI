@@ -1,0 +1,187 @@
+﻿<UserControl x:Class="BroadcastControl.App.Views.Settings.SettingsDrawerView"              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"              xmlns:materialDesign="http://materialdesigninxaml.net/winfx/xaml/themes">
+    <Grid>
+            <Rectangle x:Name="SettingsBackdrop"
+                   Fill="#22000000"
+                   Opacity="0"
+                   Visibility="Collapsed"
+                   IsHitTestVisible="False"
+                   Panel.ZIndex="20"
+                   MouseLeftButtonDown="SettingsBackdrop_OnMouseLeftButtonDown" />
+
+            <!-- ?ㅼ젙 ?쒕줈??
+             ?ㅻⅨ履??щ씪?대뱶 ?⑤꼸?대ŉ 二??먯?泥? ?뚮쭏, ?몄뼱, ?붾㈃ 紐⑤뱶, ?ㅽ듃?뚰겕 ?ㅼ젙???대뒗?? -->
+            <Border x:Name="SettingsDrawer"
+                Width="280"
+                Margin="0,12,12,12"
+                HorizontalAlignment="Right"
+                VerticalAlignment="Stretch"
+                Background="{DynamicResource DrawerBrush}"
+                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                BorderThickness="1"
+                Padding="22"
+                Effect="{StaticResource DrawerShadow}"
+                UseLayoutRounding="True"
+                SnapsToDevicePixels="True"
+                Opacity="0"
+                Visibility="Collapsed"
+                Panel.ZIndex="21">
+                <Border.RenderTransform>
+                    <!-- 湲곕낯 ?꾩튂???붾㈃ ?ㅻⅨ履?諛붽묑?대ŉ ?대┫ ???쇱そ?쇰줈 遺?쒕읇寃??대룞?쒕떎. -->
+                    <TranslateTransform x:Name="SettingsDrawerTransform" X="320" />
+                </Border.RenderTransform>
+                <Border.CacheMode>
+                    <BitmapCache RenderAtScale="1" />
+                </Border.CacheMode>
+                <Grid>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <TextBlock Text="{Binding Text[Settings]}"
+                           FontSize="24"
+                           FontWeight="Bold"
+                           Foreground="{DynamicResource DrawerTextBrush}" />
+
+                    <ScrollViewer Grid.Row="1"
+                        Margin="0,14,0,0"
+                        VerticalScrollBarVisibility="Auto"
+                        HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel>
+                            <Border Margin="0,0,0,8"
+                                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                                BorderThickness="0,0,0,2">
+                                <TextBlock Margin="0,0,0,7"
+                                    Text="{Binding Text[PrimaryTargetChange]}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource DrawerTextBrush}" />
+                            </Border>
+
+                            <Button Margin="0,0,0,6"
+                                Command="{Binding SelectPrimaryTargetCommand}"
+                                CommandParameter="蹂듯빀"
+                                Style="{StaticResource SettingsActionButton}"
+                                Content="{Binding Text[TargetComposite]}" />
+
+                            <Grid Margin="0,0,0,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
+                                </Grid.RowDefinitions>
+                                <Button Grid.Row="0"
+                                    Grid.Column="0"
+                                    Margin="0,0,6,6"
+                                    Command="{Binding SelectPrimaryTargetCommand}"
+                                    CommandParameter="?щ엺"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[TargetPerson]}" />
+                                <Button Grid.Row="0"
+                                    Grid.Column="1"
+                                    Margin="0,0,0,6"
+                                    Command="{Binding SelectPrimaryTargetCommand}"
+                                    CommandParameter="臾닿린泥닿퀎"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[TargetWeapon]}" />
+                                <Button Grid.Row="1"
+                                    Grid.Column="0"
+                                    Margin="0,0,6,0"
+                                    Command="{Binding SelectPrimaryTargetCommand}"
+                                    CommandParameter="?듭떊 ?λ퉬"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[TargetComm]}" />
+                                <Button Grid.Row="1"
+                                    Grid.Column="1"
+                                    Command="{Binding SelectPrimaryTargetCommand}"
+                                    CommandParameter="鍮꾧뎔???쒖쟻"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[TargetCivil]}" />
+                            </Grid>
+
+                            <Border Margin="0,10,0,8"
+                                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                                BorderThickness="0,1,0,0">
+                                <TextBlock Margin="0,9,0,0"
+                                    Text="{Binding Text[ThemeChange]}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource DrawerTextBrush}" />
+                            </Border>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0"
+                                    Margin="0,0,6,0"
+                                    Command="{Binding SetThemeCommand}"
+                                    CommandParameter="Dark"
+                                    Opacity="{Binding DarkThemeButtonOpacity}"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[DarkTheme]}" />
+                                <Button Grid.Column="1"
+                                    Command="{Binding SetThemeCommand}"
+                                    CommandParameter="Light"
+                                    Opacity="{Binding LightThemeButtonOpacity}"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[LightTheme]}" />
+                            </Grid>
+
+                            <Border Margin="0,12,0,8"
+                                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                                BorderThickness="0,1,0,0">
+                                <TextBlock Margin="0,9,0,0"
+                                    Text="{Binding Text[LanguageChange]}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource DrawerTextBrush}" />
+                            </Border>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Button Grid.Column="0"
+                                    Margin="0,0,6,0"
+                                    Command="{Binding SetLanguageCommand}"
+                                    CommandParameter="English"
+                                    Opacity="{Binding EnglishLanguageButtonOpacity}"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[English]}" />
+                                <Button Grid.Column="1"
+                                    Command="{Binding SetLanguageCommand}"
+                                    CommandParameter="Korean"
+                                    Opacity="{Binding KoreanLanguageButtonOpacity}"
+                                    Style="{StaticResource SettingsActionButton}"
+                                    Content="{Binding Text[Korean]}" />
+                            </Grid>
+
+                            <Border Margin="0,12,0,8"
+                                BorderBrush="{DynamicResource DrawerBorderBrush}"
+                                BorderThickness="0,1,0,0">
+                                <TextBlock Margin="0,9,0,0"
+                                    Text="{Binding Text[ScreenMode]}"
+                                    FontSize="16"
+                                    FontWeight="SemiBold"
+                                    Foreground="{DynamicResource DrawerTextBrush}" />
+                            </Border>
+
+                            <Button x:Name="WindowModeToggleButton"
+                                Click="WindowModeToggleButton_OnClick"
+                                Style="{StaticResource SettingsActionButton}"
+                                Content="{Binding Text[WindowMode]}" />
+
+                        </StackPanel>
+                    </ScrollViewer>
+                </Grid>
+            </Border>
+    </Grid>
+</UserControl>
+
+

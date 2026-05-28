@@ -525,9 +525,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double InsetFeedRotationAngle => _isEoPrimary ? _irDisplayRotationAngle : _eoDisplayRotationAngle;
 
-    public Stretch LargeFeedStretch => Stretch.Uniform;
+    public Stretch LargeFeedStretch => HasLargeFeedFrame ? Stretch.Uniform : Stretch.UniformToFill;
 
-    public Stretch InsetFeedStretch => Stretch.Uniform;
+    public Stretch InsetFeedStretch => HasInsetFeedFrame ? Stretch.Uniform : Stretch.UniformToFill;
+
+    private bool HasLargeFeedFrame => _isEoPrimary ? _eoFrame is not null : _irFrame is not null;
+
+    private bool HasInsetFeedFrame => _isEoPrimary ? _irFrame is not null : _eoFrame is not null;
 
     public string LargeFeedSubtitle => _isEoPrimary ? EoSubtitle : IrSubtitle;
 
@@ -660,6 +664,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         _eoFrame = frame;
         OnPropertyChanged(nameof(LargeFeedImage));
         OnPropertyChanged(nameof(InsetFeedImage));
+        OnPropertyChanged(nameof(LargeFeedStretch));
+        OnPropertyChanged(nameof(InsetFeedStretch));
     }
 
     /// <summary>
@@ -672,6 +678,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         _irFrame = frame;
         OnPropertyChanged(nameof(LargeFeedImage));
         OnPropertyChanged(nameof(InsetFeedImage));
+        OnPropertyChanged(nameof(LargeFeedStretch));
+        OnPropertyChanged(nameof(InsetFeedStretch));
     }
 
     public void UpdateJetsonConnectionState(bool isConnected)

@@ -1,4 +1,4 @@
-using System.ComponentModel;
+﻿using System.ComponentModel;
 using System.Globalization;
 using System.Net.Http;
 using System.Text;
@@ -23,15 +23,15 @@ using System.IO;
 
 namespace BroadcastControl.App;
 
-// 파일 역할:
-// MainWindow.xaml의 코드 비하인드로, 화면 컨트롤 이벤트와 외부 통신 서비스를 연결한다.
-// UDP 영상/탐지/VLM/모터 상태를 받아 ViewModel에 반영하고, 사용자가 누른 버튼이나 설정 값을 서비스로 전달한다.
-// 화면 상태 자체는 MainViewModel이 관리하므로, 이 파일은 UI 이벤트와 서비스 이벤트를 이어주는 연결 계층으로 보면 된다.
+// ?뚯씪 ??븷:
+// MainWindow.xaml??肄붾뱶 鍮꾪븯?몃뱶濡? ?붾㈃ 而⑦듃濡??대깽?몄? ?몃? ?듭떊 ?쒕퉬?ㅻ? ?곌껐?쒕떎.
+// UDP ?곸긽/?먯?/VLM/紐⑦꽣 ?곹깭瑜?諛쏆븘 ViewModel??諛섏쁺?섍퀬, ?ъ슜?먭? ?꾨Ⅸ 踰꾪듉?대굹 ?ㅼ젙 媛믪쓣 ?쒕퉬?ㅻ줈 ?꾨떖?쒕떎.
+// ?붾㈃ ?곹깭 ?먯껜??MainViewModel??愿由ы븯誘濡? ???뚯씪? UI ?대깽?몄? ?쒕퉬???대깽?몃? ?댁뼱二쇰뒗 ?곌껐 怨꾩링?쇰줈 蹂대㈃ ?쒕떎.
 
 public partial class MainWindow : Window
 {
-    // MainWindow는 화면 요소와 서비스들을 연결하는 중심 계층이다.
-    // 실제 UDP 파싱은 Services가 맡고, 여기서는 받은 데이터를 어떤 화면에 표시할지와 어떤 사용자 입력을 보낼지를 결정한다.
+    // MainWindow???붾㈃ ?붿냼? ?쒕퉬?ㅻ뱾???곌껐?섎뒗 以묒떖 怨꾩링?대떎.
+    // ?ㅼ젣 UDP ?뚯떛? Services媛 留↔퀬, ?ш린?쒕뒗 諛쏆? ?곗씠?곕? ?대뼡 ?붾㈃???쒖떆?좎?? ?대뼡 ?ъ슜???낅젰??蹂대궪吏瑜?寃곗젙?쒕떎.
     private enum DisplayRotation
     {
         None,
@@ -94,8 +94,8 @@ public partial class MainWindow : Window
     private DateTime _lastJetsonMessageAt = DateTime.MinValue;
     private string? _lastFilteredOutTargetSignature;
     private string? _lastOverlaySignature;
-    // VLM이 보내는 객체별 위험도를 objectId 기준으로 저장한다.
-    // 바운딩 박스 색상과 시스템 위험도는 이 값을 우선 사용한다.
+    // VLM??蹂대궡??媛앹껜蹂??꾪뿕?꾨? objectId 湲곗??쇰줈 ??ν븳??
+    // 諛붿슫??諛뺤뒪 ?됱긽怨??쒖뒪???꾪뿕?꾨뒗 ??媛믪쓣 ?곗꽑 ?ъ슜?쒕떎.
     private string _latestGlobalVlmThreatLevel = string.Empty;
     private readonly Dictionary<int, string> _objectThreatLevels = new();
     private readonly Dictionary<string, int> _activeMotorDirections = new(StringComparer.Ordinal);
@@ -193,6 +193,7 @@ public partial class MainWindow : Window
         };
         _jetsonConnectionTimer.Tick += JetsonConnectionTimer_OnTick;
         DataContext = _viewModel;
+        WireActiveViewEvents();
 
         Loaded += OnLoaded;
         Closed += OnClosed;
@@ -200,10 +201,61 @@ public partial class MainWindow : Window
         PreviewKeyUp += MainWindow_OnPreviewKeyUp;
     }
 
+    private void WireActiveViewEvents()
+    {
+        CameraActiveView.CameraViewportSizeChanged += CameraViewport_OnSizeChanged;
+        CameraActiveView.CameraViewportMouseLeftButtonDown += CameraViewport_OnMouseLeftButtonDown;
+        CameraActiveView.CameraViewportMouseWheel += CameraViewport_OnMouseWheel;
+        CameraActiveView.CameraViewportMouseMove += CameraViewport_OnMouseMove;
+        CameraActiveView.CameraViewportMouseLeftButtonUp += CameraViewport_OnMouseLeftButtonUp;
+        CameraActiveView.RotateLargeFeedRequested += RotateLargeFeedButton_OnClick;
+        CameraActiveView.RotateInsetFeedRequested += RotateInsetFeedButton_OnClick;
+        CameraActiveView.MotorButtonPreviewMouseLeftButtonDownRequested += MotorButton_OnPreviewMouseLeftButtonDown;
+        CameraActiveView.MotorButtonPreviewMouseLeftButtonUpRequested += MotorButton_OnPreviewMouseLeftButtonUp;
+        CameraActiveView.MotorButtonMouseLeaveRequested += MotorButton_OnMouseLeave;
+
+        MotorActiveView.RotateAuxCameraRequested += RotateAuxCameraButton_OnClick;
+        MotorActiveView.MotorTargetEnterClicked += Button_Click_2;
+        MotorActiveView.MotorButtonPreviewMouseLeftButtonDownRequested += MotorButton_OnPreviewMouseLeftButtonDown;
+        MotorActiveView.MotorButtonPreviewMouseLeftButtonUpRequested += MotorButton_OnPreviewMouseLeftButtonUp;
+        MotorActiveView.MotorButtonMouseLeaveRequested += MotorButton_OnMouseLeave;
+        MotorDetailsActiveView.BackdropMouseLeftButtonDownRequested += MotorDetailsBackdrop_OnMouseLeftButtonDown;
+
+        OperationActiveView.ManualModeClicked += Button_Click;
+        OperationActiveView.SaveNetworkSettingsClicked += SaveNetworkSettingsButton_OnClick;
+
+        MonitoringActiveView.OpenRecordedVideosClicked += OpenRecordedVideosButton_OnClick;
+        MonitoringActiveView.SettingsClicked += Button_Click_1;
+        MonitoringActiveView.DetectionTargetSelectionChanged += DetectionTargetList_OneSelctionChanged;
+
+        RecordedVideosActiveView.RefreshRecordedVideosClicked += RefreshRecordedVideosButton_OnClick;
+        RecordedVideosActiveView.CloseRecordedVideosClicked += CloseRecordedVideosButton_OnClick;
+        RecordedVideosActiveView.RecordedVideoSelectionChanged += RecordedVideoList_OnSelectionChanged;
+        RecordedVideosActiveView.RecordedVideoViewportMouseWheel += RecordedVideoViewport_OnMouseWheel;
+        RecordedVideosActiveView.RecordedVideoViewportMouseLeftButtonDown += RecordedVideoViewport_OnMouseLeftButtonDown;
+        RecordedVideosActiveView.RecordedVideoViewportMouseMove += RecordedVideoViewport_OnMouseMove;
+        RecordedVideosActiveView.RecordedVideoViewportMouseLeftButtonUp += RecordedVideoViewport_OnMouseLeftButtonUp;
+        RecordedVideosActiveView.RecordedVideoMediaOpened += RecordedVideoPlayer_OnMediaOpened;
+        RecordedVideosActiveView.RecordedVideoMediaEnded += RecordedVideoPlayer_OnMediaEnded;
+        RecordedVideosActiveView.RecordedVideoMediaFailed += (sender, args) => RecordedVideoPlayer_OnMediaFailed(sender ?? RecordedVideosActiveView, args);
+        RecordedVideosActiveView.RecordedVideoPositionSliderValueChanged += RecordedVideoPositionSlider_OnValueChanged;
+        RecordedVideosActiveView.RecordedVideoPositionSliderPreviewMouseLeftButtonDown += RecordedVideoPositionSlider_OnPreviewMouseLeftButtonDown;
+        RecordedVideosActiveView.RecordedVideoPositionSliderPreviewMouseLeftButtonUp += RecordedVideoPositionSlider_OnPreviewMouseLeftButtonUp;
+        RecordedVideosActiveView.RecordedVideoPlayClicked += RecordedVideoPlayButton_OnClick;
+        RecordedVideosActiveView.RecordedVideoPauseClicked += RecordedVideoPauseButton_OnClick;
+        RecordedVideosActiveView.RecordedVideoStopClicked += RecordedVideoStopButton_OnClick;
+        RecordedVideosActiveView.RecordedVideoZoomResetClicked += RecordedVideoZoomResetButton_OnClick;
+        RecordedVideosActiveView.RecordedVideoZoomSliderValueChanged += RecordedVideoZoomSlider_OnValueChanged;
+        RecordedVideosActiveView.PlaybackSpeedSelectionChanged += PlaybackSpeedCombo_OnSelectionChanged;
+
+        SettingsActiveView.BackdropMouseLeftButtonDownRequested += SettingsBackdrop_OnMouseLeftButtonDown;
+        SettingsActiveView.WindowModeToggleClicked += WindowModeToggleButton_OnClick;
+    }
+
     private async void OnLoaded(object sender, RoutedEventArgs e)
     {
-        // 앱 시작 시 모든 수신 서비스를 연결한다.
-        // EO/IR 영상, 모터 상태, VLM 결과, 모바일 알림 서버가 각각 독립적으로 동작한다.
+        // ???쒖옉 ??紐⑤뱺 ?섏떊 ?쒕퉬?ㅻ? ?곌껐?쒕떎.
+        // EO/IR ?곸긽, 紐⑦꽣 ?곹깭, VLM 寃곌낵, 紐⑤컮???뚮┝ ?쒕쾭媛 媛곴컖 ?낅┰?곸쑝濡??숈옉?쒕떎.
         WindowState = WindowState.Maximized;
         UpdateWindowModeButtonText();
 
@@ -229,11 +281,11 @@ public partial class MainWindow : Window
         _irUdpCaptureService.SetContrast(_viewModel.Contrast);
         _viewModel.InitializeMotorControlState();
         _motorStatusReceiverService.Start();
-        _viewModel.AppendImportantLog($"모터 상태 수신 대기 포트: {_motorStatusReceiverService.Port}");
+        _viewModel.AppendImportantLog($"紐⑦꽣 ?곹깭 ?섏떊 ?湲??ы듃: {_motorStatusReceiverService.Port}");
         _vlmResultReceiverService.Start();
-        _viewModel.AppendImportantLog($"VLM 결과 수신 대기 포트: {_vlmResultReceiverService.Port}");
+        _viewModel.AppendImportantLog($"VLM 寃곌낵 ?섏떊 ?湲??ы듃: {_vlmResultReceiverService.Port}");
 
-        _viewModel.UpdateViewportSize(CameraViewport.ActualWidth, CameraViewport.ActualHeight);
+        _viewModel.UpdateViewportSize(CameraActiveView.CameraViewportElement.ActualWidth, CameraActiveView.CameraViewportElement.ActualHeight);
         UpdateRecordingViewportState();
         RenderDetectionOverlay();
         UpdateMotorAutomationState();
@@ -263,20 +315,20 @@ public partial class MainWindow : Window
 
         if (_detectionUdpReceiverService.Start(_networkSettings.DetectionUdpPort))
         {
-            _viewModel.AppendImportantLog($"EO/IR 탐지 결과 수신 대기 포트: {_networkSettings.DetectionUdpPort}");
+            _viewModel.AppendImportantLog($"EO/IR ?먯? 寃곌낵 ?섏떊 ?湲??ы듃: {_networkSettings.DetectionUdpPort}");
         }
         else
         {
-            _viewModel.AppendImportantLog($"EO/IR 탐지 결과 수신 포트 {_networkSettings.DetectionUdpPort}를 열지 못했습니다.");
+            _viewModel.AppendImportantLog($"EO/IR ?먯? 寃곌낵 ?섏떊 ?ы듃 {_networkSettings.DetectionUdpPort}瑜??댁? 紐삵뻽?듬땲??");
         }
 
         if (_mobileAlertHubService.Start(_networkSettings.MobileAlertPort))
         {
-            _viewModel.AppendImportantLog($"모바일 위험 알림 앱이 시작되었습니다: {_mobileAlertHubService.AccessHintUrls}");
+            _viewModel.AppendImportantLog($"紐⑤컮???꾪뿕 ?뚮┝ ?깆씠 ?쒖옉?섏뿀?듬땲?? {_mobileAlertHubService.AccessHintUrls}");
         }
         else
         {
-            _viewModel.AppendImportantLog($"모바일 위험 알림 앱 시작에 실패했습니다. 포트 {_networkSettings.MobileAlertPort}를 확인하세요.");
+            _viewModel.AppendImportantLog($"紐⑤컮???꾪뿕 ?뚮┝ ???쒖옉???ㅽ뙣?덉뒿?덈떎. ?ы듃 {_networkSettings.MobileAlertPort}瑜??뺤씤?섏꽭??");
         }
     }
 
@@ -333,9 +385,9 @@ public partial class MainWindow : Window
 
     private void CameraViewport_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
     {
-        // 큰 영상 화면을 클릭했을 때 먼저 바운딩 박스 선택을 시도한다.
-        // 박스 안을 클릭한 경우 해당 YOLO 객체 ID를 모터 추적 대상으로 보내고, 박스가 없으면 기존 줌 드래그 동작을 수행한다.
-        if (TrySelectDetectionAtPoint(e.GetPosition(CameraViewport)))
+        // ???곸긽 ?붾㈃???대┃?덉쓣 ??癒쇱? 諛붿슫??諛뺤뒪 ?좏깮???쒕룄?쒕떎.
+        // 諛뺤뒪 ?덉쓣 ?대┃??寃쎌슦 ?대떦 YOLO 媛앹껜 ID瑜?紐⑦꽣 異붿쟻 ??곸쑝濡?蹂대궡怨? 諛뺤뒪媛 ?놁쑝硫?湲곗〈 以??쒕옒洹??숈옉???섑뻾?쒕떎.
+        if (TrySelectDetectionAtPoint(e.GetPosition(CameraActiveView.CameraViewportElement)))
         {
             e.Handled = true;
             return;
@@ -347,8 +399,8 @@ public partial class MainWindow : Window
         }
 
         _isDraggingZoom = true;
-        _lastZoomDragPoint = e.GetPosition(CameraViewport);
-        CameraViewport.CaptureMouse();
+        _lastZoomDragPoint = e.GetPosition(CameraActiveView.CameraViewportElement);
+        CameraActiveView.CameraViewportElement.CaptureMouse();
     }
 
     private void CameraViewport_OnMouseMove(object sender, MouseEventArgs e)
@@ -358,7 +410,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var currentPoint = e.GetPosition(CameraViewport);
+        var currentPoint = e.GetPosition(CameraActiveView.CameraViewportElement);
         var delta = currentPoint - _lastZoomDragPoint;
         _lastZoomDragPoint = currentPoint;
 
@@ -384,7 +436,7 @@ public partial class MainWindow : Window
         }
 
         _isDraggingZoom = false;
-        CameraViewport.ReleaseMouseCapture();
+        CameraActiveView.CameraViewportElement.ReleaseMouseCapture();
     }
 
     private void OnEoFrameReady(ReceivedVideoFrame frame)
@@ -442,8 +494,8 @@ public partial class MainWindow : Window
         Dictionary<uint, DetectionPacket> detectionCache,
         bool isPrimaryCamera)
     {
-        // detection은 영상 프레임보다 조금 늦게 도착할 수 있으므로 frame_id 기준으로 캐시에 보관한다.
-        // 렌더링 단계에서 가장 가까운 프레임의 detection을 찾아 박스를 그린다.
+        // detection? ?곸긽 ?꾨젅?꾨낫??議곌툑 ??쾶 ?꾩갑?????덉쑝誘濡?frame_id 湲곗??쇰줈 罹먯떆??蹂닿??쒕떎.
+        // ?뚮뜑留??④퀎?먯꽌 媛??媛源뚯슫 ?꾨젅?꾩쓽 detection??李얠븘 諛뺤뒪瑜?洹몃┛??
         CacheDetectionPacket(detectionPacket, detectionCache);
 
         if (!_hasReceivedDetectionPacket)
@@ -489,8 +541,8 @@ public partial class MainWindow : Window
 
     private void RefreshPrimaryTrackingTarget()
     {
-        // 모터 추적 ID는 현재 큰 화면에 표시되는 카메라의 객체만 기준으로 고른다.
-        // VLM 결과가 늦게 도착해 위험도가 갱신되는 경우에도 캐시된 현재 화면 detection으로 다시 판단한다.
+        // 紐⑦꽣 異붿쟻 ID???꾩옱 ???붾㈃???쒖떆?섎뒗 移대찓?쇱쓽 媛앹껜留?湲곗??쇰줈 怨좊Ⅸ??
+        // VLM 寃곌낵媛 ??쾶 ?꾩갑???꾪뿕?꾧? 媛깆떊?섎뒗 寃쎌슦?먮룄 罹먯떆???꾩옱 ?붾㈃ detection?쇰줈 ?ㅼ떆 ?먮떒?쒕떎.
         if (!TryGetRenderableFrameAndDetection(out var frame, out var detectionPacket))
         {
             _viewModel.UpdateDetectionSummary(Array.Empty<DetectionInfo>());
@@ -521,12 +573,12 @@ public partial class MainWindow : Window
 
         if (!statusPacket.ModelLoaded)
         {
-            _viewModel.AppendImportantLog("YOLO 모델이 아직 로드되지 않았습니다.");
+            _viewModel.AppendImportantLog("YOLO 紐⑤뜽???꾩쭅 濡쒕뱶?섏? ?딆븯?듬땲??");
         }
 
         if (!string.IsNullOrWhiteSpace(statusPacket.LastError))
         {
-            _viewModel.AppendImportantLog($"YOLO 상태 오류: {statusPacket.LastError}");
+            _viewModel.AppendImportantLog($"YOLO ?곹깭 ?ㅻ쪟: {statusPacket.LastError}");
         }
     }
 
@@ -541,7 +593,7 @@ public partial class MainWindow : Window
 
     private void OnMotorStatusReceiverError(object? sender, string message)
     {
-        Dispatcher.Invoke(() => _viewModel.AppendImportantLog($"모터 상태 수신 오류: {message}"));
+        Dispatcher.Invoke(() => _viewModel.AppendImportantLog($"紐⑦꽣 ?곹깭 ?섏떊 ?ㅻ쪟: {message}"));
     }
 
     private void OnVlmResultReceived(object? sender, VlmResultPacket result)
@@ -549,14 +601,14 @@ public partial class MainWindow : Window
         Dispatcher.Invoke(() =>
         {
             MarkJetsonMessageReceived();
-            // VLM 결과는 전체 위험도와 객체별 위험도로 나뉜다.
-            // 전체 위험도는 시스템 상태창에, 객체별 위험도는 각 바운딩 박스 색상에 반영한다.
+            // VLM 寃곌낵???꾩껜 ?꾪뿕?꾩? 媛앹껜蹂??꾪뿕?꾨줈 ?섎돏??
+            // ?꾩껜 ?꾪뿕?꾨뒗 ?쒖뒪???곹깭李쎌뿉, 媛앹껜蹂??꾪뿕?꾨뒗 媛?諛붿슫??諛뺤뒪 ?됱긽??諛섏쁺?쒕떎.
             if (!string.IsNullOrWhiteSpace(result.ThreatLevel))
             {
                 _latestGlobalVlmThreatLevel = NormalizeThreatLevel(result.ThreatLevel);
             }
 
-            // VLM이 객체별 위험도를 보내면 track_id/objectId 기준으로 보관했다가 바운딩 박스 색과 시스템 위험도에 반영한다.
+            // VLM??媛앹껜蹂??꾪뿕?꾨? 蹂대궡硫?track_id/objectId 湲곗??쇰줈 蹂닿??덈떎媛 諛붿슫??諛뺤뒪 ?됯낵 ?쒖뒪???꾪뿕?꾩뿉 諛섏쁺?쒕떎.
             foreach (var pair in result.ObjectThreatLevels)
             {
                 _objectThreatLevels[pair.Key] = NormalizeThreatLevel(pair.Value);
@@ -567,7 +619,7 @@ public partial class MainWindow : Window
                 : result.ThreatLevel;
             var analysisMessage = string.IsNullOrWhiteSpace(result.DetectionSummary)
                 ? result.AnalysisMessage
-                : $"{result.AnalysisMessage} 탐지 내용: {result.DetectionSummary}";
+                : $"{result.AnalysisMessage} ?먯? ?댁슜: {result.DetectionSummary}";
 
             _viewModel.ApplyVlmAnalysisResult(threatLevel, analysisMessage);
             RefreshPrimaryTrackingTarget();
@@ -577,7 +629,7 @@ public partial class MainWindow : Window
 
     private void OnVlmResultReceiverError(object? sender, string message)
     {
-        Dispatcher.Invoke(() => _viewModel.AppendImportantLog($"VLM 결과 수신 오류: {message}"));
+        Dispatcher.Invoke(() => _viewModel.AppendImportantLog($"VLM 寃곌낵 ?섏떊 ?ㅻ쪟: {message}"));
     }
 
     private void OnIrFrameReady(ReceivedVideoFrame frame)
@@ -612,14 +664,14 @@ public partial class MainWindow : Window
             _viewModel.ZoomLevel,
             _viewModel.ZoomTransformX,
             _viewModel.ZoomTransformY,
-            CameraViewport.ActualWidth,
-            CameraViewport.ActualHeight);
+            CameraActiveView.CameraViewportElement.ActualWidth,
+            CameraActiveView.CameraViewportElement.ActualHeight);
         _irUdpCaptureService.UpdateViewportTransform(
             _viewModel.ZoomLevel,
             _viewModel.ZoomTransformX,
             _viewModel.ZoomTransformY,
-            CameraViewport.ActualWidth,
-            CameraViewport.ActualHeight);
+            CameraActiveView.CameraViewportElement.ActualWidth,
+            CameraActiveView.CameraViewportElement.ActualHeight);
     }
 
     private void MarkJetsonMessageReceived()
@@ -650,14 +702,14 @@ public partial class MainWindow : Window
 
     private void RenderDetectionOverlay(bool forceRefresh = false)
     {
-        // 현재 큰 화면(EO 또는 IR)에 해당하는 최신 프레임과 detection을 맞춰 바운딩 박스를 다시 그린다.
-        // 줌/창 크기/EO-IR 전환이 바뀌면 forceRefresh로 캐시된 화면 서명을 무시한다.
+        // ?꾩옱 ???붾㈃(EO ?먮뒗 IR)???대떦?섎뒗 理쒖떊 ?꾨젅?꾧낵 detection??留욎떠 諛붿슫??諛뺤뒪瑜??ㅼ떆 洹몃┛??
+        // 以?李??ш린/EO-IR ?꾪솚??諛붾뚮㈃ forceRefresh濡?罹먯떆???붾㈃ ?쒕챸??臾댁떆?쒕떎.
         if (_isRenderingOverlay)
         {
             return;
         }
 
-        if (DetectionOverlayCanvas is null)
+        if (CameraActiveView.DetectionOverlayCanvasElement is null)
         {
             return;
         }
@@ -665,7 +717,7 @@ public partial class MainWindow : Window
         _isRenderingOverlay = true;
         try
         {
-            DetectionOverlayCanvas.Children.Clear();
+            CameraActiveView.DetectionOverlayCanvasElement.Children.Clear();
 
             var latestFrame = _viewModel.IsEoPrimary ? _latestEoFrame : _latestIrFrame;
             if (latestFrame is null)
@@ -709,8 +761,8 @@ public partial class MainWindow : Window
 
             _lastOverlaySignature = overlaySignature;
 
-            var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
-            var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
+            var viewportWidth = Math.Max(CameraActiveView.CameraViewportElement.ActualWidth, 1);
+            var viewportHeight = Math.Max(CameraActiveView.CameraViewportElement.ActualHeight, 1);
             var baseScale = Math.Min(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
             var scaleX = baseScale;
             var scaleY = baseScale;
@@ -753,8 +805,8 @@ public partial class MainWindow : Window
 
     private bool TrySelectDetectionAtPoint(Point viewportPoint)
     {
-        // 사용자가 누른 GUI 좌표를 현재 영상 스케일/여백/줌 이동이 적용된 바운딩 박스 좌표와 비교한다.
-        // 여러 박스가 겹쳐 있으면 더 위험하고 신뢰도가 높은 객체를 우선 선택한다.
+        // ?ъ슜?먭? ?꾨Ⅸ GUI 醫뚰몴瑜??꾩옱 ?곸긽 ?ㅼ????щ갚/以??대룞???곸슜??諛붿슫??諛뺤뒪 醫뚰몴? 鍮꾧탳?쒕떎.
+        // ?щ윭 諛뺤뒪媛 寃뱀퀜 ?덉쑝硫????꾪뿕?섍퀬 ?좊ː?꾧? ?믪? 媛앹껜瑜??곗꽑 ?좏깮?쒕떎.
         if (!TryGetRenderableFrameAndDetection(out var frameToRender, out var detectionPacket))
         {
             return false;
@@ -776,15 +828,15 @@ public partial class MainWindow : Window
 
         var rotatedSourceWidth = GetRotatedWidth(originalSourceWidth, originalSourceHeight, rotation);
         var rotatedSourceHeight = GetRotatedHeight(originalSourceWidth, originalSourceHeight, rotation);
-        var viewportWidth = Math.Max(CameraViewport.ActualWidth, 1);
-        var viewportHeight = Math.Max(CameraViewport.ActualHeight, 1);
+        var viewportWidth = Math.Max(CameraActiveView.CameraViewportElement.ActualWidth, 1);
+        var viewportHeight = Math.Max(CameraActiveView.CameraViewportElement.ActualHeight, 1);
         var baseScale = Math.Min(viewportWidth / rotatedSourceWidth, viewportHeight / rotatedSourceHeight);
         var scaledWidth = rotatedSourceWidth * baseScale;
         var scaledHeight = rotatedSourceHeight * baseScale;
         var baseLeft = (viewportWidth - scaledWidth) / 2.0;
         var baseTop = (viewportHeight - scaledHeight) / 2.0;
 
-        // 화면이 확대/이동된 상태에서도 사용자가 실제로 보는 바운딩 박스 위치를 기준으로 클릭 판정을 한다.
+        // ?붾㈃???뺣?/?대룞???곹깭?먯꽌???ъ슜?먭? ?ㅼ젣濡?蹂대뒗 諛붿슫??諛뺤뒪 ?꾩튂瑜?湲곗??쇰줈 ?대┃ ?먯젙???쒕떎.
         var zoomLevel = Math.Max(_viewModel.ZoomLevel, 1.0);
         var viewportCenter = new Point(viewportWidth / 2.0, viewportHeight / 2.0);
 
@@ -1048,11 +1100,6 @@ public partial class MainWindow : Window
 
     private string GetDetectionThreatLevel(DetectionInfo detection)
     {
-        // 우선순위:
-        // 1. VLM이 명시한 objectId별 위험도
-        // 2. detection 자체가 가진 위험도
-        // 3. VLM 전체 위험도
-        // 4. 클래스 이름 기반 임시 추정값
         if (_objectThreatLevels.TryGetValue(detection.ObjectId, out var objectThreatLevel))
         {
             return NormalizeThreatLevel(objectThreatLevel);
@@ -1073,28 +1120,28 @@ public partial class MainWindow : Window
 
     private static string EstimateThreatLevelFromClass(string className)
     {
-        // VLM 객체별 위험도가 아직 오지 않은 순간에도 화면 색이 완전히 비어 보이지 않도록 임시 기준을 둔다.
+        // VLM 媛앹껜蹂??꾪뿕?꾧? ?꾩쭅 ?ㅼ? ?딆? ?쒓컙?먮룄 ?붾㈃ ?됱씠 ?꾩쟾??鍮꾩뼱 蹂댁씠吏 ?딅룄濡??꾩떆 湲곗????붾떎.
         var normalizedClass = className.Trim().ToLowerInvariant();
         if (normalizedClass is "airplane" or "car" or "motorcycle" or "bus" or "truck" or "train" or "boat" or "tank" or "drone" or "missile" or "weapon")
         {
-            return "높음";
+            return "?믪쓬";
         }
 
         if (normalizedClass is "person" or "bicycle" or "cell phone" or "laptop")
         {
-            return "중간";
+            return "以묎컙";
         }
 
-        return "낮음";
+        return "??쓬";
     }
 
     private static string NormalizeThreatLevel(string threatLevel)
     {
         return threatLevel.Trim().ToLowerInvariant() switch
         {
-            "high" or "높음" => "높음",
-            "medium" or "mid" or "중간" => "중간",
-            _ => "낮음"
+            "high" or "?믪쓬" => "?믪쓬",
+            "medium" or "mid" or "以묎컙" => "以묎컙",
+            _ => "??쓬"
         };
     }
 
@@ -1102,8 +1149,8 @@ public partial class MainWindow : Window
     {
         return NormalizeThreatLevel(threatLevel) switch
         {
-            "높음" => 3,
-            "중간" => 2,
+            "?믪쓬" => 3,
+            "以묎컙" => 2,
             _ => 1
         };
     }
@@ -1113,7 +1160,7 @@ public partial class MainWindow : Window
         return detections
             .OrderByDescending(detection => GetThreatWeight(detection.ThreatLevel))
             .Select(detection => NormalizeThreatLevel(detection.ThreatLevel))
-            .FirstOrDefault("낮음");
+            .FirstOrDefault("??쓬");
     }
 
     private bool ShouldDisplayDetectionSafe(DetectionInfo detection)
@@ -1172,18 +1219,18 @@ public partial class MainWindow : Window
 
     private void UpdateRiskAndMobileAlert(uint frameId, IReadOnlyList<DetectionInfo> detections)
     {
-        // 시스템 위험도는 화면에 표시 중인 객체들의 위험도 중 가장 높은 값으로 결정한다.
-        // 위험 상황이 반복해서 들어와도 모바일 알림이 과도하게 울리지 않도록 cooldown과 signature를 함께 사용한다.
+        // ?쒖뒪???꾪뿕?꾨뒗 ?붾㈃???쒖떆 以묒씤 媛앹껜?ㅼ쓽 ?꾪뿕??以?媛???믪? 媛믪쑝濡?寃곗젙?쒕떎.
+        // ?꾪뿕 ?곹솴??諛섎났?댁꽌 ?ㅼ뼱???紐⑤컮???뚮┝??怨쇰룄?섍쾶 ?몃━吏 ?딅룄濡?cooldown怨?signature瑜??④퍡 ?ъ슜?쒕떎.
         if (detections.Count == 0)
         {
-            _viewModel.ApplyVlmAnalysisResult("낮음", "VLM 분석: 현재 선택된 주 탐지체 기준 위험 객체가 확인되지 않았습니다.");
+            _viewModel.ApplyVlmAnalysisResult("??쓬", "VLM 遺꾩꽍: ?꾩옱 ?좏깮??二??먯?泥?湲곗? ?꾪뿕 媛앹껜媛 ?뺤씤?섏? ?딆븯?듬땲??");
             return;
         }
 
         var analysis = BuildVlmStyleAnalysis(detections);
         var detectionSummary = BuildDetectionSummary(detections);
         var systemThreatLevel = GetHighestThreatLevel(detections);
-        _viewModel.ApplyVlmAnalysisResult(systemThreatLevel, $"{analysis} 탐지 내용: {detectionSummary}");
+        _viewModel.ApplyVlmAnalysisResult(systemThreatLevel, $"{analysis} ?먯? ?댁슜: {detectionSummary}");
 
         var alertSignature = $"{_viewModel.SelectedPrimaryTarget}:{frameId}:{BuildOverlaySignature(detections)}";
         var now = DateTimeOffset.Now;
@@ -1195,21 +1242,21 @@ public partial class MainWindow : Window
 
         _lastDetectionAlertSignature = alertSignature;
         _lastMobileAlertAt = now;
-        var evidencePng = CaptureElementAsPng(CameraPanel);
+        var evidencePng = CaptureElementAsPng(CameraActiveView.CameraPanelElement);
         _ = _mobileAlertHubService.PublishAlertAsync(
-            "운용통제 위험 알림",
+            "?댁슜?듭젣 ?꾪뿕 ?뚮┝",
             analysis,
             detectionSummary,
             _viewModel.CurrentThreatLevel,
             evidencePng);
-        _viewModel.AppendImportantLog("모바일 앱으로 위험 알림을 전송했습니다.");
+        _viewModel.AppendImportantLog("紐⑤컮???깆쑝濡??꾪뿕 ?뚮┝???꾩넚?덉뒿?덈떎.");
     }
 
     private string BuildVlmStyleAnalysis(IReadOnlyList<DetectionInfo> detections)
     {
         return
-            $"{_viewModel.LargeFeedTitle} 영상에서 주 탐지체 '{_viewModel.SelectedPrimaryTarget}' 기준 위험 객체 {detections.Count}개가 확인되었습니다. " +
-            "운용자는 현 화면의 바운딩 박스 위치를 확인하고 추적/녹화 상태를 유지하십시오.";
+            $"{_viewModel.LargeFeedTitle} ?곸긽?먯꽌 二??먯?泥?'{_viewModel.SelectedPrimaryTarget}' 湲곗? ?꾪뿕 媛앹껜 {detections.Count}媛쒓? ?뺤씤?섏뿀?듬땲?? " +
+            "?댁슜?먮뒗 ???붾㈃??諛붿슫??諛뺤뒪 ?꾩튂瑜??뺤씤?섍퀬 異붿쟻/?뱁솕 ?곹깭瑜??좎??섏떗?쒖삤.";
     }
 
     private static string BuildDetectionSummary(IReadOnlyList<DetectionInfo> detections)
@@ -1219,7 +1266,7 @@ public partial class MainWindow : Window
             detections
                 .OrderByDescending(d => d.Score)
                 .Take(8)
-                .Select((d, index) => $"{index + 1}. {d.ClassName} object{d.ObjectId} / 위험도 {d.ThreatLevel} / 신뢰도 {d.Score:0.00} / bbox ({d.X1:0}, {d.Y1:0})-({d.X2:0}, {d.Y2:0})"));
+                .Select((d, index) => $"{index + 1}. {d.ClassName} object{d.ObjectId} / ?꾪뿕??{d.ThreatLevel} / ?좊ː??{d.Score:0.00} / bbox ({d.X1:0}, {d.Y1:0})-({d.X2:0}, {d.Y2:0})"));
     }
 
     private static IReadOnlyList<DetectionTargetItem> BuildDetectionTargetItems(
@@ -1337,7 +1384,7 @@ public partial class MainWindow : Window
         };
         Canvas.SetLeft(mainRectangle, rectLeft);
         Canvas.SetTop(mainRectangle, rectTop);
-        DetectionOverlayCanvas.Children.Add(mainRectangle);
+        CameraActiveView.DetectionOverlayCanvasElement.Children.Add(mainRectangle);
 
         var cornerLength = Math.Max(12, Math.Min(rectWidth, rectHeight) * 0.18);
         var cornerThickness = isTracked ? 5 : 3;
@@ -1357,20 +1404,20 @@ public partial class MainWindow : Window
         labelText.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
         var labelWidth = labelText.DesiredSize.Width;
         var labelHeight = labelText.DesiredSize.Height;
-        var labelLeft = Math.Max(0, Math.Min(rectLeft, Math.Max(0, CameraViewport.ActualWidth - labelWidth - 4)));
+        var labelLeft = Math.Max(0, Math.Min(rectLeft, Math.Max(0, CameraActiveView.CameraViewportElement.ActualWidth - labelWidth - 4)));
         var preferredTop = rectTop - labelHeight - 6;
-        var labelTop = preferredTop >= 0 ? preferredTop : Math.Min(CameraViewport.ActualHeight - labelHeight - 4, rectTop + 6);
+        var labelTop = preferredTop >= 0 ? preferredTop : Math.Min(CameraActiveView.CameraViewportElement.ActualHeight - labelHeight - 4, rectTop + 6);
         Canvas.SetLeft(labelText, labelLeft);
         Canvas.SetTop(labelText, Math.Max(0, labelTop));
-        DetectionOverlayCanvas.Children.Add(labelText);
+        CameraActiveView.DetectionOverlayCanvasElement.Children.Add(labelText);
     }
 
     private static SolidColorBrush GetDetectionThreatBrush(string threatLevel)
     {
         return NormalizeThreatLevel(threatLevel) switch
         {
-            "높음" => new SolidColorBrush(Color.FromRgb(255, 107, 107)),
-            "중간" => new SolidColorBrush(Color.FromRgb(255, 193, 69)),
+            "?믪쓬" => new SolidColorBrush(Color.FromRgb(255, 107, 107)),
+            "以묎컙" => new SolidColorBrush(Color.FromRgb(255, 193, 69)),
             _ => new SolidColorBrush(Color.FromRgb(123, 216, 143))
         };
     }
@@ -1408,8 +1455,8 @@ public partial class MainWindow : Window
             StrokeEndLineCap = PenLineCap.Square
         };
 
-        DetectionOverlayCanvas.Children.Add(horizontal);
-        DetectionOverlayCanvas.Children.Add(vertical);
+        CameraActiveView.DetectionOverlayCanvasElement.Children.Add(horizontal);
+        CameraActiveView.DetectionOverlayCanvasElement.Children.Add(vertical);
     }
 
     private void HandleRecordingActiveStateChanged()
@@ -1421,7 +1468,7 @@ public partial class MainWindow : Window
                 return;
             }
 
-            var filePath = _viewportRecordingService.StartRecordingToDesktop(CameraPanel);
+            var filePath = _viewportRecordingService.StartRecordingToDesktop(CameraActiveView.CameraPanelElement);
             _isViewportRecordingActive = true;
             _viewModel.AppendImportantLog($"Recording started: {filePath}");
             return;
@@ -1472,7 +1519,7 @@ public partial class MainWindow : Window
 
     private async void OpenRecordedVideosButton_OnClick(object sender, RoutedEventArgs e)
     {
-        RecordedVideosPanel.Visibility = Visibility.Visible;
+        RecordedVideosActiveView.RecordedVideosPanelElement.Visibility = Visibility.Visible;
         await LoadRecordedVideosAsync();
         e.Handled = true;
     }
@@ -1486,15 +1533,15 @@ public partial class MainWindow : Window
     private void CloseRecordedVideosButton_OnClick(object sender, RoutedEventArgs e)
     {
         _recordedVideoPositionTimer.Stop();
-        RecordedVideoPlayer.Stop();
-        RecordedVideoPlayer.Source = null;
-        RecordedVideosPanel.Visibility = Visibility.Collapsed;
+        RecordedVideosActiveView.RecordedVideoPlayerElement.Stop();
+        RecordedVideosActiveView.RecordedVideoPlayerElement.Source = null;
+        RecordedVideosActiveView.RecordedVideosPanelElement.Visibility = Visibility.Collapsed;
         e.Handled = true;
     }
 
     private async void RecordedVideoList_OnSelectionChanged(object sender, SelectionChangedEventArgs e)
     {
-        if (RecordedVideoList.SelectedItem is not RecordedVideoItem item)
+        if (RecordedVideosActiveView.RecordedVideoListElement.SelectedItem is not RecordedVideoItem item)
         {
             return;
         }
@@ -1521,41 +1568,41 @@ public partial class MainWindow : Window
         try
         {
             _recordedVideoPositionTimer.Stop();
-            RecordedVideoPlayer.Stop();
-            RecordedVideoPlayer.Source = null;
+            RecordedVideosActiveView.RecordedVideoPlayerElement.Stop();
+            RecordedVideosActiveView.RecordedVideoPlayerElement.Source = null;
             ResetRecordedVideoPositionUi();
-            RecordedVideosStatusText.Text = $"{item.DisplayName} 내려받는 중...";
+            RecordedVideosActiveView.RecordedVideosStatusTextElement.Text = $"{item.DisplayName} ?대젮諛쏅뒗 以?..";
 
             var localPath = await EnsureRecordedVideoCachedAsync(item);
-            RecordedVideoPlayer.Source = new Uri(localPath, UriKind.Absolute);
+            RecordedVideosActiveView.RecordedVideoPlayerElement.Source = new Uri(localPath, UriKind.Absolute);
             ResetRecordedVideoZoom();
             ApplyRecordedVideoPlaybackSpeed();
-            RecordedVideoPlayer.Play();
+            RecordedVideosActiveView.RecordedVideoPlayerElement.Play();
             _recordedVideoPositionTimer.Start();
-            RecordedVideosStatusText.Text = item.DisplayName;
+            RecordedVideosActiveView.RecordedVideosStatusTextElement.Text = item.DisplayName;
         }
         catch (Exception ex)
         {
-            RecordedVideosStatusText.Text = "영상을 재생할 수 없습니다.";
-            _viewModel.AppendImportantLog($"녹화 영상 재생 준비에 실패했습니다: {ex.Message}");
+            RecordedVideosActiveView.RecordedVideosStatusTextElement.Text = "?곸긽???ъ깮?????놁뒿?덈떎.";
+            _viewModel.AppendImportantLog($"?뱁솕 ?곸긽 ?ъ깮 以鍮꾩뿉 ?ㅽ뙣?덉뒿?덈떎: {ex.Message}");
         }
     }
 
     private void RecordedVideoPlayButton_OnClick(object sender, RoutedEventArgs e)
     {
         ApplyRecordedVideoPlaybackSpeed();
-        RecordedVideoPlayer.Play();
+        RecordedVideosActiveView.RecordedVideoPlayerElement.Play();
         _recordedVideoPositionTimer.Start();
     }
 
     private void RecordedVideoPauseButton_OnClick(object sender, RoutedEventArgs e)
     {
-        RecordedVideoPlayer.Pause();
+        RecordedVideosActiveView.RecordedVideoPlayerElement.Pause();
     }
 
     private void RecordedVideoStopButton_OnClick(object sender, RoutedEventArgs e)
     {
-        RecordedVideoPlayer.Stop();
+        RecordedVideosActiveView.RecordedVideoPlayerElement.Stop();
         _recordedVideoPositionTimer.Stop();
         ResetRecordedVideoPositionUi();
     }
@@ -1569,7 +1616,7 @@ public partial class MainWindow : Window
     {
         var baseUri = GetRecordedVideoBaseUri();
         var apiUri = new Uri(baseUri, "api/videos");
-        RecordedVideosStatusText.Text = "목록을 불러오는 중...";
+        RecordedVideosActiveView.RecordedVideosStatusTextElement.Text = "紐⑸줉??遺덈윭?ㅻ뒗 以?..";
 
         try
         {
@@ -1608,9 +1655,9 @@ public partial class MainWindow : Window
         }
         catch (Exception ex)
         {
-            RecordedVideoList.ItemsSource = null;
-            RecordedVideosStatusText.Text = "목록을 불러오지 못했습니다.";
-            _viewModel.AppendImportantLog($"녹화 영상 목록을 불러오지 못했습니다: {ex.Message}");
+            RecordedVideosActiveView.RecordedVideoListElement.ItemsSource = null;
+            RecordedVideosActiveView.RecordedVideosStatusTextElement.Text = "紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?듬땲??";
+            _viewModel.AppendImportantLog($"?뱁솕 ?곸긽 紐⑸줉??遺덈윭?ㅼ? 紐삵뻽?듬땲?? {ex.Message}");
         }
     }
 
@@ -1634,15 +1681,15 @@ public partial class MainWindow : Window
             .Select(group => new RecordedVideoItem
             {
                 Folder = group.Key,
-                DisplayName = $"[폴더] {group.Key} ({group.Count()}개)",
+                DisplayName = $"[?대뜑] {group.Key} ({group.Count()}媛?",
                 IsFolder = true
             })
             .ToList();
 
-        RecordedVideoList.ItemsSource = folders;
-        RecordedVideosStatusText.Text = folders.Count == 0
-            ? "저장된 영상 폴더가 아직 없습니다."
-            : $"{folders.Count}개 폴더";
+        RecordedVideosActiveView.RecordedVideoListElement.ItemsSource = folders;
+        RecordedVideosActiveView.RecordedVideosStatusTextElement.Text = folders.Count == 0
+            ? "??λ맂 ?곸긽 ?대뜑媛 ?꾩쭅 ?놁뒿?덈떎."
+            : $"{folders.Count}媛??대뜑";
     }
 
     private void ShowRecordedVideoFolderContents(string folder)
@@ -1656,14 +1703,14 @@ public partial class MainWindow : Window
         {
             new()
             {
-                DisplayName = "[상위 폴더로]",
+                DisplayName = "[?곸쐞 ?대뜑濡?",
                 IsBack = true
             }
         };
         items.AddRange(videos);
 
-        RecordedVideoList.ItemsSource = items;
-        RecordedVideosStatusText.Text = $"{folder} / {videos.Count}개 영상";
+        RecordedVideosActiveView.RecordedVideoListElement.ItemsSource = items;
+        RecordedVideosActiveView.RecordedVideosStatusTextElement.Text = $"{folder} / {videos.Count}媛??곸긽";
     }
 
     private static string GetRecordedVideoFolder(string name)
@@ -1672,7 +1719,7 @@ public partial class MainWindow : Window
         var separatorIndex = normalized.LastIndexOf('/');
         return separatorIndex > 0
             ? normalized[..separatorIndex]
-            : "기존 영상";
+            : "湲곗〈 ?곸긽";
     }
 
     private static string GetRecordedVideoFileName(string name)
@@ -1754,36 +1801,36 @@ public partial class MainWindow : Window
 
             if (manual)
             {
-                var targetName = includeAnalysis ? "VLM 분석 결과" : "시스템 로그";
-                _viewModel.AppendImportantLog($"{targetName}를 젝슨 영상 폴더에 C_ 파일로 저장했습니다.");
+                var targetName = includeAnalysis ? "VLM 遺꾩꽍 寃곌낵" : "?쒖뒪??濡쒓렇";
+                _viewModel.AppendImportantLog($"{targetName}瑜??앹뒯 ?곸긽 ?대뜑??C_ ?뚯씪濡???ν뻽?듬땲??");
             }
         }
         catch (Exception ex)
         {
-            var modeText = manual ? "수동" : "자동";
-            _viewModel.AppendImportantLog($"{modeText} 로그/VLM 저장에 실패했습니다: {ex.Message}");
+            var modeText = manual ? "?섎룞" : "?먮룞";
+            _viewModel.AppendImportantLog($"{modeText} 濡쒓렇/VLM ??μ뿉 ?ㅽ뙣?덉뒿?덈떎: {ex.Message}");
         }
     }
 
     private void ApplyRecordedVideoPlaybackSpeed()
     {
-        if (PlaybackSpeedCombo?.SelectedItem is not ComboBoxItem item ||
+        if (RecordedVideosActiveView.PlaybackSpeedComboElement?.SelectedItem is not ComboBoxItem item ||
             item.Tag is not string value ||
             !double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var speed))
         {
             speed = 1.0;
         }
 
-        RecordedVideoPlayer.SpeedRatio = speed;
+        RecordedVideosActiveView.RecordedVideoPlayerElement.SpeedRatio = speed;
     }
 
     private void RecordedVideoPlayer_OnMediaOpened(object sender, RoutedEventArgs e)
     {
-        if (RecordedVideoPlayer.NaturalDuration.HasTimeSpan)
+        if (RecordedVideosActiveView.RecordedVideoPlayerElement.NaturalDuration.HasTimeSpan)
         {
-            var duration = RecordedVideoPlayer.NaturalDuration.TimeSpan;
-            RecordedVideoPositionSlider.Maximum = Math.Max(duration.TotalSeconds, 1);
-            RecordedVideoDurationText.Text = FormatVideoTime(duration);
+            var duration = RecordedVideosActiveView.RecordedVideoPlayerElement.NaturalDuration.TimeSpan;
+            RecordedVideosActiveView.RecordedVideoPositionSliderElement.Maximum = Math.Max(duration.TotalSeconds, 1);
+            RecordedVideosActiveView.RecordedVideoDurationTextElement.Text = FormatVideoTime(duration);
         }
 
         UpdateRecordedVideoPositionUi();
@@ -1798,8 +1845,8 @@ public partial class MainWindow : Window
     private void RecordedVideoPlayer_OnMediaFailed(object sender, ExceptionRoutedEventArgs e)
     {
         _recordedVideoPositionTimer.Stop();
-        RecordedVideosStatusText.Text = "영상을 재생할 수 없습니다.";
-        _viewModel.AppendImportantLog($"녹화 영상 재생에 실패했습니다: {e.ErrorException.Message}");
+        RecordedVideosActiveView.RecordedVideosStatusTextElement.Text = "?곸긽???ъ깮?????놁뒿?덈떎.";
+        _viewModel.AppendImportantLog($"?뱁솕 ?곸긽 ?ъ깮???ㅽ뙣?덉뒿?덈떎: {e.ErrorException.Message}");
     }
 
     private void RecordedVideoPositionTimer_OnTick(object? sender, EventArgs e)
@@ -1822,13 +1869,13 @@ public partial class MainWindow : Window
     {
         if (_isDraggingRecordedVideoPosition)
         {
-            RecordedVideoCurrentTimeText.Text = FormatVideoTime(TimeSpan.FromSeconds(e.NewValue));
+            RecordedVideosActiveView.RecordedVideoCurrentTimeTextElement.Text = FormatVideoTime(TimeSpan.FromSeconds(e.NewValue));
         }
     }
 
     private void SeekRecordedVideoToSlider()
     {
-        RecordedVideoPlayer.Position = TimeSpan.FromSeconds(RecordedVideoPositionSlider.Value);
+        RecordedVideosActiveView.RecordedVideoPlayerElement.Position = TimeSpan.FromSeconds(RecordedVideosActiveView.RecordedVideoPositionSliderElement.Value);
         UpdateRecordedVideoPositionUi();
     }
 
@@ -1839,27 +1886,27 @@ public partial class MainWindow : Window
             return;
         }
 
-        var position = RecordedVideoPlayer.Position;
-        RecordedVideoCurrentTimeText.Text = FormatVideoTime(position);
+        var position = RecordedVideosActiveView.RecordedVideoPlayerElement.Position;
+        RecordedVideosActiveView.RecordedVideoCurrentTimeTextElement.Text = FormatVideoTime(position);
 
-        if (RecordedVideoPlayer.NaturalDuration.HasTimeSpan)
+        if (RecordedVideosActiveView.RecordedVideoPlayerElement.NaturalDuration.HasTimeSpan)
         {
-            var duration = RecordedVideoPlayer.NaturalDuration.TimeSpan;
-            RecordedVideoPositionSlider.Maximum = Math.Max(duration.TotalSeconds, 1);
-            RecordedVideoDurationText.Text = FormatVideoTime(duration);
+            var duration = RecordedVideosActiveView.RecordedVideoPlayerElement.NaturalDuration.TimeSpan;
+            RecordedVideosActiveView.RecordedVideoPositionSliderElement.Maximum = Math.Max(duration.TotalSeconds, 1);
+            RecordedVideosActiveView.RecordedVideoDurationTextElement.Text = FormatVideoTime(duration);
         }
 
-        RecordedVideoPositionSlider.Value = Math.Min(position.TotalSeconds, RecordedVideoPositionSlider.Maximum);
+        RecordedVideosActiveView.RecordedVideoPositionSliderElement.Value = Math.Min(position.TotalSeconds, RecordedVideosActiveView.RecordedVideoPositionSliderElement.Maximum);
     }
 
     private void ResetRecordedVideoPositionUi()
     {
         _isDraggingRecordedVideoPosition = false;
-        RecordedVideoPositionSlider.Minimum = 0;
-        RecordedVideoPositionSlider.Maximum = 1;
-        RecordedVideoPositionSlider.Value = 0;
-        RecordedVideoCurrentTimeText.Text = "00:00";
-        RecordedVideoDurationText.Text = "00:00";
+        RecordedVideosActiveView.RecordedVideoPositionSliderElement.Minimum = 0;
+        RecordedVideosActiveView.RecordedVideoPositionSliderElement.Maximum = 1;
+        RecordedVideosActiveView.RecordedVideoPositionSliderElement.Value = 0;
+        RecordedVideosActiveView.RecordedVideoCurrentTimeTextElement.Text = "00:00";
+        RecordedVideosActiveView.RecordedVideoDurationTextElement.Text = "00:00";
     }
 
     private void RecordedVideoViewport_OnMouseWheel(object sender, MouseWheelEventArgs e)
@@ -1876,9 +1923,9 @@ public partial class MainWindow : Window
         }
 
         _isDraggingRecordedVideoPan = true;
-        _lastRecordedVideoPanPoint = e.GetPosition(RecordedVideoViewport);
-        RecordedVideoViewport.CaptureMouse();
-        RecordedVideoViewport.Cursor = Cursors.ScrollAll;
+        _lastRecordedVideoPanPoint = e.GetPosition(RecordedVideosActiveView.RecordedVideoViewportElement);
+        RecordedVideosActiveView.RecordedVideoViewportElement.CaptureMouse();
+        RecordedVideosActiveView.RecordedVideoViewportElement.Cursor = Cursors.ScrollAll;
         e.Handled = true;
     }
 
@@ -1889,7 +1936,7 @@ public partial class MainWindow : Window
             return;
         }
 
-        var point = e.GetPosition(RecordedVideoViewport);
+        var point = e.GetPosition(RecordedVideosActiveView.RecordedVideoViewportElement);
         _recordedVideoPanX += point.X - _lastRecordedVideoPanPoint.X;
         _recordedVideoPanY += point.Y - _lastRecordedVideoPanPoint.Y;
         _lastRecordedVideoPanPoint = point;
@@ -1904,7 +1951,7 @@ public partial class MainWindow : Window
 
     private void RecordedVideoZoomSlider_OnValueChanged(object sender, RoutedPropertyChangedEventArgs<double> e)
     {
-        if (RecordedVideoScaleTransform is null)
+        if (RecordedVideosActiveView.RecordedVideoScaleTransformElement is null)
         {
             return;
         }
@@ -1953,8 +2000,8 @@ public partial class MainWindow : Window
         }
 
         _isDraggingRecordedVideoPan = false;
-        RecordedVideoViewport.ReleaseMouseCapture();
-        RecordedVideoViewport.Cursor = Cursors.Arrow;
+        RecordedVideosActiveView.RecordedVideoViewportElement.ReleaseMouseCapture();
+        RecordedVideosActiveView.RecordedVideoViewportElement.Cursor = Cursors.Arrow;
     }
 
     private void ClampRecordedVideoPan()
@@ -1967,35 +2014,35 @@ public partial class MainWindow : Window
 
     private double GetRecordedVideoMaxPanX()
     {
-        return Math.Max(0, RecordedVideoViewport.ActualWidth * (_recordedVideoZoomLevel - 1.0) / 2.0);
+        return Math.Max(0, RecordedVideosActiveView.RecordedVideoViewportElement.ActualWidth * (_recordedVideoZoomLevel - 1.0) / 2.0);
     }
 
     private double GetRecordedVideoMaxPanY()
     {
-        return Math.Max(0, RecordedVideoViewport.ActualHeight * (_recordedVideoZoomLevel - 1.0) / 2.0);
+        return Math.Max(0, RecordedVideosActiveView.RecordedVideoViewportElement.ActualHeight * (_recordedVideoZoomLevel - 1.0) / 2.0);
     }
 
     private void UpdateRecordedVideoZoomUi()
     {
-        if (RecordedVideoScaleTransform is null)
+        if (RecordedVideosActiveView.RecordedVideoScaleTransformElement is null)
         {
             return;
         }
 
-        RecordedVideoScaleTransform.ScaleX = _recordedVideoZoomLevel;
-        RecordedVideoScaleTransform.ScaleY = _recordedVideoZoomLevel;
-        RecordedVideoTranslateTransform.X = _recordedVideoPanX;
-        RecordedVideoTranslateTransform.Y = _recordedVideoPanY;
+        RecordedVideosActiveView.RecordedVideoScaleTransformElement.ScaleX = _recordedVideoZoomLevel;
+        RecordedVideosActiveView.RecordedVideoScaleTransformElement.ScaleY = _recordedVideoZoomLevel;
+        RecordedVideosActiveView.RecordedVideoTranslateTransformElement.X = _recordedVideoPanX;
+        RecordedVideosActiveView.RecordedVideoTranslateTransformElement.Y = _recordedVideoPanY;
 
-        if (RecordedVideoZoomSlider is not null &&
-            Math.Abs(RecordedVideoZoomSlider.Value - _recordedVideoZoomLevel) > 0.001)
+        if (RecordedVideosActiveView.RecordedVideoZoomSliderElement is not null &&
+            Math.Abs(RecordedVideosActiveView.RecordedVideoZoomSliderElement.Value - _recordedVideoZoomLevel) > 0.001)
         {
-            RecordedVideoZoomSlider.Value = _recordedVideoZoomLevel;
+            RecordedVideosActiveView.RecordedVideoZoomSliderElement.Value = _recordedVideoZoomLevel;
         }
 
-        if (RecordedVideoZoomResetButton is not null)
+        if (RecordedVideosActiveView.RecordedVideoZoomResetButtonElement is not null)
         {
-            RecordedVideoZoomResetButton.Content = $"x{_recordedVideoZoomLevel:0.00}";
+            RecordedVideosActiveView.RecordedVideoZoomResetButtonElement.Content = $"x{_recordedVideoZoomLevel:0.00}";
         }
 
         UpdateRecordedVideoMiniMap();
@@ -2003,22 +2050,22 @@ public partial class MainWindow : Window
 
     private void UpdateRecordedVideoMiniMap()
     {
-        if (RecordedVideoZoomMiniMap is null || RecordedVideoMiniMapViewport is null)
+        if (RecordedVideosActiveView.RecordedVideoZoomMiniMapElement is null || RecordedVideosActiveView.RecordedVideoMiniMapViewportElement is null)
         {
             return;
         }
 
         if (_recordedVideoZoomLevel <= 1.0)
         {
-            RecordedVideoZoomMiniMap.Visibility = Visibility.Collapsed;
+            RecordedVideosActiveView.RecordedVideoZoomMiniMapElement.Visibility = Visibility.Collapsed;
             return;
         }
 
-        RecordedVideoZoomMiniMap.Visibility = Visibility.Visible;
+        RecordedVideosActiveView.RecordedVideoZoomMiniMapElement.Visibility = Visibility.Visible;
         var viewportWidth = RecordedVideoMiniMapWidth / _recordedVideoZoomLevel;
         var viewportHeight = RecordedVideoMiniMapHeight / _recordedVideoZoomLevel;
-        RecordedVideoMiniMapViewport.Width = viewportWidth;
-        RecordedVideoMiniMapViewport.Height = viewportHeight;
+        RecordedVideosActiveView.RecordedVideoMiniMapViewportElement.Width = viewportWidth;
+        RecordedVideosActiveView.RecordedVideoMiniMapViewportElement.Height = viewportHeight;
 
         var maxPanX = GetRecordedVideoMaxPanX();
         var maxPanY = GetRecordedVideoMaxPanY();
@@ -2029,8 +2076,8 @@ public partial class MainWindow : Window
             ? (RecordedVideoMiniMapHeight - viewportHeight) / 2
             : (1.0 - ((_recordedVideoPanY + maxPanY) / (maxPanY * 2.0))) * (RecordedVideoMiniMapHeight - viewportHeight);
 
-        Canvas.SetLeft(RecordedVideoMiniMapViewport, left);
-        Canvas.SetTop(RecordedVideoMiniMapViewport, top);
+        Canvas.SetLeft(RecordedVideosActiveView.RecordedVideoMiniMapViewportElement, left);
+        Canvas.SetTop(RecordedVideosActiveView.RecordedVideoMiniMapViewportElement, top);
     }
 
     private static string FormatVideoTime(TimeSpan value)
@@ -2095,21 +2142,21 @@ public partial class MainWindow : Window
 
     private void LoadNetworkSettingsEditor()
     {
-        JetsonHostTextBox.Text = _networkSettings.JetsonHost;
+        OperationActiveView.JetsonHostTextBoxElement.Text = _networkSettings.JetsonHost;
 
         var localAddresses = AppNetworkSettings.GetLocalIpv4Addresses();
-        PcGuiHostComboBox.ItemsSource = localAddresses;
-        PcGuiHostComboBox.Text = _networkSettings.PcGuiHost;
+        OperationActiveView.PcGuiHostComboBoxElement.ItemsSource = localAddresses;
+        OperationActiveView.PcGuiHostComboBoxElement.Text = _networkSettings.PcGuiHost;
         if (localAddresses.Count > 0 && !localAddresses.Contains(_networkSettings.PcGuiHost, StringComparer.Ordinal))
         {
-            _viewModel.AppendImportantLog($"현재 GUI IP 후보: {string.Join(", ", localAddresses)}");
+            _viewModel.AppendImportantLog($"?꾩옱 GUI IP ?꾨낫: {string.Join(", ", localAddresses)}");
         }
     }
 
     private void SaveNetworkSettingsButton_OnClick(object sender, RoutedEventArgs e)
     {
-        _networkSettings.JetsonHost = JetsonHostTextBox.Text;
-        _networkSettings.PcGuiHost = PcGuiHostComboBox.Text;
+        _networkSettings.JetsonHost = OperationActiveView.JetsonHostTextBoxElement.Text;
+        _networkSettings.PcGuiHost = OperationActiveView.PcGuiHostComboBoxElement.Text;
         _networkSettings.RecordedVideoUrl = $"http://{_networkSettings.JetsonHost.Trim()}:{_networkSettings.RecordingHttpPort.ToString(CultureInfo.InvariantCulture)}/";
         _networkSettings.Save();
         _motorControlService.ConfigureEndpoint(
@@ -2117,9 +2164,9 @@ public partial class MainWindow : Window
             _networkSettings.MotorControlPort,
             _networkSettings.TrackingRecordingControlPort);
 
-        _viewModel.AppendImportantLog($"네트워크 설정을 저장하고 즉시 적용했습니다: Jetson {_networkSettings.JetsonHost}, GUI {_networkSettings.PcGuiHost}");
+        _viewModel.AppendImportantLog($"?ㅽ듃?뚰겕 ?ㅼ젙????ν븯怨?利됱떆 ?곸슜?덉뒿?덈떎: Jetson {_networkSettings.JetsonHost}, GUI {_networkSettings.PcGuiHost}");
         MessageBox.Show(
-            "네트워크 설정을 저장했습니다.\n\n모터 명령과 녹화 영상 주소는 즉시 새 Jetson IP를 사용합니다.\nGUI IP는 Jetson 브릿지의 송출 대상 설정에도 반영되어야 영상 수신 대상이 바뀝니다.",
+            "?ㅽ듃?뚰겕 ?ㅼ젙????ν뻽?듬땲??\n\n紐⑦꽣 紐낅졊怨??뱁솕 ?곸긽 二쇱냼??利됱떆 ??Jetson IP瑜??ъ슜?⑸땲??\nGUI IP??Jetson 釉뚮┸吏???≪텧 ????ㅼ젙?먮룄 諛섏쁺?섏뼱???곸긽 ?섏떊 ??곸씠 諛붾앸땲??",
             "Network",
             MessageBoxButton.OK,
             MessageBoxImage.Information);
@@ -2156,12 +2203,12 @@ public partial class MainWindow : Window
 
     private void UpdateWindowModeButtonText()
     {
-        if (WindowModeToggleButton is null)
+        if (SettingsActiveView.WindowModeToggleButtonElement is null)
         {
             return;
         }
 
-        WindowModeToggleButton.Content = _isFullscreenMode
+        SettingsActiveView.WindowModeToggleButtonElement.Content = _isFullscreenMode
             ? _viewModel.Text["WindowMode"]
             : _viewModel.Text["FullscreenMode"];
     }
@@ -2363,11 +2410,11 @@ public partial class MainWindow : Window
 
     private void UpdateMotorPadButtonVisualStates()
     {
-        SetMotorPadButtonActive(MotorPadLeftButton, _activeMotorDirections.ContainsKey("Left"));
-        SetMotorPadButtonActive(MotorPadRightButton, _activeMotorDirections.ContainsKey("Right"));
-        SetMotorPadButtonActive(MotorPadUpButton, _activeMotorDirections.ContainsKey("Up"));
-        SetMotorPadButtonActive(MotorPadDownButton, _activeMotorDirections.ContainsKey("Down"));
-        SetMotorPadButtonActive(MotorPadCenterButton, _activeMotorDirections.ContainsKey("Center"));
+        SetMotorPadButtonActive(MotorActiveView.MotorPadLeftButtonElement, _activeMotorDirections.ContainsKey("Left"));
+        SetMotorPadButtonActive(MotorActiveView.MotorPadRightButtonElement, _activeMotorDirections.ContainsKey("Right"));
+        SetMotorPadButtonActive(MotorActiveView.MotorPadUpButtonElement, _activeMotorDirections.ContainsKey("Up"));
+        SetMotorPadButtonActive(MotorActiveView.MotorPadDownButtonElement, _activeMotorDirections.ContainsKey("Down"));
+        SetMotorPadButtonActive(MotorActiveView.MotorPadCenterButtonElement, _activeMotorDirections.ContainsKey("Center"));
     }
 
     private static void SetMotorPadButtonActive(Button? button, bool isActive)
@@ -2444,13 +2491,13 @@ public partial class MainWindow : Window
     {
         if (!animate)
         {
-            SettingsBackdrop.Visibility = isOpen ? Visibility.Visible : Visibility.Collapsed;
-            SettingsBackdrop.IsHitTestVisible = isOpen;
-            SettingsBackdrop.Opacity = isOpen ? 1.0 : 0.0;
+            SettingsActiveView.SettingsBackdropElement.Visibility = isOpen ? Visibility.Visible : Visibility.Collapsed;
+            SettingsActiveView.SettingsBackdropElement.IsHitTestVisible = isOpen;
+            SettingsActiveView.SettingsBackdropElement.Opacity = isOpen ? 1.0 : 0.0;
 
-            SettingsDrawer.Visibility = isOpen ? Visibility.Visible : Visibility.Collapsed;
-            SettingsDrawer.Opacity = isOpen ? 1.0 : 0.0;
-            SettingsDrawerTransform.X = isOpen ? 0 : SettingsDrawerClosedOffset;
+            SettingsActiveView.SettingsDrawerElement.Visibility = isOpen ? Visibility.Visible : Visibility.Collapsed;
+            SettingsActiveView.SettingsDrawerElement.Opacity = isOpen ? 1.0 : 0.0;
+            SettingsActiveView.SettingsDrawerTransformElement.X = isOpen ? 0 : SettingsDrawerClosedOffset;
             return;
         }
 
@@ -2462,9 +2509,9 @@ public partial class MainWindow : Window
 
         if (isOpen)
         {
-            SettingsBackdrop.Visibility = Visibility.Visible;
-            SettingsBackdrop.IsHitTestVisible = true;
-            SettingsDrawer.Visibility = Visibility.Visible;
+            SettingsActiveView.SettingsBackdropElement.Visibility = Visibility.Visible;
+            SettingsActiveView.SettingsBackdropElement.IsHitTestVisible = true;
+            SettingsActiveView.SettingsDrawerElement.Visibility = Visibility.Visible;
         }
 
         var backdropAnimation = new DoubleAnimation
@@ -2492,15 +2539,15 @@ public partial class MainWindow : Window
         {
             drawerSlideAnimation.Completed += (_, _) =>
             {
-                SettingsBackdrop.Visibility = Visibility.Collapsed;
-                SettingsBackdrop.IsHitTestVisible = false;
-                SettingsDrawer.Visibility = Visibility.Collapsed;
+                SettingsActiveView.SettingsBackdropElement.Visibility = Visibility.Collapsed;
+                SettingsActiveView.SettingsBackdropElement.IsHitTestVisible = false;
+                SettingsActiveView.SettingsDrawerElement.Visibility = Visibility.Collapsed;
             };
         }
 
-        SettingsBackdrop.BeginAnimation(OpacityProperty, backdropAnimation, HandoffBehavior.SnapshotAndReplace);
-        SettingsDrawer.BeginAnimation(OpacityProperty, drawerOpacityAnimation, HandoffBehavior.SnapshotAndReplace);
-        SettingsDrawerTransform.BeginAnimation(TranslateTransform.XProperty, drawerSlideAnimation, HandoffBehavior.SnapshotAndReplace);
+        SettingsActiveView.SettingsBackdropElement.BeginAnimation(OpacityProperty, backdropAnimation, HandoffBehavior.SnapshotAndReplace);
+        SettingsActiveView.SettingsDrawerElement.BeginAnimation(OpacityProperty, drawerOpacityAnimation, HandoffBehavior.SnapshotAndReplace);
+        SettingsActiveView.SettingsDrawerTransformElement.BeginAnimation(TranslateTransform.XProperty, drawerSlideAnimation, HandoffBehavior.SnapshotAndReplace);
     }
 
     private void OnClosed(object? sender, EventArgs e)

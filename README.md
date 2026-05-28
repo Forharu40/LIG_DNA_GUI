@@ -9,7 +9,7 @@
 - `ViewModels`를 기능별 폴더로 나누기 위한 기본 구조를 추가했습니다.
 - `Models` 폴더를 신설해 카메라, 모터, 네트워크, 모바일 알림, VLM 데이터 모델을 서비스 파일에서 분리했습니다.
 - `Services`를 카메라, 모터, 네트워크, 녹화, 모니터링, 알림, VLM 영역으로 정리했습니다.
-- `Views`를 기능별 UserControl로 분리할 수 있도록 기본 파일을 추가했습니다.
+- `MainWindow.xaml`을 shell 구조로 축소하고 실제 화면을 기능별 UserControl로 분리했습니다.
 - 모터 제어 패킷 직렬화를 `MotorPacketSerializer`로 분리하고, Jetson으로 보내는 모터 명령을 아래 10바이트 명세에 맞췄습니다.
 - 카메라 영상은 실제 영상 비율을 유지하도록 `Uniform` 표시를 사용합니다. 비율이 맞지 않는 영역에는 검정 여백이 보일 수 있습니다.
 
@@ -118,12 +118,17 @@ BroadcastControl.App/
     Motor/
       MotorControlView.xaml
       MotorControlView.xaml.cs
+      MotorDetailsView.xaml
+      MotorDetailsView.xaml.cs
     Operation/
       OperationControlView.xaml
       OperationControlView.xaml.cs
     Recording/
       RecordedVideosView.xaml
       RecordedVideosView.xaml.cs
+    Settings/
+      SettingsDrawerView.xaml
+      SettingsDrawerView.xaml.cs
     Vlm/
       VlmPanelView.xaml
       VlmPanelView.xaml.cs
@@ -134,8 +139,8 @@ BroadcastControl.App/
 | 파일 | 역할 |
 | --- | --- |
 | `App.xaml`, `App.xaml.cs` | WPF 앱 시작, 테마 적용, 전역 리소스 초기화 |
-| `MainWindow.xaml` | 현재 GUI의 메인 화면 레이아웃 |
-| `MainWindow.xaml.cs` | 기존 화면 이벤트, UDP 서비스 연결, 영상 렌더링, 탐지 오버레이, 녹화/모바일/VLM 이벤트 연결 |
+| `MainWindow.xaml` | 기능별 active view를 배치하는 shell 레이아웃 |
+| `MainWindow.xaml.cs` | UDP 서비스 연결과 active view 이벤트 연결, 영상 렌더링, 탐지 오버레이, 녹화/모바일/VLM 이벤트 연결 |
 | `Infrastructure/RelayCommand.cs` | ViewModel 명령을 WPF `ICommand`로 연결하는 공통 클래스 |
 | `Models/Camera/VideoStreamModels.cs` | `ReceivedVideoFrame`, `DetectionInfo`, `DetectionPacket`, `YoloStatusPacket`, 녹화 segment 모델 |
 | `Models/Motor/MotorControlModels.cs` | 방향키 버튼 비트마스크 `MotorButtonMask` |
@@ -168,7 +173,13 @@ BroadcastControl.App/
 | `ViewModels/Recording/RecordingViewModel.cs` | 녹화 상태와 녹화된 영상 목록 |
 | `ViewModels/Vlm/VlmViewModel.cs` | VLM 최신 분석과 분석 히스토리 |
 | `ViewModels/Mobile/MobileWebAppViewModel.cs` | 모바일 알림 서버 상태, 포트, 최신 evidence URL |
-| `Views/*` | 향후 `MainWindow.xaml`에서 분리될 기능별 화면 UserControl |
+| `Views/Camera/CameraView.xaml` | 중앙 카메라 영상, 탐지 오버레이, 인셋 영상 화면 |
+| `Views/Motor/MotorControlView.xaml` | 좌측 전원, 보조 카메라, 모터 위치/각도/속도/방향키 패널 |
+| `Views/Operation/OperationControlView.xaml` | 하단 밝기/대비/줌/모드/트래킹/네트워크 상태 패널 |
+| `Views/Monitoring/MonitoringView.xaml` | 우측 녹화 상태, YOLO Targets, System Log 패널 |
+| `Views/Recording/RecordedVideosView.xaml` | 녹화 영상 목록과 재생 오버레이 |
+| `Views/Motor/MotorDetailsView.xaml` | 모터 상세 상태 오버레이 |
+| `Views/Settings/SettingsDrawerView.xaml` | 설정 drawer 오버레이 |
 
 ## 모터 제어 UDP 패킷
 
