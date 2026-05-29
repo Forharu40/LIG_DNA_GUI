@@ -23,9 +23,9 @@ using BroadcastControl.App.ViewModels.Vlm;
 namespace BroadcastControl.App.ViewModels;
 
 // 파일 역할:
-// 메인 화면의 표시 상태와 사용자 명령을 관리하는 ViewModel입니다.
-// 카메라, 모터, 녹화, 네트워크 설정을 한곳에서 조율합니다.
-// 화면 바인딩용 속성과 명령은 이 클래스에서 갱신됩니다.
+// 메인 화면 전체를 묶는 루트 ViewModel입니다.
+// 기능별 세부 로직은 Camera/Motor/Operation/Recording/Vlm 폴더의 ViewModel 파일 안에 partial로 나누어 둡니다.
+// 이 파일은 공통 필드, 생성자, Command 선언, 공통 이벤트와 보조 타입을 담당합니다.
 
 public sealed partial class MainViewModel : INotifyPropertyChanged
 {

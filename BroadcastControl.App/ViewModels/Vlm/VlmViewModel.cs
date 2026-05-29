@@ -21,9 +21,17 @@ using BroadcastControl.App.ViewModels.Operation;
 using BroadcastControl.App.ViewModels.Recording;
 using BroadcastControl.App.ViewModels.Vlm;
 
+// 파일 역할:
+// VLM/YOLO 분석 화면에서 사용하는 ViewModel과 MainViewModel의 탐지/위험도 상태를 함께 둡니다.
+// 객체 ID, 객체 분류, 정확도, 위험도, VLM 분석 결과, 추적 대상 선택 로직을 담당합니다.
+
 namespace BroadcastControl.App.ViewModels.Vlm
 {
 
+/// <summary>
+/// VlmPanelView가 직접 참조할 수 있는 VLM 분석 상태입니다.
+/// 화면 전체에 연결된 탐지/위험도 바인딩은 아래 MainViewModel partial에서 유지합니다.
+/// </summary>
 public sealed class VlmViewModel : ViewModelBase
 {
     private string _latestAnalysis = string.Empty;
@@ -47,6 +55,8 @@ public sealed class VlmViewModel : ViewModelBase
 
 namespace BroadcastControl.App.ViewModels
 {
+// VlmViewModel.cs 안에 둔 MainViewModel partial 영역입니다.
+// YOLO 탐지 결과와 VLM 위험도 처리 코드를 Vlm 폴더에 모아 관리합니다.
 public sealed partial class MainViewModel
 {
     public string CurrentThreatLevel

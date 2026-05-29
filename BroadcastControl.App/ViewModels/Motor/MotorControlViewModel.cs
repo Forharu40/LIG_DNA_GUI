@@ -21,9 +21,17 @@ using BroadcastControl.App.ViewModels.Operation;
 using BroadcastControl.App.ViewModels.Recording;
 using BroadcastControl.App.ViewModels.Vlm;
 
+// 파일 역할:
+// 모터 제어 화면에서 사용하는 ViewModel과 MainViewModel의 모터 관련 상태/명령을 함께 둡니다.
+// Pan/Tilt 표시, 방향키, 각도 입력, Motor Speed, UDP 모터 명령 패킷 생성을 담당합니다.
+
 namespace BroadcastControl.App.ViewModels.Motor
 {
 
+/// <summary>
+/// MotorControlView가 직접 참조할 수 있는 모터 전용 상태입니다.
+/// 실제 WPF 화면 바인딩과 명령 호환 로직은 아래 MainViewModel partial에 있습니다.
+/// </summary>
 public sealed class MotorControlViewModel : ViewModelBase
 {
     private double _panDegrees;
@@ -80,6 +88,8 @@ public sealed class MotorControlViewModel : ViewModelBase
 
 namespace BroadcastControl.App.ViewModels
 {
+// MotorControlViewModel.cs 안에 둔 MainViewModel partial 영역입니다.
+// 모터 기능 코드를 Motor 폴더에 모아 MainViewModel 본문이 다시 길어지지 않도록 합니다.
 public sealed partial class MainViewModel
 {
     public int AutoMotorAngleSize

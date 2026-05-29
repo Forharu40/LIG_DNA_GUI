@@ -21,9 +21,17 @@ using BroadcastControl.App.ViewModels.Operation;
 using BroadcastControl.App.ViewModels.Recording;
 using BroadcastControl.App.ViewModels.Vlm;
 
+// 파일 역할:
+// 카메라 기능에서 직접 사용하는 ViewModel과 MainViewModel의 카메라 관련 상태/명령을 함께 둡니다.
+// EO/IR 영상 프레임, 큰 화면/작은 화면 전환, 줌, 팬, 회전, 밝기/대비 표시 로직을 담당합니다.
+
 namespace BroadcastControl.App.ViewModels.Camera
 {
 
+/// <summary>
+/// CameraView가 직접 참조할 수 있는 카메라 전용 상태입니다.
+/// 현재는 단순 상태 보관용이며, 실제 화면 바인딩 호환 로직은 아래 MainViewModel partial에 있습니다.
+/// </summary>
 public sealed class CameraViewModel : ViewModelBase
 {
     private ImageSource? _eoFrame;
@@ -66,6 +74,8 @@ public sealed class CameraViewModel : ViewModelBase
 
 namespace BroadcastControl.App.ViewModels
 {
+// CameraViewModel.cs 안에 둔 MainViewModel partial 영역입니다.
+// 기존 XAML 바인딩을 유지하면서 카메라 기능 관련 코드를 기능 폴더로 모으기 위한 구조입니다.
 public sealed partial class MainViewModel
 {
     public string EoTitle => "EO cam";

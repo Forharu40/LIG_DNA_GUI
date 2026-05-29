@@ -3,6 +3,10 @@ using System.Windows.Controls;
 using System.Globalization;
 using BroadcastControl.App.Models.Network;
 
+// 파일 역할:
+// OperationControlView의 코드비하인드입니다.
+// 하단 조작 패널의 모드 전환, 네트워크 설정 입력, 저장 버튼 이벤트를 연결합니다.
+
 namespace BroadcastControl.App.Views.Operation
 {
 public partial class OperationControlView : UserControl

@@ -16,6 +16,10 @@ using BroadcastControl.App.Models.Network;
 using BroadcastControl.App.Models.Vlm;
 using BroadcastControl.App.ViewModels;
 
+// 파일 역할:
+// MotorControlView의 코드비하인드입니다.
+// 모터 방향키, 각도 입력, 모터 속도 조절 버튼처럼 모터 조작 UI 이벤트를 연결합니다.
+
 namespace BroadcastControl.App.Views.Motor
 {
 public partial class MotorControlView : UserControl

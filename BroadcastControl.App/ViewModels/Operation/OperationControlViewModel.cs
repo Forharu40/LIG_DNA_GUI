@@ -21,9 +21,17 @@ using BroadcastControl.App.ViewModels.Operation;
 using BroadcastControl.App.ViewModels.Recording;
 using BroadcastControl.App.ViewModels.Vlm;
 
+// 파일 역할:
+// 하단 조작/설정 영역에서 사용하는 ViewModel과 MainViewModel의 시스템 운영 상태를 함께 둡니다.
+// 전원, Scan/Manual 모드, Tracking, 테마, 언어, 주 탐지체, System 연결 표시를 담당합니다.
+
 namespace BroadcastControl.App.ViewModels.Operation
 {
 
+/// <summary>
+/// OperationControlView가 직접 참조할 수 있는 운영 상태입니다.
+/// 기존 화면 바인딩과 명령은 아래 MainViewModel partial에서 유지합니다.
+/// </summary>
 public sealed class OperationControlViewModel : ViewModelBase
 {
     private bool _isScanMode = true;
@@ -59,6 +67,8 @@ public sealed class OperationControlViewModel : ViewModelBase
 
 namespace BroadcastControl.App.ViewModels
 {
+// OperationControlViewModel.cs 안에 둔 MainViewModel partial 영역입니다.
+// 시스템 운영과 설정 관련 코드를 Operation 폴더로 모아 기능별 책임을 분리합니다.
 public sealed partial class MainViewModel
 {
     public bool IsEoPrimary => _isEoPrimary;

@@ -16,6 +16,10 @@ using BroadcastControl.App.Models.Network;
 using BroadcastControl.App.Models.Vlm;
 using BroadcastControl.App.ViewModels;
 
+// 파일 역할:
+// MonitoringView의 코드비하인드입니다.
+// 시스템 상태, YOLO 리스트, 로그 표시와 관련된 화면 이벤트를 MainWindow 쪽 처리 흐름에 연결합니다.
+
 namespace BroadcastControl.App.Views.Monitoring
 {
 public partial class MonitoringView : UserControl

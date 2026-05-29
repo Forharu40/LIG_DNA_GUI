@@ -16,6 +16,10 @@ using BroadcastControl.App.Models.Network;
 using BroadcastControl.App.Models.Vlm;
 using BroadcastControl.App.ViewModels;
 
+// 파일 역할:
+// SettingsDrawerView의 코드비하인드입니다.
+// 설정 drawer의 배경 클릭, 창 모드 전환, 설정 UI 요소 접근자를 제공합니다.
+
 namespace BroadcastControl.App.Views.Settings
 {
 public partial class SettingsDrawerView : UserControl

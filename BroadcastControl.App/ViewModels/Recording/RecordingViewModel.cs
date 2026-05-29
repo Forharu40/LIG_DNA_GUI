@@ -21,9 +21,17 @@ using BroadcastControl.App.ViewModels.Operation;
 using BroadcastControl.App.ViewModels.Recording;
 using BroadcastControl.App.ViewModels.Vlm;
 
+// 파일 역할:
+// 녹화 화면에서 사용하는 ViewModel과 MainViewModel의 녹화/로그 관련 상태를 함께 둡니다.
+// 녹화 상태, 수동 녹화, 분석 로그 저장, 시스템 로그 저장, 녹화 목록 표시를 담당합니다.
+
 namespace BroadcastControl.App.ViewModels.Recording
 {
 
+/// <summary>
+/// RecordedVideosView와 녹화 패널이 직접 참조할 수 있는 녹화 전용 상태입니다.
+/// 실제 화면 공통 바인딩과 로그 저장 로직은 아래 MainViewModel partial에 있습니다.
+/// </summary>
 public sealed class RecordingViewModel : ViewModelBase
 {
     private bool _isRecording;
@@ -47,6 +55,8 @@ public sealed class RecordingViewModel : ViewModelBase
 
 namespace BroadcastControl.App.ViewModels
 {
+// RecordingViewModel.cs 안에 둔 MainViewModel partial 영역입니다.
+// 녹화와 로그 기능 코드를 Recording 폴더에 모아 기능 단위로 관리합니다.
 public sealed partial class MainViewModel
 {
     public bool IsRecordingActive =>
