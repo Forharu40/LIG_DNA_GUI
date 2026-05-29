@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Globalization;
 using System.IO;
@@ -22,15 +22,15 @@ using BroadcastControl.App.ViewModels.Vlm;
 
 namespace BroadcastControl.App.ViewModels;
 
-// ?뚯씪 ??븷:
-// 硫붿씤 ?붾㈃???곹깭? 紐낅졊??愿由ы븯??MVVM ViewModel?대떎.
-// XAML? ???뚯씪???띿꽦??諛붿씤?⑸릺??移대찓???붾㈃, 紐⑦꽣 ?곹깭, ?꾪뿕?? ?몄뼱, ?뚮쭏, 濡쒓렇, ?뱁솕 ?곹깭瑜??쒖떆?쒕떎.
-// 踰꾪듉 ?대┃? ICommand濡??곌껐?섎ŉ, ?꾩슂??寃쎌슦 UdpMotorControlService瑜??듯빐 Jetson/Thor 履쎌쑝濡?紐⑦꽣 紐낅졊 ?⑦궥??蹂대궦??
+// 파일 역할:
+// 메인 화면의 표시 상태와 사용자 명령을 관리하는 ViewModel입니다.
+// 카메라, 모터, 녹화, 네트워크 설정을 한곳에서 조율합니다.
+// 화면 바인딩용 속성과 명령은 이 클래스에서 갱신됩니다.
 
 public sealed partial class MainViewModel : INotifyPropertyChanged
 {
-    /// 紐⑤뱶, ?꾪뿕 ?깃툒, 諛앷린/?議곕퉬, 以? 濡쒓렇, ?뚮쭏 踰꾪듉 ?곹깭瑜??④퍡 愿由ы븳??
-    // 誘몃땲留듭? ?꾩옱 ?뺣????곸뿭??媛꾨떒??蹂댁뿬二쇰뒗 ?⑸룄?대?濡? 蹂??붾㈃ 鍮꾩쑉??留욎떠 ?묒? ?ш린濡?怨좎젙?쒕떎.
+    // 메인 화면의 크기, 색상, 상태 표시 기본값을 정의합니다.
+    // 화면 바인딩에 쓰이는 기본 상수입니다.
     private const double MiniMapWidth = 130;
     private const double MiniMapHeight = 74;
 
@@ -47,7 +47,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private string _currentMode = "\uC790\uB3D9";
     private string _selectedPrimaryTarget = "\uBCF5\uD569";
     private string _currentThreatLevel = "\uB0AE\uC74C";
-    // ?꾨줈洹몃옩??泥섏쓬 耳곗쓣 ??諛앷린??以묎컙媛믪씤 50%?먯꽌 ?쒖옉?쒕떎.
+    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     private double _brightness = 50;
     private double _contrast = 50;
     private bool _isManualRecordingEnabled;
@@ -95,8 +95,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private readonly List<SystemLogItem> _systemLogHistory = new();
     private string? _lastAnalysisMessage;
 
-    // EO? IR 紐⑤몢 Jetson?먯꽌 ?꾨떖?섎뒗 UDP ?곸긽???쒖떆?쒕떎.
-    // ?ㅼ젣 ?꾨젅?꾩쓣 ?꾩쭅 諛쏆? 紐삵븳 寃쎌슦?먮룄 ?붾㈃??鍮꾩뼱 蹂댁씠吏 ?딅룄濡?EO/IR 湲곕낯 ?덈궡 ?대?吏瑜?誘몃━ 以鍮꾪빐?붾떎.
+    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     private ImageSource? _eoFrame;
     private ImageSource? _irFrame;
     private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame(string.Empty, Color.FromRgb(51, 94, 160));
@@ -114,7 +114,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         Vlm = new VlmViewModel();
         Mobile = new MobileWebAppViewModel();
 
-        // ?깆씠 ?꾩옱 ?ъ슜 以묒씤 ?뚮쭏瑜??쎌뼱???ㅼ젙 李?踰꾪듉 ?곹깭? 留욎텣??
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         if (Application.Current is App app)
         {
             _currentThemeMode = app.CurrentThemeMode;
@@ -130,14 +130,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         PrimaryTargets = new ObservableCollection<PrimaryTargetOption>(CreatePrimaryTargetOptions());
 
-        // ?붾㈃??紐⑤뱺 踰꾪듉? Command 諛붿씤?⑹쑝濡??곌껐?섎?濡??앹꽦?먯뿉????踰덉뿉 ?깅줉?쒕떎.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         TogglePowerCommand = new RelayCommand(_ => TogglePower());
         SetModeCommand = new RelayCommand(SetMode, _ => IsSystemPoweredOn);
         ToggleSettingsCommand = new RelayCommand(_ => IsSettingsOpen = !IsSettingsOpen);
         SelectPrimaryTargetCommand = new RelayCommand(SelectPrimaryTarget, _ => IsSystemPoweredOn);
         ResetBrightnessCommand = new RelayCommand(_ => Brightness = 50, _ => IsSystemPoweredOn);
         ResetContrastCommand = new RelayCommand(_ => Contrast = 50, _ => IsSystemPoweredOn);
-        // ?뺣? ?쒕ぉ 踰꾪듉???꾨Ⅴ硫?湲곕낯 諛곗쑉 x1.0?쇰줈 利됱떆 蹂듦??쒕떎.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         ResetZoomCommand = new RelayCommand(_ => ZoomLevel = 1.0, _ => CanUseZoomControls);
         ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsSystemPoweredOn);
         SetThemeCommand = new RelayCommand(SetTheme);
@@ -260,7 +260,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public bool IsEoPrimary => _isEoPrimary;
 
-    // ?곷떒 ?꾩썝 踰꾪듉? ?ㅼ젣 ?꾨줈洹몃옩 醫낅즺 踰꾪듉?쇰줈 ?ъ슜?쒕떎.
+    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     public string PowerButtonText => Text["PowerExit"];
 
     public string CurrentMode
@@ -296,14 +296,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public string CurrentModeText => $"{Text["CameraMode"]}: {TranslateMode(CurrentMode)}";
 
-    // ?꾩옱 ?좏깮??紐⑤뱶 踰꾪듉留??좊챸?섍쾶 蹂댁뿬??蹂꾨룄 ?띿뒪???놁씠???곹깭瑜??뚯븘蹂????덇쾶 ?쒕떎.
+    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     public double AutoModeOpacity => CurrentMode == "\uC790\uB3D9" ? 1.0 : 0.35;
 
     public double ManualModeOpacity => CurrentMode == "\uC218\uB3D9" ? 1.0 : 0.35;
 
-    // ?뱁솕 ?곹깭???꾩옱 ?섎룞 ?뱁솕 ?щ?? ?먮룞 ?뱁솕 議곌굔???④퍡 諛섏쁺??寃곌낵媛믪씠??
-    // ?먮룞 紐⑤뱶?먯꽌???꾪뿕 ?깃툒???믪쓬???뚮쭔 ?먮룞 ?뱁솕 ?곹깭濡?媛꾩＜?섍퀬,
-    // ?섎룞 紐⑤뱶?먯꽌???ъ슜?먭? 吏곸젒 ?뱁솕瑜?耳?寃쎌슦?먮쭔 ?쒖꽦?붾맂??
+    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 
     public bool IsRecordingActive =>
         IsSystemPoweredOn &&
@@ -335,9 +335,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public string JetsonConnectionText => IsJetsonConnected ? Text["Connected"] : Text["Connecting"];
 
-    public Brush JetsonConnectionBrush => IsJetsonConnected ? RecordingOnBrush : RecordingTextOffBrush;
+    public Brush JetsonConnectionBrush => IsJetsonConnected ? RecordingOnBrush : RecordingTextBrush;
 
-    public double JetsonConnectionOpacity => IsJetsonConnected ? 1.0 : 0.72;
+    public double JetsonConnectionOpacity => RecordingIndicatorOpacity;
 
     public bool IsManualMode => IsSystemPoweredOn && CurrentMode == "\uC218\uB3D9";
 
@@ -432,7 +432,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public double KoreanLanguageButtonOpacity => IsKoreanLanguage ? 1.0 : 0.55;
 
-    // ?섎룞 ?뱁솕???섎룞 紐⑤뱶?먯꽌留?耳쒓퀬 ?????덈룄濡??쒗븳?쒕떎.
+    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     public bool IsManualRecordingEnabled
     {
         get => _isManualRecordingEnabled;
@@ -500,7 +500,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public string PrimaryTargetShortText => $"{Text["PrimaryTarget"]}: {GetShortPrimaryTargetName(SelectedPrimaryTarget)}";
 
-    // 移대찓???대쫫? 吏㏐퀬 紐낇솗?섍쾶 ?좎??댁꽌 ?ㅼ젣 ?붾㈃??媛由ъ? ?딅룄濡??쒕떎.
+    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     public string EoTitle => "EO cam";
 
     public string IrTitle => "IR cam";
@@ -542,7 +542,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         get => _brightness;
         set
         {
-            // ?щ씪?대뜑 媛믪씠 諛붾뚮㈃ ?붾㈃??蹂댁씠???띿뒪?몃룄 諛붾줈 媛깆떊?쒕떎.
+            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             if (SetProperty(ref _brightness, value))
             {
                 OnPropertyChanged(nameof(BrightnessText));
@@ -557,7 +557,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         get => _contrast;
         set
         {
-            // ?議곕퉬 ?レ옄 ?쒖떆? ?ㅼ젣 ?곸긽 蹂댁젙 媛믪씠 ??긽 媛숈? 媛믪쓣 蹂댁씠?꾨줉 留욎텣??
+            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             if (SetProperty(ref _contrast, value))
             {
                 OnPropertyChanged(nameof(ContrastText));
@@ -572,11 +572,11 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         get => _zoomLevel;
         set
         {
-            // 吏?섏튇 ?뺣?瑜?留됯린 ?꾪빐 以?踰붿쐞??1.0~4.0 ?ъ씠濡??쒗븳?쒕떎.
+            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             var clamped = Math.Clamp(value, 1.0, 4.0);
             if (SetProperty(ref _zoomLevel, clamped))
             {
-                // 湲곕낯 諛곗쑉濡??뚯븘?ㅻ㈃ ?댁쟾???대룞?대몦 ?붾㈃ ?꾩튂???④퍡 以묒븰?쇰줈 珥덇린?뷀븳??
+                // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
                 if (_zoomLevel <= 1.0)
                 {
                     _zoomPanX = 0;
@@ -618,7 +618,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
 
             var normalized = (_zoomPanX + maxPan) / (maxPan * 2);
-            // ?ㅼ젣 ?붾㈃ ?대룞 諛⑺뼢怨?誘몃땲留??쒖떆 諛⑺뼢??留욎텛湲??꾪빐 醫뚰몴瑜?諛섎?濡?怨꾩궛?쒕떎.
+            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             return (1.0 - normalized) * (MiniMapWidth - MiniMapViewportWidth);
         }
     }
@@ -634,7 +634,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             }
 
             var normalized = (_zoomPanY + maxPan) / (maxPan * 2);
-            // ?ㅼ젣 ?붾㈃ ?대룞 諛⑺뼢怨?誘몃땲留??쒖떆 諛⑺뼢??留욎텛湲??꾪빐 醫뚰몴瑜?諛섎?濡?怨꾩궛?쒕떎.
+            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             return (1.0 - normalized) * (MiniMapHeight - MiniMapViewportHeight);
         }
     }
@@ -656,8 +656,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// EO 移대찓???꾨젅?꾩쓣 ViewModel??諛섏쁺?쒕떎.
-    /// EO媛 硫붿씤 ?붾㈃?대뱺 蹂댁“ ?붾㈃?대뱺 愿怨꾩뾾?? 諛붿씤?⑸맂 ?대?吏媛 利됱떆 媛깆떊?섎룄濡??뚮┝??蹂대궦??
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     public void UpdateEoFrame(ImageSource? frame)
     {
@@ -669,9 +669,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// IR 移대찓???꾨젅?꾩쓣 ViewModel??諛섏쁺?쒕떎.
-    /// ?섎뱶?⑥뼱 ?μ갑 諛⑺뼢??吏곸젒 議곗젙?????덈룄濡??섏떊 ?꾨젅?꾩쓽 ?먮낯 媛곷룄瑜?洹몃?濡??붾㈃???ъ슜?쒕떎.
-    /// EO/IR ?붾㈃???쒕줈 諛붾??곹깭?щ룄 硫붿씤 ?붾㈃怨?蹂댁“ ?붾㈃ 紐⑤몢 利됱떆 媛깆떊?쒕떎.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     public void UpdateIrFrame(ImageSource? frame)
     {
@@ -717,9 +717,9 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
     {
-        // tracking=1? UI ?좉?留뚯쑝濡?蹂대궡吏 ?딅뒗??
-        // ?꾩옱 ???붾㈃??VLM/?꾪뿕???먯젙 寃곌낵媛 ?믪쓬??媛앹껜媛 ?덇퀬, tracking 湲곕뒫??耳쒖쭊 寃쎌슦?먮쭔 Zybo濡?tracking=1??蹂대궦??
-        // 媛숈? ?꾪뿕 ?깃툒?먯꽌??癒쇱? ?≫엺 媛앹껜 ID瑜??좎???紐⑦꽣 異붿쟻 ??곸씠 ?꾨젅?꾨쭏???붾뱾由ъ? ?딄쾶 ?쒕떎.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         var highThreatCandidates = detections
             .Select((detection, index) => new TrackingCandidate(
                 detection.ObjectId,
@@ -759,12 +759,12 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         if (targetChanged && hasTrackedTarget)
         {
-            AppendImportantLog($"???붾㈃ ?꾪뿕 媛앹껜 異붿쟻 ID ?좏깮: object {yoloObjectId}");
+            AppendImportantLog($"큰 화면 위험 객체 추적 ID 선택: object {yoloObjectId}");
         }
 
         if (!TrySendMotorCommandPacket(out var modeError))
         {
-            AppendImportantLog($"?먮룞 紐⑤뱶 ?곹깭 ?꾩넚???ㅽ뙣?덉뒿?덈떎: {modeError}");
+            AppendImportantLog($"자동 모드 상태 전송에 실패했습니다: {modeError}");
             return;
         }
 
@@ -776,8 +776,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void SelectYoloObject(int objectId, string threatLevel)
     {
-        // ?ъ슜?먭? ?곸긽?먯꽌 ?뱀젙 諛붿슫??諛뺤뒪瑜??대┃?덉쓣 ???몄텧?쒕떎.
-        // ?꾪뿕 ?깃툒???믪쓬??媛앹껜???뚮쭔 tracking=1 ?꾨낫濡???ν븳??
+        // 사용자가 큰 화면에서 특정 바운딩 박스를 클릭했을 때 호출합니다.
+        // 현재는 선택한 객체 ID를 추적 대상으로 Jetson에 전송합니다.
         if (!IsSystemPoweredOn || objectId < 0)
         {
             return;
@@ -794,19 +794,19 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         if (!TrySendMotorCommandPacket(out var error))
         {
-            AppendImportantLog($"YOLO 媛앹껜 ID ?꾩넚???ㅽ뙣?덉뒿?덈떎: {error}");
+            AppendImportantLog($"YOLO 객체 ID 전송에 실패했습니다: {error}");
             return;
         }
 
         AppendImportantLog(isHighThreat
-            ? $"?꾪뿕 媛앹껜 異붿쟻 ID ?꾩넚: object {objectId}"
-            : $"?좏깮??媛앹껜???꾪뿕 ?깃툒 ?믪쓬???꾨땲誘濡?tracking=0???꾩넚?덉뒿?덈떎: object {objectId}");
+            ? $"위험 객체 추적 ID 전송: object {objectId}"
+            : $"선택한 객체가 위험 등급 높음이 아니므로 tracking=0으로 전송했습니다: object {objectId}");
     }
 
     public void ApplyVlmAnalysisResult(string threatLevel, string analysisMessage)
     {
-        // VLM 寃곌낵???곹솴 遺꾩꽍 李쎄낵 ?쒖뒪???꾪뿕?꾩뿉 諛섏쁺?쒕떎.
-        // ?꾪뿕?꾧? ?믪쓬?쇰줈 ?щ씪媛硫??먮룞 紐⑤뱶 ?뱁솕 latch媛 耳쒖졇 ?щ엺???꾧린 ?꾧퉴吏 ?뱁솕瑜??좎??쒕떎.
+        // VLM 결과를 상황 분석 창과 시스템 위험도에 반영합니다.
+        // 위험도가 높음으로 올라가면 자동 모드 녹화 latch가 켜져 녹화 주기가 끝날 때까지 유지됩니다.
         var normalizedThreatLevel = NormalizeThreatLevel(threatLevel);
         var threatChanged = !string.Equals(CurrentThreatLevel, normalizedThreatLevel, StringComparison.Ordinal);
         CurrentThreatLevel = normalizedThreatLevel;
@@ -820,7 +820,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         if (threatChanged)
         {
-            AppendImportantLog($"?꾪뿕 ?깃툒??{CurrentThreatLevel}(??濡?蹂寃쎈릺?덉뒿?덈떎.");
+            AppendImportantLog($"위험 등급이 {CurrentThreatLevel}(으)로 변경되었습니다.");
         }
     }
 
@@ -828,7 +828,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     {
         if (!TrySendMotorCommandPacket(out var modeError))
         {
-            AppendImportantLog($"珥덇린 紐⑦꽣 ?쒖뼱 ?⑦궥 ?꾩넚???ㅽ뙣?덉뒿?덈떎: {modeError}");
+            AppendImportantLog($"초기 모터 제어 패킷 전송에 실패했습니다: {modeError}");
             return;
         }
     }
@@ -860,8 +860,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void UpdateMotorStatus(MotorStatusSnapshot snapshot)
     {
-        // Thor?먯꽌 ?ㅼ뼱??36B 紐⑦꽣 ?곹깭 ?⑦궥???붾㈃ ?쒖떆????ぉ?쇰줈 蹂?섑븳??
-        // Dynamixel position(0~4095)? ?щ엺???쎄린 ?ъ슫 degree 媛믪쑝濡??④퍡 ?쒖떆?쒕떎.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         UpdateMotorStatusItems(PanMotorStatusItems, snapshot.Pan);
         _panMotorFeedbackRaw = ClampMotorRaw((int)Math.Min(snapshot.Pan.PresentPosition, (uint)MotorRawMaximum));
         _panMotorPositionDegrees = DynamixelPositionToDegrees(snapshot.Pan.PresentPosition);
@@ -900,8 +900,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public void UpdateManualButtonState(MotorButtonMask buttons)
     {
-        // ?섎룞 諛⑺뼢??踰꾪듉 ?낅젰? UI ?쒖떆 媛곷룄瑜?癒쇱? 媛깆떊????媛숈? ?곹깭瑜?UDP ?⑦궥?쇰줈 蹂대궦??
-        // ?ㅼ젣 紐⑦꽣 ?쒖뼱??Thor媛 ?섑뻾?섎?濡?GUI??mode, button mask, 紐⑺몴 媛곷룄, ?뚯쟾 媛곷룄 ?ш린留??꾨떖?쒕떎.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         if (!IsManualMode)
         {
             return;
@@ -911,14 +911,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         if (!TrySendMotorCommandPacket(out var modeError, buttons, syncFromFeedback: false))
         {
-            AppendImportantLog($"紐⑦꽣 ?섎룞 ?쒖뼱 ?⑦궥 ?꾩넚???ㅽ뙣?덉뒿?덈떎: {modeError}");
+            AppendImportantLog($"모터 수동 제어 패킷 전송에 실패했습니다: {modeError}");
             return;
         }
     }
 
     /// <summary>
-    /// 移대찓??酉고룷?몄쓽 ?ㅼ젣 ?쒖떆 ?ш린瑜?諛쏆븘 ?뺣? ?대룞 ?쒓퀎瑜??ㅼ떆 怨꾩궛?쒕떎.
-    /// 李??ш린???덉씠?꾩썐??諛붾뚯뿀????以??대룞 踰붿쐞媛 ?닿툔?섏? ?딅룄濡?蹂댁젙?섎뒗 ?⑸룄??
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     public void UpdateViewportSize(double width, double height)
     {
@@ -929,8 +929,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?뺣? ?곹깭?먯꽌 留덉슦???쒕옒洹몃줈 ?붾㈃ ?꾩튂瑜??대룞?쒕떎.
-    /// ?뺣? 以묒씠 ?꾨땺 ?뚮뒗 ?대룞???꾩슂媛 ?놁쑝誘濡??꾨Т ?숈옉???섏? ?딅뒗??
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     public void PanZoom(double deltaX, double deltaY)
     {
@@ -948,8 +948,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 留덉슦?????낅젰?쇰줈 ?뺣? 諛곗쑉??議곌툑??議곗젅?쒕떎.
-    /// ?섎룞 紐⑤뱶?먯꽌留??숈옉?섎ŉ, ??踰?援대┫ ?뚮쭏??0.1 ?⑥쐞濡?諛곗쑉??蹂寃쏀븳??
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     public void AdjustZoomByWheel(double wheelSteps)
     {
@@ -958,7 +958,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             return;
         }
 
-        // ????移몃쭏??0.1 諛곗뵫 議곗젅?댁꽌 ?щ씪?대뜑? 鍮꾩듂??媛먮룄濡?留욎텣??
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         ZoomLevel += wheelSteps * 0.1;
     }
 
@@ -1068,8 +1068,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?꾩옱 ?쒖뒪??濡쒓렇瑜?諛뷀깢?붾㈃???쒓컙 湲곗? ?뚯씪紐낆쑝濡???ν븳??
-    /// ?섏쨷???뚯뒪??湲곕줉?대굹 ?μ븷 異붿쟻 ?먮즺濡?諛붾줈 ?쒖슜?????덈룄濡?UTF-8 ?뺤떇?쇰줈 ??ν븳??
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void SaveSystemLogsToDesktop()
     {
@@ -1099,7 +1099,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?곷떒 ?꾩썝 醫낅즺 踰꾪듉???ㅼ젣 ?숈옉??泥섎━?쒕떎.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void TogglePower()
     {
@@ -1125,8 +1125,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-     /// ?먮룞 紐⑤뱶? ?섎룞 紐⑤뱶瑜??꾪솚?쒕떎.
-    /// 紐⑤뱶 ?꾪솚 ??紐⑦꽣 媛곷룄???좎??섍퀬, ?꾩넚??紐⑤뱶 ?⑦궥留??꾩옱 ?곹깭??留욊쾶 媛깆떊?쒕떎.
+     /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
      /// </summary>
     private void SetMode(object? parameter)
     {
@@ -1151,7 +1151,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         {
             if (IsManualRecordingEnabled)
             {
-                // ?먮룞 紐⑤뱶濡?諛붾뚮㈃ ?섎룞 ?뱁솕??利됱떆 醫낅즺 ?곹깭濡?留욎텣??
+                // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
                 IsManualRecordingEnabled = false;
             }
         }
@@ -1165,7 +1165,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         if (!TrySendMotorCommandPacket(out var modeError))
         {
-            AppendImportantLog($"紐⑦꽣 紐⑤뱶 ?꾩넚???ㅽ뙣?덉뒿?덈떎: {modeError}");
+            AppendImportantLog($"모터 모드 전송에 실패했습니다: {modeError}");
         }
         else if (IsAutoMode)
         {
@@ -1186,13 +1186,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         if (!TrySendMotorCommandPacket(out var modeError))
         {
-            AppendImportantLog($"異붿쟻 紐⑤뱶 ?꾩넚???ㅽ뙣?덉뒿?덈떎: {modeError}");
+            AppendImportantLog($"추적 모드 전송에 실패했습니다: {modeError}");
         }
     }
 
     /// <summary>
-    /// ?뱁솕 踰꾪듉???뚮??????꾩옱 ?뱁솕 ?곹깭瑜?湲곗??쇰줈 ?쒖옉/醫낅즺瑜??꾪솚?쒕떎.
-    /// ?먮룞 紐⑤뱶 ?뱁솕 以묒뿉???ъ슜?먭? 利됱떆 醫낅즺?????덈룄濡?蹂꾨룄 ?듭젣 ?곹깭瑜??붾떎.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void ToggleManualRecording()
     {
@@ -1217,8 +1217,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?ㅼ젙 李쎌뿉???뚮쭏瑜?吏곸젒 諛붽? ???몄텧?섎뒗 紐낅졊 泥섎━遺??
-    /// ???꾩껜 ?뚮쭏瑜??곸슜????踰꾪듉 ?좏깮 ?곹깭瑜?媛깆떊?쒕떎.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void SetTheme(object? parameter)
     {
@@ -1259,8 +1259,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?ㅼ젙 李쎌뿉??二??먯?泥대? ?좏깮?섎㈃ ?꾩옱 ?좏깮 ?곹깭瑜?媛깆떊?쒕떎.
-    /// ?꾪뿕 ?깃툒 蹂?붾뒗 ?댄썑 VLM 遺꾩꽍 寃곌낵? ?곕룞????諛섏쁺?쒕떎.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void SelectPrimaryTarget(object? parameter)
     {
@@ -1273,8 +1273,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// EO? IR??硫붿씤 ?붾㈃/蹂댁“ ?붾㈃ ?꾩튂瑜??쒕줈 諛붽씔??
-    /// ?ъ슜?먭? ?묒? ?붾㈃???뚮??????먰븯???곸긽???ш쾶 蹂????덈룄濡??섎뒗 ?숈옉?대떎.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void SwapFeeds()
     {
@@ -1436,8 +1436,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?섎룞 紐⑤뱶?먯꽌 紐⑦꽣 諛⑺뼢 踰꾪듉???꾨Ⅴ硫?UI ?쒖떆??媛곷룄? 踰꾪듉 鍮꾪듃留덉뒪?щ? ?④퍡 媛깆떊?쒕떎.
-    /// ?ㅼ젣 ?대룞?됱? 誘몄뀡 PC媛 寃곗젙?섎?濡?GUI??0x02 踰꾪듉 ?⑦궥留??꾩넚?쒕떎.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
      /// </summary>
     private void MoveMotor(object? parameter)
     {
@@ -1464,7 +1464,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         if (!double.TryParse(MotorTargetPanText, NumberStyles.Float, CultureInfo.InvariantCulture, out var panDegrees) ||
             !double.TryParse(MotorTargetTiltText, NumberStyles.Float, CultureInfo.InvariantCulture, out var tiltDegrees))
         {
-            AppendImportantLog("紐⑦꽣 媛곷룄 ?낅젰媛믪쓣 ?뺤씤?섏꽭?? ?? 0, 45.5, 360");
+            AppendImportantLog("모터 각도 입력값을 확인하세요. 예: 0, 45.5, 360");
             return;
         }
 
@@ -1476,13 +1476,13 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         if (!TrySendMotorCommandPacket(out var error, syncFromFeedback: false, forcedMode: 1))
         {
-            AppendImportantLog($"紐⑦꽣 媛곷룄 ?꾩넚???ㅽ뙣?덉뒿?덈떎: {error}");
+            AppendImportantLog($"모터 각도 전송에 실패했습니다: {error}");
             return;
         }
 
         MotorTargetPanText = string.Empty;
         MotorTargetTiltText = string.Empty;
-        AppendImportantLog($"紐⑦꽣 媛곷룄 ?꾩넚: pan {panDegrees:0.0}째, tilt {tiltDegrees:0.0}째");
+        AppendImportantLog($"모터 각도 전송: pan {panDegrees:0.0}°, tilt {tiltDegrees:0.0}°");
     }
 
     private void AdjustMotorStep(object? parameter)
@@ -1503,7 +1503,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         if (!TrySendMotorCommandPacket(out var error))
         {
-            AppendImportantLog($"紐⑦꽣 ?멸린 ?꾩넚???ㅽ뙣?덉뒿?덈떎: {error}");
+            AppendImportantLog($"모터 속도 전송에 실패했습니다: {error}");
             return;
         }
 
@@ -1575,8 +1575,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?꾩옱 ?뺣? ?대룞 媛믪씠 ?덉슜 踰붿쐞瑜??섏? ?딅룄濡?蹂댁젙?쒕떎.
-    /// ?붾㈃ ?ш린??諛곗쑉??諛붾??ㅼ뿉???대룞 醫뚰몴媛 ?吏 ?딅룄濡??뺣━?섎뒗 ?④퀎??
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void ClampZoomPan()
     {
@@ -1591,8 +1591,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private double GetMaxPanY() => (_viewportHeight * (ZoomLevel - 1)) / 2;
 
     /// <summary>
-    /// ?뺣? 誘몃땲留??ш컖?뺤쓽 ?ш린? ?꾩튂媛 諛붾뚯뿀?뚯쓣 UI???뚮┛??
-    /// 以?諛곗쑉?대굹 ?대룞 醫뚰몴媛 諛붾??뚮쭏??誘몃땲留??쒖떆???④퍡 媛깆떊?쒕떎.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void UpdateMiniMapViewport()
     {
@@ -1603,8 +1603,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// 紐⑤뱶, ?꾩썝, 以?媛???щ?媛 諛붾뚮㈃ 媛?踰꾪듉???쒖꽦 ?곹깭瑜??ㅼ떆 怨꾩궛?쒕떎.
-    /// 愿?⑤맂 Command 媛앹껜??CanExecuteChanged瑜?蹂대궡??踰꾪듉??利됱떆 耳쒖?嫄곕굹 爰쇱??꾨줉 ?쒕떎.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void RaiseAllCommandStates()
     {
@@ -1716,8 +1716,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ?щ윭 怨녹뿉??諛섎났?댁꽌 ?ъ슜?섎뒗 怨좎젙 ?됱긽 釉뚮윭?쒕? ?앹꽦?쒕떎.
-    /// Freeze 泥섎━濡??깅뒫怨?硫붾え由??ъ슜??議곌툑 ???덉젙?곸쑝濡??좎??쒕떎.
+    /// 색상 브러시를 만들고 UI 스레드 밖에서도 안전하게 쓰도록 고정합니다.
     /// </summary>
     private static SolidColorBrush CreateBrush(byte r, byte g, byte b)
     {
@@ -1730,19 +1729,17 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     {
         return threatLevel.Trim().ToLowerInvariant() switch
         {
-            "high" or "?믪쓬" => "\uB192\uC74C",
-            "medium" or "以묎컙" => "\uC911\uAC04",
+            "high" or "높음" => "\uB192\uC74C",
+            "medium" or "mid" or "중간" => "\uC911\uAC04",
             _ => "\uB0AE\uC74C"
         };
     }
-
     /// <summary>
-    /// ?ㅼ젣 移대찓???꾨젅?꾩쓣 諛쏄린 ???붾㈃??蹂댁뿬以??뚮젅?댁뒪????대?吏瑜?留뚮뱺??
-    /// UI ?뚯뒪???④퀎???곌껐 ?湲??곹깭?먯꽌 移대찓???곸뿭???꾩쟾??鍮꾩뼱 蹂댁씠吏 ?딅룄濡??섍린 ?꾪븳 ?⑸룄??
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private static ImageSource CreateCameraPlaceholderFrame(string label, Color accentColor)
     {
-        // ?ㅼ젣 ?낅젰??諛쏄린 ?꾩뿉??移대찓???꾩튂? ?곸뿭???쎄쾶 ?뚯븘蹂????덈룄濡??덈궡???꾨젅?꾩쓣 留뚮뱺??
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         var group = new DrawingGroup();
         using (var dc = group.Open())
         {
@@ -1800,7 +1797,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             SyncMotorRawFromFeedback();
         }
 
-        // GUI의 현재 제어 상태를 Jetson이 기대하는 10B 모터 명령 패킷으로 변환한다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         return _motorControlService.TrySendMotorCommandPacket(
             mode: forcedMode ?? (IsManualMode ? (byte)1 : (byte)0),
             tracking: IsTrackingModeEnabled ? (byte)1 : (byte)0,
@@ -1872,8 +1869,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     private static int MotorSpeedToStepDelta(int motorSpeed)
     {
-        // Motor Speed????degree)媛 ?꾨땲??Dynamixel raw step 媛쒖닔??
-        // raw 1 step? 360 / 4096 = ??0.088?꾩씠誘濡? ?붾㈃ 媛?1? ??0.08???대룞???삵븳??
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         return Math.Clamp(motorSpeed, 1, 10);
     }
 
@@ -1931,8 +1928,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     }
 
     /// <summary>
-    /// ViewModel 怨듯넻 ?띿꽦 蹂寃??꾩슦誘?硫붿꽌?쒕떎.
-    /// 媛믪씠 ?ㅼ젣濡?諛붾?寃쎌슦?먮쭔 PropertyChanged瑜?諛쒖깮?쒖폒 遺덊븘?뷀븳 ?붾㈃ 媛깆떊??以꾩씤??
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
     {
@@ -1953,7 +1950,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 }
 
 /// <summary>
-/// ?곹솴 遺꾩꽍 ?곸뿭???쒖떆??遺꾩꽍 臾몄옣 ??以꾩쓣 ?섑??몃떎.
+/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 /// </summary>
 public sealed record AnalysisItem(string Time, string Message)
 {
@@ -1961,7 +1958,7 @@ public sealed record AnalysisItem(string Time, string Message)
 }
 
 /// <summary>
-/// ?쒖뒪??濡쒓렇 ?곸뿭???쒖떆??二쇱슂 ?곹깭 蹂寃???ぉ ??以꾩쓣 ?섑??몃떎.
+/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 /// </summary>
 public sealed record SystemLogItem(string Time, string Message)
 {

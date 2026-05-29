@@ -1,4 +1,4 @@
-using BroadcastControl.App.Models.Motor;
+﻿using BroadcastControl.App.Models.Motor;
 using BroadcastControl.App.ViewModels;
 
 namespace BroadcastControl.App.ViewModels.Motor;

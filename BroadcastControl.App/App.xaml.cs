@@ -1,6 +1,6 @@
-// 애플리케이션 전체 시작점과 테마 리소스를 관리하는 파일이다.
-// 프로그램이 실행될 때 시스템 테마를 읽어 Material Design 테마와 앱 전용 색상 브러시를 맞추고,
-// MainWindow를 직접 생성해 GUI 화면을 띄운다.
+﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 using System.Windows;
 using System.Windows.Media;
 using MaterialDesignThemes.Wpf;
@@ -9,31 +9,31 @@ using Microsoft.Win32;
 namespace BroadcastControl.App;
 
 /// <summary>
-/// 앱 전체 테마와 공통 색상 리소스를 관리하는 진입점임.
-/// 시스템 테마 감지, Material Design 테마 갱신, 자체 브러시 갱신을 담당함.
+/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 /// </summary>
 public partial class App : Application
 {
     /// <summary>
-    /// 현재 앱 테마 상태임. 설정창 버튼 상태와 테마 전환 기준으로 사용함.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     public AppThemeMode CurrentThemeMode { get; private set; } = AppThemeMode.Dark;
 
     protected override void OnStartup(StartupEventArgs e)
     {
-        // 창 생성 전에 시스템 테마를 먼저 읽어 초기 색상 리소스를 맞춤.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         ApplyTheme(GetSystemThemeMode());
         base.OnStartup(e);
 
-        // StartupUri 대신 코드에서 창을 생성해 테마 적용 순서를 명확히 함.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         var mainWindow = new MainWindow();
         MainWindow = mainWindow;
         mainWindow.Show();
     }
 
     /// <summary>
-    /// 앱 전체 테마를 다크 또는 라이트로 적용함.
-    /// Material Design 테마와 직접 정의한 브러시를 함께 갱신함.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     public void ApplyTheme(AppThemeMode themeMode)
     {
@@ -46,7 +46,7 @@ public partial class App : Application
 
         if (themeMode == AppThemeMode.Dark)
         {
-            // theme5 다크 테마: 전술 관제 SW 느낌의 네이비-그래파이트 팔레트임.
+            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             SetBrushColor("WindowBackgroundBrush", "#FF161B24");
             SetBrushColor("PanelBrush", "#FF242A35");
             SetBrushColor("PanelBorderBrush", "#FF464E5D");
@@ -67,7 +67,7 @@ public partial class App : Application
             return;
         }
 
-        // theme5 라이트 테마: 밝은 작업 캔버스와 회백색 패널 중심 팔레트임.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         SetBrushColor("WindowBackgroundBrush", "#FFE7E8EB");
         SetBrushColor("PanelBrush", "#FFF8F8F9");
         SetBrushColor("PanelBorderBrush", "#FFCBCDD2");
@@ -88,8 +88,8 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// Windows 앱 테마 설정을 읽어 기본 테마를 결정함.
-    /// 레지스트리 접근 실패 시 안전하게 다크 테마로 시작함.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private AppThemeMode GetSystemThemeMode()
     {
@@ -105,14 +105,14 @@ public partial class App : Application
         }
         catch
         {
-            // 시스템 테마 조회 실패가 앱 실행 실패로 이어지지 않도록 기본값 사용.
+            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             return AppThemeMode.Dark;
         }
     }
 
     /// <summary>
-    /// 브러시 리소스를 새 SolidColorBrush로 교체함.
-    /// Freeze된 공유 브러시를 직접 수정하지 않기 위한 처리임.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void SetBrushColor(string resourceKey, string colorCode)
     {
@@ -125,8 +125,8 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 화면 최하단 배경 그라데이션을 교체함.
-    /// 라이트/다크 테마 전환 시 배경 이질감을 줄이기 위한 처리임.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     /// </summary>
     private void SetBackdropBrush(string startColor, string accentColor, string midColor, string endColor)
     {
@@ -152,7 +152,7 @@ public partial class App : Application
 }
 
 /// <summary>
-/// 앱에서 지원하는 테마 종류임.
+/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 /// </summary>
 public enum AppThemeMode
 {

@@ -29,7 +29,7 @@
                                          Fill="{Binding RecordingIndicatorBrush}" />
                                     <TextBlock
                                            Foreground="{Binding RecordingTextBrush}"
-                                           FontSize="9"
+                                           FontSize="11"
                                            FontWeight="Bold"
                                            Text="{Binding Text[RecordingOn]}" />
                                 </StackPanel>
@@ -44,7 +44,7 @@
                                          Fill="{Binding JetsonConnectionBrush}" />
                                     <TextBlock
                                            Foreground="{Binding JetsonConnectionBrush}"
-                                           FontSize="9"
+                                           FontSize="11"
                                            FontWeight="Bold"
                                            Text="{Binding JetsonConnectionText}" />
                                 </StackPanel>
@@ -61,8 +61,8 @@
                             </Button>
                         </Grid>
 
-                        <!-- ?쒖뒪???꾪솴 ?⑤꼸:
-                         ?꾪뿕 ?깃툒怨?二??먯?泥댁쿂??利됱떆 ?꾩슂???곹깭留??쒖떆?쒕떎. -->
+                        <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+                         <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                         <Border Grid.Row="1"
                             Margin="0,0,0,12"
                             Style="{StaticResource GlassCardBorder}"
@@ -93,8 +93,8 @@
                             </StackPanel>
                         </Border>
 
-                        <!-- ?곹솴 遺꾩꽍 ?⑤꼸:
-                         ?ν썑 VLM 遺꾩꽍 臾몄옣???ㅼ떆媛꾩쑝濡??꾩쟻 ?쒖떆???곸뿭?대떎. -->
+                        <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+                         <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                         <Border Grid.Row="1"
                             Margin="0,0,0,12"
                             Style="{StaticResource GlassCardBorder}"
@@ -174,8 +174,8 @@
                             </Grid>
                         </Border>
 
-                        <!-- ?쒖뒪??濡쒓렇 ?⑤꼸:
-                         以묒슂??紐⑤뱶 蹂寃쎄낵 ?곹깭 寃쎄퀬 ?대깽?몃쭔 ?④린???댁슜 濡쒓렇 ?곸뿭?대떎. -->
+                        <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+                         <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                         <Border Grid.Row="2"
                             Style="{StaticResource GlassCardBorder}"
                             CornerRadius="2"

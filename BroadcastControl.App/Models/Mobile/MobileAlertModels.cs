@@ -1,5 +1,5 @@
-// 모바일 브라우저 알림 페이지로 전달할 위험 이벤트 데이터 모델 파일이다.
-// MobileAlertHubService가 이 모델을 JSON으로 직렬화해 SSE 이벤트와 /latest API 응답에 사용한다.
+﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 namespace BroadcastControl.App.Models.Mobile;
 
 public sealed record MobileAlertEvent(

@@ -15,8 +15,8 @@
                           MouseLeftButtonUp="CameraViewport_OnMouseLeftButtonUp">
                                 <Rectangle Fill="#FF000000" />
 
-                                <!-- LargeFeedImage???ш쾶 蹂댁뿬以?移대찓???곸긽 諛붿씤?⑹씠??
-                             EO/IR ?꾪솚 ?곹깭???곕씪 ?쒖떆 ?곸긽???щ씪吏꾨떎. -->
+                                <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+                             <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                                 <Image Source="{Binding LargeFeedImage}"
                                Margin="0"
                                Stretch="{Binding LargeFeedStretch}"
@@ -35,7 +35,7 @@
                                     </Image.RenderTransform>
                                 </Image>
 
-                                <!-- 醫뚯긽???쇰꺼? ?꾩옱 ???붾㈃??移대찓??醫낅쪟瑜??쒖떆?쒕떎. -->
+                                <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                                 <Border Margin="16,12,0,0"
                                 HorizontalAlignment="Left"
                                 VerticalAlignment="Top"
@@ -58,8 +58,8 @@
                                     </DockPanel>
                                 </Border>
 
-                                <!-- ?꾩옄 以?誘몃땲留?
-                             ?뺣? 以??꾩껜 ?붾㈃ ?鍮??꾩옱 蹂닿퀬 ?덈뒗 ?곸뿭???묒? 吏?꾩쿂???쒖떆?쒕떎. -->
+                                <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+                             <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                                 <Border Width="152"
                                 Height="108"
                                 Margin="18,0,0,20"
@@ -112,8 +112,8 @@
                                     </Canvas.RenderTransform>
                                 </Canvas>
 
-                                <!-- IR/EO ?몄뀑 ?붾㈃:
-                             ?묒? ?붾㈃ ?대┃ ?????붾㈃怨??꾪솚?섎뒗 ?낅젰 ?곸뿭?대떎. -->
+                                <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+                             <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                                 <Button Width="168"
                                 Height="124"
                                 Margin="0,8,26,0"
@@ -123,7 +123,7 @@
                                 Background="Transparent"
                                 BorderThickness="0"
                                 Padding="0">
-                                    <!-- IR ?몄뀑? ?곸긽留?蹂댁씠?꾨줉 ?대? 諛곌꼍怨??뚮몢由щ? ?쒓굅?쒕떎. -->
+                                    <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                                     <Border Background="Transparent"
                                     BorderBrush="Transparent"
                                     BorderThickness="0"
@@ -164,8 +164,8 @@
                                     </Border>
                                 </Button>
 
-                                <!-- 紐⑦꽣 諛⑺뼢 踰꾪듉:
-                             ?섎룞 紐⑤뱶?먯꽌 ?쒖떆?섎ŉ ?ㅼ젣 紐⑦꽣 ?쒖뼱 紐낅졊怨??곌껐?쒕떎. -->
+                                <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+                             <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                                 <Grid Margin="0,0,24,26"
                               HorizontalAlignment="Right"
                               VerticalAlignment="Bottom"
@@ -256,9 +256,9 @@
                                     </Button>
                                 </Grid>
 
-                                <!-- ?꾩옄 以??⑤꼸? 諛곌꼍??怨쇳븯寃?湲몄뼱 蹂댁씠吏 ?딅룄濡?怨좎젙 ??쑝濡?臾띕뒗?? -->
-                                <!-- ?꾩옄 以??⑤꼸:
-                             以?由ъ뀑 踰꾪듉, 諛곗쑉 ?щ씪?대뜑, ?꾩옱 諛곗쑉 ?띿뒪?몃? ??臾띠쓬?쇰줈 ?쒖떆?쒕떎. -->
+                                <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+                                <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+                             <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                                 <Border Margin="182,0,220,18"
                                 Padding="10,7"
                                 Width="340"
@@ -273,7 +273,7 @@
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="Auto" />
                                         </Grid.ColumnDefinitions>
-                                        <!-- ?꾩옄 以??쇰꺼? 由ъ뀑 踰꾪듉?대ŉ ?대┃ ??x1.0 湲곕낯 諛곗쑉濡?蹂듦??쒕떎. -->
+                                        <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                                         <Button VerticalAlignment="Center"
                                         Command="{Binding ResetZoomCommand}"
                                         Style="{StaticResource TopBarSmallButton}"
@@ -419,7 +419,7 @@
                                                  Fill="{Binding RecordingIndicatorBrush}" />
                                                 <TextBlock VerticalAlignment="Center"
                                                    Foreground="{Binding RecordingTextBrush}"
-                                                   FontSize="9"
+                                                   FontSize="11"
                                                    FontWeight="SemiBold"
                                                    Text="{Binding Text[RecordingStatus]}" />
                                             </StackPanel>
@@ -433,7 +433,7 @@
                                                  Fill="{Binding JetsonConnectionBrush}" />
                                                 <TextBlock VerticalAlignment="Center"
                                                    Foreground="{Binding JetsonConnectionBrush}"
-                                                   FontSize="9"
+                                                   FontSize="11"
                                                    FontWeight="Bold"
                                                    Text="{Binding JetsonConnectionText}" />
                                             </StackPanel>

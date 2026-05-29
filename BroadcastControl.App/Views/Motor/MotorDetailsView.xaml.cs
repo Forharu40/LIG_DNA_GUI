@@ -1,8 +1,9 @@
-using System.Windows.Controls;
+﻿using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows;
 
-namespace BroadcastControl.App.Views.Motor;
-
+namespace BroadcastControl.App.Views.Motor
+{
 public partial class MotorDetailsView : UserControl
 {
     public MotorDetailsView()
@@ -16,4 +17,20 @@ public partial class MotorDetailsView : UserControl
     {
         BackdropMouseLeftButtonDownRequested?.Invoke(sender, e);
     }
+}
+}
+
+namespace BroadcastControl.App
+{
+public partial class MainWindow : Window
+{
+    private void MotorDetailsBackdrop_OnMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+    {
+        if (_viewModel.IsMotorDetailsOpen)
+        {
+            _viewModel.IsMotorDetailsOpen = false;
+            e.Handled = true;
+        }
+    }
+}
 }

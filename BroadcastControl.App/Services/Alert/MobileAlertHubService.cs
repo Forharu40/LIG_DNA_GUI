@@ -1,5 +1,5 @@
-// 위험 상황을 같은 네트워크의 모바일 브라우저로 전달하는 작은 HTTP/SSE 서버 파일이다.
-// 별도 앱 설치 없이 휴대폰에서 GUI PC 주소로 접속하면 최신 위험 이벤트, VLM 분석, 증거 이미지를 볼 수 있다.
+﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
@@ -54,7 +54,7 @@ public sealed class MobileAlertHubService : IDisposable
 
         try
         {
-            // 별도 앱 설치 없이 같은 네트워크의 휴대폰 브라우저에서 접속할 수 있도록 TCP 서버를 연다.
+            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             Port = port;
             _listener = new TcpListener(IPAddress.Any, port);
             _listener.Start();
@@ -71,8 +71,8 @@ public sealed class MobileAlertHubService : IDisposable
 
     public async Task PublishAlertAsync(string title, string vlmAnalysis, string detectionSummary, string threatLevel, byte[]? evidencePng)
     {
-        // 증거 이미지는 메모리에 잠시 보관하고, 모바일 페이지에는 /evidence/{id}.png URL로 제공한다.
-        // SSE로 연결된 모든 모바일 클라이언트에 같은 알림 이벤트를 동시에 보낸다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         var id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var evidenceUrl = string.Empty;
         if (evidencePng is { Length: > 0 })
@@ -152,8 +152,8 @@ public sealed class MobileAlertHubService : IDisposable
 
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
-        // 접속한 모바일 브라우저마다 별도 작업을 만들어 처리한다.
-        // 한 사용자의 느린 네트워크가 다른 사용자 알림 전송을 막지 않게 하기 위한 구조다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         while (!cancellationToken.IsCancellationRequested && _listener is not null)
         {
             TcpClient? client = null;
@@ -176,8 +176,8 @@ public sealed class MobileAlertHubService : IDisposable
 
     private async Task HandleClientAsync(TcpClient tcpClient, CancellationToken cancellationToken)
     {
-        // 매우 작은 내장 HTTP 라우터다.
-        // /events는 SSE 연결, /latest는 최신 알림 JSON, /evidence/*.png는 증거 이미지, 나머지는 모바일 HTML을 반환한다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         using var client = tcpClient;
         try
         {
@@ -232,8 +232,8 @@ public sealed class MobileAlertHubService : IDisposable
 
     private async Task HandleSseClientAsync(TcpClient client, NetworkStream stream, CancellationToken cancellationToken)
     {
-        // SSE 연결은 끊기지 않는 HTTP 응답으로 유지된다.
-        // 새 알림이 PublishAlertAsync에서 발생하면 이 writer 목록으로 event: alert를 보낸다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true)
         {
             AutoFlush = true
@@ -484,13 +484,13 @@ public sealed class MobileAlertHubService : IDisposable
         <body>
         <main>
         <header>
-        <h1>운용통제 위험 알림</h1>
+        <h1>사용자 제어 위험 알림</h1>
         <div id="status" class="status">GUI 알림 대기 중</div>
         </header>
         <section id="alert" class="alert">
         <div class="empty">위험 이벤트가 발생하면 YOLO 바운딩 박스 화면과 분석 결과가 표시됩니다.</div>
         </section>
-        <button id="enable">알림음/진동 활성화</button>
+        <button id="enable">알림 진동 활성화</button>
         </main>
         <script>
         let audioReady = false;
@@ -520,18 +520,18 @@ public sealed class MobileAlertHubService : IDisposable
           if (!alert) return;
           statusEl.textContent = "마지막 수신: " + alert.createdAt;
           const vlmAnalysis = escapeHtml(alert.vlmAnalysis || alert.analysis || "");
-          const detectionSummary = escapeHtml(alert.detectionSummary || "\uD0D0\uC9C0 \uB0B4\uC6A9\uC774 \uC5C6\uC2B5\uB2C8\uB2E4.");
+          const detectionSummary = escapeHtml(alert.detectionSummary || "탐지 내용이 없습니다.");
           alertEl.innerHTML = `
             <div class="level"><span class="dot"></span>${alert.threatLevel} 위험</div>
             <div class="time">${alert.createdAt}</div>
             ${alert.evidenceUrl ? `<img src="${alert.evidenceUrl}?t=${encodeURIComponent(alert.id)}" alt="위험 화면">` : ""}
             <div class="detail-grid">
               <article class="detail-card">
-                <h2 class="detail-title">VLM \uBD84\uC11D</h2>
+                <h2 class="detail-title">VLM 분석</h2>
                 <p class="detail-text">${vlmAnalysis}</p>
               </article>
               <article class="detail-card">
-                <h2 class="detail-title">\uD0D0\uC9C0 \uB0B4\uC6A9</h2>
+                <h2 class="detail-title">탐지 내용</h2>
                 <p class="detail-text">${detectionSummary}</p>
               </article>
             </div>`;

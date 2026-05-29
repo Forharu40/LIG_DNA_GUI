@@ -1,4 +1,4 @@
-namespace BroadcastControl.App.Services;
+﻿namespace BroadcastControl.App.Services;
 
 public interface IUdpSenderService : IDisposable
 {

@@ -1,4 +1,4 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.IO;
 using System.Net.Sockets;
 using BroadcastControl.App.Models.Motor;
@@ -6,8 +6,8 @@ using BroadcastControl.App.Models.Motor;
 namespace BroadcastControl.App.Services;
 
 /// <summary>
-/// GUI에서 Jetson으로 모터 제어 UDP 패킷을 보내는 서비스입니다.
-/// 8000/udp 모터 명령은 10바이트 고정 길이이며, 추적 녹화 제어는 8010/udp로 별도 전송합니다.
+/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 /// </summary>
 public sealed class UdpMotorControlService : IDisposable
 {

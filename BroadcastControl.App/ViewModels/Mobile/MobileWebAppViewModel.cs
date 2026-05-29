@@ -1,4 +1,4 @@
-using BroadcastControl.App.ViewModels;
+﻿using BroadcastControl.App.ViewModels;
 
 namespace BroadcastControl.App.ViewModels.Mobile;
 

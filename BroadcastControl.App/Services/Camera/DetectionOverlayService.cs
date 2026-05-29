@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using BroadcastControl.App.Models.Camera;
 
 namespace BroadcastControl.App.Services;

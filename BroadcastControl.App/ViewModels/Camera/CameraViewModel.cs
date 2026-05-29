@@ -1,4 +1,4 @@
-using System.Windows.Media;
+﻿using System.Windows.Media;
 using BroadcastControl.App.ViewModels;
 
 namespace BroadcastControl.App.ViewModels.Camera;

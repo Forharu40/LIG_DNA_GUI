@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using BroadcastControl.App.ViewModels;
 
 namespace BroadcastControl.App.ViewModels.Monitoring;

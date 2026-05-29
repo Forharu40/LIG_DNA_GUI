@@ -244,4 +244,8 @@ public partial class MainWindow : Window
         SettingsActiveView.WindowModeToggleClicked += WindowModeToggleButton_OnClick;
     }
 
+    private void SettingsActiveView_Loaded(object sender, RoutedEventArgs e)
+    {
+
+    }
 }

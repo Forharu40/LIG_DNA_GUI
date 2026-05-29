@@ -548,24 +548,24 @@ namespace BroadcastControl.App
         var normalizedClass = className.Trim().ToLowerInvariant();
         if (normalizedClass is "airplane" or "car" or "motorcycle" or "bus" or "truck" or "train" or "boat" or "tank" or "drone" or "missile" or "weapon")
         {
-            return "?믪쓬";
+            return "높음";
         }
 
         if (normalizedClass is "person" or "bicycle" or "cell phone" or "laptop")
         {
-            return "以묎컙";
+            return "중간";
         }
 
-        return "??쓬";
+        return "낮음";
     }
 
     private static string NormalizeThreatLevel(string threatLevel)
     {
         return threatLevel.Trim().ToLowerInvariant() switch
         {
-            "high" or "?믪쓬" => "?믪쓬",
-            "medium" or "mid" or "以묎컙" => "以묎컙",
-            _ => "??쓬"
+            "high" or "높음" => "높음",
+            "medium" or "mid" or "중간" => "중간",
+            _ => "낮음"
         };
     }
 
@@ -573,8 +573,8 @@ namespace BroadcastControl.App
     {
         return NormalizeThreatLevel(threatLevel) switch
         {
-            "?믪쓬" => 3,
-            "以묎컙" => 2,
+            "높음" => 3,
+            "중간" => 2,
             _ => 1
         };
     }
@@ -584,7 +584,7 @@ namespace BroadcastControl.App
         return detections
             .OrderByDescending(detection => GetThreatWeight(detection.ThreatLevel))
             .Select(detection => NormalizeThreatLevel(detection.ThreatLevel))
-            .FirstOrDefault("??쓬");
+            .FirstOrDefault("낮음");
     }
 
     private bool ShouldDisplayDetectionSafe(DetectionInfo detection)
@@ -638,6 +638,7 @@ namespace BroadcastControl.App
 
     private void NotifyDetectionAlertIfNeeded(uint frameId, IReadOnlyList<DetectionInfo> detections)
     {
+        UpdateRiskAndMobileAlert(frameId, detections);
         _lastDetectionAlertSignature = detections.Count == 0 ? null : $"{frameId}:{detections.Count}";
     }
 
@@ -645,14 +646,14 @@ namespace BroadcastControl.App
     {
         if (detections.Count == 0)
         {
-            _viewModel.ApplyVlmAnalysisResult("??쓬", "VLM 遺꾩꽍: ?꾩옱 ?좏깮??二??먯?泥?湲곗? ?꾪뿕 媛앹껜媛 ?뺤씤?섏? ?딆븯?듬땲??");
+            _viewModel.ApplyVlmAnalysisResult("낮음", "VLM 분석: 현재 선택한 주 탐지체 기준 위험 객체가 확인되지 않았습니다.");
             return;
         }
 
         var analysis = BuildVlmStyleAnalysis(detections);
         var detectionSummary = BuildDetectionSummary(detections);
         var systemThreatLevel = GetHighestThreatLevel(detections);
-        _viewModel.ApplyVlmAnalysisResult(systemThreatLevel, $"{analysis} ?먯? ?댁슜: {detectionSummary}");
+        _viewModel.ApplyVlmAnalysisResult(systemThreatLevel, $"{analysis} 탐지 내용: {detectionSummary}");
 
         var alertSignature = $"{_viewModel.SelectedPrimaryTarget}:{frameId}:{BuildOverlaySignature(detections)}";
         var now = DateTimeOffset.Now;
@@ -664,21 +665,20 @@ namespace BroadcastControl.App
 
         _lastDetectionAlertSignature = alertSignature;
         _lastMobileAlertAt = now;
-        var evidencePng = CaptureElementAsPng(CameraActiveView.CameraPanelElement);
+        _viewModel.AppendImportantLog("모바일 앱으로 위험 알림을 전송했습니다.");
         _ = _mobileAlertHubService.PublishAlertAsync(
-            "?댁슜?듭젣 ?꾪뿕 ?뚮┝",
+            "사용자 제어 위험 알림",
             analysis,
             detectionSummary,
             _viewModel.CurrentThreatLevel,
-            evidencePng);
-        _viewModel.AppendImportantLog("紐⑤컮???깆쑝濡??꾪뿕 ?뚮┝???꾩넚?덉뒿?덈떎.");
+            null);
     }
 
     private string BuildVlmStyleAnalysis(IReadOnlyList<DetectionInfo> detections)
     {
         return
-            $"{_viewModel.LargeFeedTitle} ?곸긽?먯꽌 二??먯?泥?'{_viewModel.SelectedPrimaryTarget}' 湲곗? ?꾪뿕 媛앹껜 {detections.Count}媛쒓? ?뺤씤?섏뿀?듬땲?? " +
-            "?댁슜?먮뒗 ???붾㈃??諛붿슫??諛뺤뒪 ?꾩튂瑜??뺤씤?섍퀬 異붿쟻/?뱁솕 ?곹깭瑜??좎??섏떗?쒖삤.";
+            $"{_viewModel.LargeFeedTitle} 영상에서 주 탐지체 '{_viewModel.SelectedPrimaryTarget}' 기준 위험 객체 {detections.Count}개가 확인되었습니다. " +
+            "사용자는 큰 화면의 바운딩 박스 위치를 확인하고 추적/녹화 상태를 유지하십시오.";
     }
 
     private static string BuildDetectionSummary(IReadOnlyList<DetectionInfo> detections)
@@ -688,7 +688,7 @@ namespace BroadcastControl.App
             detections
                 .OrderByDescending(d => d.Score)
                 .Take(8)
-                .Select((d, index) => $"{index + 1}. {d.ClassName} object{d.ObjectId} / ?꾪뿕??{d.ThreatLevel} / ?좊ː??{d.Score:0.00} / bbox ({d.X1:0}, {d.Y1:0})-({d.X2:0}, {d.Y2:0})"));
+                .Select((d, index) => $"{index + 1}. {d.ClassName} object{d.ObjectId} / 위험도 {d.ThreatLevel} / 신뢰도 {d.Score:0.00} / bbox ({d.X1:0}, {d.Y1:0})-({d.X2:0}, {d.Y2:0})"));
     }
 
     private static IReadOnlyList<DetectionTargetItem> BuildDetectionTargetItems(
@@ -838,8 +838,8 @@ namespace BroadcastControl.App
     {
         return NormalizeThreatLevel(threatLevel) switch
         {
-            "?믪쓬" => new SolidColorBrush(Color.FromRgb(255, 107, 107)),
-            "以묎컙" => new SolidColorBrush(Color.FromRgb(255, 193, 69)),
+            "높음" => new SolidColorBrush(Color.FromRgb(255, 107, 107)),
+            "중간" => new SolidColorBrush(Color.FromRgb(255, 193, 69)),
             _ => new SolidColorBrush(Color.FromRgb(123, 216, 143))
         };
     }

@@ -1,8 +1,4 @@
-﻿<!--
-    ?좏뵆由ъ??댁뀡 怨듯넻 由ъ냼???뚯씪?대떎.
-    Material Design 湲곕낯 ?뚮쭏, ???꾩껜 ?됱긽 釉뚮윭?? 諛곌꼍 洹몃씪?곗씠?섏쿂??紐⑤뱺 ?붾㈃?먯꽌 怨듭쑀?섎뒗 ?ㅽ???媛믪쓣 ?뺤쓽?쒕떎.
-    ?ㅼ젣 ?ㅽ겕/?쇱씠???됱긽 ?꾪솚? App.xaml.cs?먯꽌 ??釉뚮윭??媛믪쓣 援먯껜?섎뒗 諛⑹떇?쇰줈 ?숈옉?쒕떎.
--->
+﻿<!-- 앱 전역 테마, 색상, 공통 컨트롤 스타일을 정의합니다. -->
 <Application x:Class="BroadcastControl.App.App"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
@@ -10,15 +6,15 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Material Design 湲곕낯 ?뚮쭏 由ъ냼??濡쒕뱶 -->
+                <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                 <materialDesign:BundledTheme BaseTheme="Dark"
                                              PrimaryColor="Teal"
                                              SecondaryColor="Amber" />
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign3.Defaults.xaml" />
             </ResourceDictionary.MergedDictionaries>
 
-            <!-- ???꾩껜 怨듯넻 ?됱긽 由ъ냼??
-                 App.xaml.cs?먯꽌 ?ㅽ겕/?쇱씠???뚮쭏 ?꾪솚 ???④퍡 援먯껜. -->
+            <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+                 <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
             <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF161B24" />
             <SolidColorBrush x:Key="PanelBrush" Color="#FF242A35" />
             <SolidColorBrush x:Key="PanelBorderBrush" Color="#FF464E5D" />
@@ -39,7 +35,7 @@
             <SolidColorBrush x:Key="TopBarButtonHoverBrush" Color="#FF394353" />
             <SolidColorBrush x:Key="TopBarButtonPressedBrush" Color="#FF465164" />
 
-            <!-- ?붾㈃ 理쒗븯??諛곌꼍 洹몃씪?곗씠??-->
+            <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
             <LinearGradientBrush x:Key="WindowBackdropBrush" StartPoint="0,0" EndPoint="0,1">
                 <GradientStop Offset="0" Color="#FF1C2230" />
                 <GradientStop Offset="0.08" Color="#FF1A2742" />

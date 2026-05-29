@@ -8,8 +8,8 @@
                    Panel.ZIndex="20"
                    MouseLeftButtonDown="SettingsBackdrop_OnMouseLeftButtonDown" />
 
-            <!-- ?ㅼ젙 ?쒕줈??
-             ?ㅻⅨ履??щ씪?대뱶 ?⑤꼸?대ŉ 二??먯?泥? ?뚮쭏, ?몄뼱, ?붾㈃ 紐⑤뱶, ?ㅽ듃?뚰겕 ?ㅼ젙???대뒗?? -->
+            <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
+             <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
             <Border x:Name="SettingsDrawer"
                 Width="280"
                 Margin="0,12,12,12"
@@ -26,7 +26,7 @@
                 Visibility="Collapsed"
                 Panel.ZIndex="21">
                 <Border.RenderTransform>
-                    <!-- 湲곕낯 ?꾩튂???붾㈃ ?ㅻⅨ履?諛붽묑?대ŉ ?대┫ ???쇱そ?쇰줈 遺?쒕읇寃??대룞?쒕떎. -->
+                    <!-- 화면 구성 요소의 역할을 설명하는 주석입니다. -->
                     <TranslateTransform x:Name="SettingsDrawerTransform" X="320" />
                 </Border.RenderTransform>
                 <Border.CacheMode>
@@ -60,7 +60,7 @@
 
                             <Button Margin="0,0,0,6"
                                 Command="{Binding SelectPrimaryTargetCommand}"
-                                CommandParameter="蹂듯빀"
+                                CommandParameter="복합"
                                 Style="{StaticResource SettingsActionButton}"
                                 Content="{Binding Text[TargetComposite]}" />
 
@@ -77,27 +77,27 @@
                                     Grid.Column="0"
                                     Margin="0,0,6,6"
                                     Command="{Binding SelectPrimaryTargetCommand}"
-                                    CommandParameter="?щ엺"
+                                    CommandParameter="사람"
                                     Style="{StaticResource SettingsActionButton}"
                                     Content="{Binding Text[TargetPerson]}" />
                                 <Button Grid.Row="0"
                                     Grid.Column="1"
                                     Margin="0,0,0,6"
                                     Command="{Binding SelectPrimaryTargetCommand}"
-                                    CommandParameter="臾닿린泥닿퀎"
+                                    CommandParameter="무기체계"
                                     Style="{StaticResource SettingsActionButton}"
                                     Content="{Binding Text[TargetWeapon]}" />
                                 <Button Grid.Row="1"
                                     Grid.Column="0"
                                     Margin="0,0,6,0"
                                     Command="{Binding SelectPrimaryTargetCommand}"
-                                    CommandParameter="?듭떊 ?λ퉬"
+                                    CommandParameter="통신 장비"
                                     Style="{StaticResource SettingsActionButton}"
                                     Content="{Binding Text[TargetComm]}" />
                                 <Button Grid.Row="1"
                                     Grid.Column="1"
                                     Command="{Binding SelectPrimaryTargetCommand}"
-                                    CommandParameter="鍮꾧뎔???쒖쟻"
+                                    CommandParameter="비군사 표적"
                                     Style="{StaticResource SettingsActionButton}"
                                     Content="{Binding Text[TargetCivil]}" />
                             </Grid>

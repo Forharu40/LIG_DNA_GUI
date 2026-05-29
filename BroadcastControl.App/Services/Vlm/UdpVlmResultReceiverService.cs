@@ -1,5 +1,5 @@
-// 외부 VLM 분석 결과를 UDP로 받는 서비스 파일이다.
-// 6002/udp에서 JSON 또는 일반 텍스트 메시지를 받아 전체 위험도, 분석 문장, 객체별 위험도 맵으로 정리한다.
+﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -35,7 +35,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
             return;
         }
 
-        // VLM 결과 수신도 UI를 막지 않도록 백그라운드에서 계속 대기한다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         _cancellationTokenSource = new CancellationTokenSource();
         _receiveTask = Task.Run(() => ReceiveLoopAsync(_cancellationTokenSource.Token));
     }
@@ -86,8 +86,8 @@ public sealed class UdpVlmResultReceiverService : IDisposable
 
     private static VlmResultPacket ParsePacket(byte[] buffer)
     {
-        // 현재는 JSON과 일반 텍스트를 모두 허용한다.
-        // 실험 중 VLM 송신 포맷이 바뀌어도 최소한 분석 문장은 화면에 표시되도록 하기 위해서다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         var text = DecodeText(buffer);
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -100,7 +100,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
             {
                 using var document = JsonDocument.Parse(text);
                 var root = document.RootElement;
-                // 필드 이름은 팀원 구현에 따라 조금씩 달라질 수 있어 여러 후보 이름을 허용한다.
+                // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
                 var threatLevel = ReadString(root, "threatLevel", "riskLevel", "risk", "threat", "level") ?? string.Empty;
                 var analysisMessage =
                     ReadString(root, "analysisMessage", "vlmAnalysis", "analysis", "message", "result") ?? text;
@@ -125,7 +125,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
         var offset = 0;
         if (buffer.Length >= 4 && Encoding.ASCII.GetString(buffer, 0, 4) == "VLMR")
         {
-            // VLMR prefix는 바이너리 패킷임을 표시하기 위한 4B 식별자이므로 실제 메시지에서는 제외한다.
+            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             offset = 4;
         }
 
@@ -177,7 +177,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
 
     private static IReadOnlyDictionary<int, string> ReadObjectThreatLevels(JsonElement root)
     {
-        // VLM 쪽 포맷이 조금 바뀌어도 받을 수 있도록 대표적인 키 이름들을 모두 허용한다.
+        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         foreach (var name in new[] { "objectThreats", "object_threats", "trackThreats", "track_threats", "detections", "tracks", "objects" })
         {
             if (!root.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Array)

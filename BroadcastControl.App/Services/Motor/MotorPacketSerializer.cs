@@ -1,4 +1,4 @@
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using BroadcastControl.App.Models.Motor;
 
 namespace BroadcastControl.App.Services;
