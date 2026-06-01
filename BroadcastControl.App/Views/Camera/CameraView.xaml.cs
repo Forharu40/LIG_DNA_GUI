@@ -14,7 +14,6 @@ using System.Windows.Shapes;
 using BroadcastControl.App.Models.Camera;
 using BroadcastControl.App.Models.Motor;
 using BroadcastControl.App.Models.Network;
-using BroadcastControl.App.Models.Vlm;
 using BroadcastControl.App.ViewModels;
 
 // 파일 역할:
@@ -529,19 +528,9 @@ namespace BroadcastControl.App
 
     private string GetDetectionThreatLevel(DetectionInfo detection)
     {
-        if (_objectThreatLevels.TryGetValue(detection.ObjectId, out var objectThreatLevel))
-        {
-            return NormalizeThreatLevel(objectThreatLevel);
-        }
-
         if (!string.IsNullOrWhiteSpace(detection.ThreatLevel))
         {
             return NormalizeThreatLevel(detection.ThreatLevel);
-        }
-
-        if (_objectThreatLevels.Count == 0 && !string.IsNullOrWhiteSpace(_latestGlobalVlmThreatLevel))
-        {
-            return NormalizeThreatLevel(_latestGlobalVlmThreatLevel);
         }
 
         return EstimateThreatLevelFromClass(detection.ClassName);
@@ -581,14 +570,6 @@ namespace BroadcastControl.App
             "중간" => 2,
             _ => 1
         };
-    }
-
-    private static string GetHighestThreatLevel(IReadOnlyList<DetectionInfo> detections)
-    {
-        return detections
-            .OrderByDescending(detection => GetThreatWeight(detection.ThreatLevel))
-            .Select(detection => NormalizeThreatLevel(detection.ThreatLevel))
-            .FirstOrDefault("낮음");
     }
 
     private bool ShouldDisplayDetectionSafe(DetectionInfo detection)
@@ -639,61 +620,6 @@ namespace BroadcastControl.App
     }
 
     private bool ShouldDisplayDetection(DetectionInfo detection) => ShouldDisplayDetectionSafe(detection);
-
-    private void NotifyDetectionAlertIfNeeded(uint frameId, IReadOnlyList<DetectionInfo> detections)
-    {
-        UpdateRiskAndMobileAlert(frameId, detections);
-        _lastDetectionAlertSignature = detections.Count == 0 ? null : $"{frameId}:{detections.Count}";
-    }
-
-    private void UpdateRiskAndMobileAlert(uint frameId, IReadOnlyList<DetectionInfo> detections)
-    {
-        if (detections.Count == 0)
-        {
-            _viewModel.ApplyVlmAnalysisResult("낮음", "VLM 분석: 현재 선택한 주 탐지체 기준 위험 객체가 확인되지 않았습니다.");
-            return;
-        }
-
-        var analysis = BuildVlmStyleAnalysis(detections);
-        var detectionSummary = BuildDetectionSummary(detections);
-        var systemThreatLevel = GetHighestThreatLevel(detections);
-        _viewModel.ApplyVlmAnalysisResult(systemThreatLevel, $"{analysis} 탐지 내용: {detectionSummary}");
-
-        var alertSignature = $"{_viewModel.SelectedPrimaryTarget}:{frameId}:{BuildOverlaySignature(detections)}";
-        var now = DateTimeOffset.Now;
-        if (string.Equals(_lastDetectionAlertSignature, alertSignature, StringComparison.Ordinal) ||
-            now - _lastMobileAlertAt < MobileAlertCooldown)
-        {
-            return;
-        }
-
-        _lastDetectionAlertSignature = alertSignature;
-        _lastMobileAlertAt = now;
-        _viewModel.AppendImportantLog("모바일 앱으로 위험 알림을 전송했습니다.");
-        _ = _mobileAlertHubService.PublishAlertAsync(
-            "사용자 제어 위험 알림",
-            analysis,
-            detectionSummary,
-            _viewModel.CurrentThreatLevel,
-            null);
-    }
-
-    private string BuildVlmStyleAnalysis(IReadOnlyList<DetectionInfo> detections)
-    {
-        return
-            $"{_viewModel.LargeFeedTitle} 영상에서 주 탐지체 '{_viewModel.SelectedPrimaryTarget}' 기준 위험 객체 {detections.Count}개가 확인되었습니다. " +
-            "사용자는 큰 화면의 바운딩 박스 위치를 확인하고 추적/녹화 상태를 유지하십시오.";
-    }
-
-    private static string BuildDetectionSummary(IReadOnlyList<DetectionInfo> detections)
-    {
-        return string.Join(
-            "\n",
-            detections
-                .OrderByDescending(d => d.Score)
-                .Take(8)
-                .Select((d, index) => $"{index + 1}. {d.ClassName} object{d.ObjectId} / 위험도 {d.ThreatLevel} / 신뢰도 {d.Score:0.00} / bbox ({d.X1:0}, {d.Y1:0})-({d.X2:0}, {d.Y2:0})"));
-    }
 
     private static IReadOnlyList<DetectionTargetItem> BuildDetectionTargetItems(
         IReadOnlyList<DetectionInfo> detections,

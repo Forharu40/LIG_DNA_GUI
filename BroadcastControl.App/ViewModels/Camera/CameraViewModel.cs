@@ -15,12 +15,10 @@ using BroadcastControl.App.Models.Motor;
 using BroadcastControl.App.Models.Network;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels.Camera;
-using BroadcastControl.App.ViewModels.Mobile;
 using BroadcastControl.App.ViewModels.Monitoring;
 using BroadcastControl.App.ViewModels.Motor;
 using BroadcastControl.App.ViewModels.Operation;
 using BroadcastControl.App.ViewModels.Recording;
-using BroadcastControl.App.ViewModels.Vlm;
 
 // 파일 역할:
 // CameraView에서 표시하는 EO/IR 영상 프레임과 영상 조작 상태를 관리합니다.

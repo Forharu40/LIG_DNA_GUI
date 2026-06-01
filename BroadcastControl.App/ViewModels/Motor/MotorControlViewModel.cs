@@ -15,12 +15,10 @@ using BroadcastControl.App.Models.Camera;
 using BroadcastControl.App.Models.Network;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels.Camera;
-using BroadcastControl.App.ViewModels.Mobile;
 using BroadcastControl.App.ViewModels.Monitoring;
 using BroadcastControl.App.ViewModels.Motor;
 using BroadcastControl.App.ViewModels.Operation;
 using BroadcastControl.App.ViewModels.Recording;
-using BroadcastControl.App.ViewModels.Vlm;
 
 // 파일 역할:
 // MotorControlView의 Pan/Tilt 위치 표시와 모터 조작 명령을 관리합니다.

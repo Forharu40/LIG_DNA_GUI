@@ -36,7 +36,7 @@ public enum DetectionStream
 }
 
 // 한 프레임에 포함된 YOLO/추적 객체 목록입니다.
-// CameraView의 바운딩 박스 렌더링과 VlmViewModel의 위험 객체 우선순위 계산에 사용됩니다.
+// CameraView의 바운딩 박스 렌더링과 MonitoringViewModel의 위험 객체 우선순위 계산에 사용됩니다.
 public readonly record struct DetectionPacket(
     ulong StampNs,
     uint FrameId,

@@ -13,7 +13,6 @@ using System.Windows.Shapes;
 using BroadcastControl.App.Models.Camera;
 using BroadcastControl.App.Models.Motor;
 using BroadcastControl.App.Models.Network;
-using BroadcastControl.App.Models.Vlm;
 using BroadcastControl.App.ViewModels;
 
 // 파일 역할:
@@ -51,7 +50,6 @@ public partial class MainWindow : Window
         UpdateWindowModeButtonText();
 
         _viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        _viewModel.ManualAnalysisSaveRequested += ViewModel_OnManualAnalysisSaveRequested;
         _viewModel.ManualSystemLogSaveRequested += ViewModel_OnManualSystemLogSaveRequested;
         _eoUdpCaptureService.FrameReady += OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived += OnEoDetectionsReceived;
@@ -63,8 +61,6 @@ public partial class MainWindow : Window
         _detectionUdpReceiverService.StatusReceived += OnYoloStatusReceived;
         _motorStatusReceiverService.StatusReceived += OnMotorStatusReceived;
         _motorStatusReceiverService.ReceiverError += OnMotorStatusReceiverError;
-        _vlmResultReceiverService.ResultReceived += OnVlmResultReceived;
-        _vlmResultReceiverService.ReceiverError += OnVlmResultReceiverError;
 
         _eoUdpCaptureService.SetBrightness(_viewModel.Brightness);
         _eoUdpCaptureService.SetContrast(_viewModel.Contrast);
@@ -72,7 +68,6 @@ public partial class MainWindow : Window
         _irUdpCaptureService.SetContrast(_viewModel.Contrast);
         _viewModel.InitializeMotorControlState();
         _viewModel.Motor.StartStatusReceiver(_viewModel.AppendImportantLog);
-        _viewModel.Vlm.StartResultReceiver(_viewModel.AppendImportantLog);
 
         _viewModel.UpdateViewportSize(CameraActiveView.CameraViewportElement.ActualWidth, CameraActiveView.CameraViewportElement.ActualHeight);
         UpdateRecordingViewportState();
@@ -87,7 +82,6 @@ public partial class MainWindow : Window
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
 
         _viewModel.Camera.StartNetworkReceivers(_networkSettings, _viewModel.AppendImportantLog);
-        _viewModel.Mobile.StartAlertServer(_networkSettings, _viewModel.AppendImportantLog);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -217,7 +211,6 @@ public partial class MainWindow : Window
             _lastFilteredOutTargetSignature = null;
         }
 
-        NotifyDetectionAlertIfNeeded(detectionPacket.FrameId, displayDetections);
         if (isPrimaryCamera)
         {
             _viewModel.UpdateDetectionSummary(displayDetections);
@@ -229,7 +222,6 @@ public partial class MainWindow : Window
         }
 
         RenderDetectionOverlay(forceRefresh: true);
-        UpdateRiskAndMobileAlert(detectionPacket.FrameId, displayDetections);
     }
 
     private void RefreshPrimaryTrackingTarget()
@@ -285,39 +277,6 @@ public partial class MainWindow : Window
     private void OnMotorStatusReceiverError(object? sender, string message)
     {
         Dispatcher.Invoke(() => _viewModel.AppendImportantLog($"모터 상태 수신 오류: {message}"));
-    }
-
-    private void OnVlmResultReceived(object? sender, VlmResultPacket result)
-    {
-        Dispatcher.Invoke(() =>
-        {
-            MarkJetsonMessageReceived();
-            if (!string.IsNullOrWhiteSpace(result.ThreatLevel))
-            {
-                _latestGlobalVlmThreatLevel = NormalizeThreatLevel(result.ThreatLevel);
-            }
-
-            foreach (var pair in result.ObjectThreatLevels)
-            {
-                _objectThreatLevels[pair.Key] = NormalizeThreatLevel(pair.Value);
-            }
-
-            var threatLevel = string.IsNullOrWhiteSpace(result.ThreatLevel)
-                ? _viewModel.CurrentThreatLevel
-                : result.ThreatLevel;
-            var analysisMessage = string.IsNullOrWhiteSpace(result.DetectionSummary)
-                ? result.AnalysisMessage
-                : $"{result.AnalysisMessage} 탐지 내용: {result.DetectionSummary}";
-
-            _viewModel.ApplyVlmAnalysisResult(threatLevel, analysisMessage);
-            RefreshPrimaryTrackingTarget();
-            RenderDetectionOverlay(forceRefresh: true);
-        });
-    }
-
-    private void OnVlmResultReceiverError(object? sender, string message)
-    {
-        Dispatcher.Invoke(() => _viewModel.AppendImportantLog($"VLM 결과 수신 오류: {message}"));
     }
 
     private void OnIrFrameReady(ReceivedVideoFrame frame)
@@ -395,7 +354,6 @@ public partial class MainWindow : Window
         _recordingMetadataTimer.Stop();
         _jetsonConnectionTimer.Stop();
         _viewModel.PropertyChanged -= OnViewModelPropertyChanged;
-        _viewModel.ManualAnalysisSaveRequested -= ViewModel_OnManualAnalysisSaveRequested;
         _viewModel.ManualSystemLogSaveRequested -= ViewModel_OnManualSystemLogSaveRequested;
         _eoUdpCaptureService.FrameReady -= OnEoFrameReady;
         _eoUdpCaptureService.DetectionsReceived -= OnEoDetectionsReceived;
@@ -407,8 +365,6 @@ public partial class MainWindow : Window
         _detectionUdpReceiverService.StatusReceived -= OnYoloStatusReceived;
         _motorStatusReceiverService.StatusReceived -= OnMotorStatusReceived;
         _motorStatusReceiverService.ReceiverError -= OnMotorStatusReceiverError;
-        _vlmResultReceiverService.ResultReceived -= OnVlmResultReceived;
-        _vlmResultReceiverService.ReceiverError -= OnVlmResultReceiverError;
         _viewModel.DisposeFeatureServices();
     }
 }

@@ -14,15 +14,13 @@ using BroadcastControl.App.Models.Camera;
 using BroadcastControl.App.Models.Motor;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels.Camera;
-using BroadcastControl.App.ViewModels.Mobile;
 using BroadcastControl.App.ViewModels.Monitoring;
 using BroadcastControl.App.ViewModels.Motor;
 using BroadcastControl.App.ViewModels.Operation;
 using BroadcastControl.App.ViewModels.Recording;
-using BroadcastControl.App.ViewModels.Vlm;
 
 // 파일 역할:
-// 녹화 상태 표시, 수동 녹화 토글, 분석/시스템 로그 저장, Jetson 녹화 영상 목록 갱신을 관리합니다.
+// 녹화 상태 표시, 수동 녹화 토글, 시스템 로그 저장, Jetson 녹화 영상 목록 갱신을 관리합니다.
 // Recording 패널의 표시등과 RecordedVideosView의 목록/재생 요청이 이 파일의 속성과 함수에 연결됩니다.
 
 namespace BroadcastControl.App.ViewModels.Recording
@@ -100,45 +98,6 @@ public sealed partial class MainViewModel
         AddSystemLogItem(new SystemLogItem(DateTime.Now.ToString("HH:mm:ss"), message));
     }
 
-    public void AppendAnalysisLog(string message)
-    {
-        AddAnalysisItem(new AnalysisItem(DateTime.Now.ToString("HH:mm:ss"), message));
-    }
-
-    public string BuildAnalysisLogSnapshot(DateTime startInclusive, DateTime endExclusive, bool includeAll)
-    {
-        var items = includeAll
-            ? _analysisHistory.OrderBy(item => item.CreatedAt).ToArray()
-            : _analysisHistory
-                .Where(item => item.CreatedAt >= startInclusive && item.CreatedAt < endExclusive)
-                .OrderBy(item => item.CreatedAt)
-                .ToArray();
-
-        var builder = new StringBuilder();
-        builder.AppendLine("LIG DNA GUI VLM Analysis Result");
-        builder.AppendLine($"Saved At: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-        if (!includeAll)
-        {
-            builder.AppendLine($"Window: {startInclusive:yyyy-MM-dd HH:mm:ss} - {endExclusive:yyyy-MM-dd HH:mm:ss}");
-        }
-
-        builder.AppendLine();
-
-        if (items.Length == 0)
-        {
-            builder.AppendLine("No VLM analysis result in this period.");
-        }
-        else
-        {
-            foreach (var item in items)
-            {
-                builder.AppendLine($"[{item.CreatedAt:yyyy-MM-dd HH:mm:ss}] {item.Message}");
-            }
-        }
-
-        return builder.ToString();
-    }
-
     public string BuildSystemLogSnapshot(DateTime startInclusive, DateTime endExclusive, bool includeAll)
     {
         var items = includeAll
@@ -171,33 +130,6 @@ public sealed partial class MainViewModel
         }
 
         return builder.ToString();
-    }
-
-    private void SaveAnalysisLogsToDesktop()
-    {
-        try
-        {
-            var desktopPath = Environment.GetFolderPath(Environment.SpecialFolder.DesktopDirectory);
-            var timestamp = DateTime.Now.ToString("yyyyMMdd_HHmmss");
-            var filePath = Path.Combine(desktopPath, $"analysis_log_{timestamp}.txt");
-
-            var builder = new StringBuilder();
-            builder.AppendLine("LIG DNA GUI Situation Analysis Log");
-            builder.AppendLine($"Saved At: {DateTime.Now:yyyy-MM-dd HH:mm:ss}");
-            builder.AppendLine();
-
-            foreach (var item in _analysisHistory)
-            {
-                builder.AppendLine($"[{item.Time}] {item.Message}");
-            }
-
-            File.WriteAllText(filePath, builder.ToString(), new UTF8Encoding(false));
-            AppendImportantLog($"\uC0C1\uD669 \uBD84\uC11D \uAE30\uB85D\uC744 \uC800\uC7A5\uD588\uC2B5\uB2C8\uB2E4: {Path.GetFileName(filePath)}");
-        }
-        catch (Exception ex)
-        {
-            AppendImportantLog($"\uC0C1\uD669 \uBD84\uC11D \uAE30\uB85D \uC800\uC7A5\uC5D0 \uC2E4\uD328\uD588\uC2B5\uB2C8\uB2E4: {ex.Message}");
-        }
     }
 
     /// <summary>
@@ -276,15 +208,6 @@ public sealed partial class MainViewModel
         {
             items.RemoveAt(items.Count - 1);
         }
-    }
-
-    private void AddAnalysisItem(AnalysisItem item)
-    {
-        _analysisHistory.Insert(0, item);
-        TrimList(_analysisHistory, StoredLogItemLimit);
-
-        AnalysisItems.Insert(0, item);
-        TrimCollection(AnalysisItems, VisibleLogItemLimit);
     }
 
     private void AddSystemLogItem(SystemLogItem item)

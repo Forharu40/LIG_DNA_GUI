@@ -14,18 +14,16 @@ using BroadcastControl.App.Models.Motor;
 using BroadcastControl.App.Models.Network;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels.Camera;
-using BroadcastControl.App.ViewModels.Mobile;
 using BroadcastControl.App.ViewModels.Monitoring;
 using BroadcastControl.App.ViewModels.Motor;
 using BroadcastControl.App.ViewModels.Operation;
 using BroadcastControl.App.ViewModels.Recording;
-using BroadcastControl.App.ViewModels.Vlm;
 
 namespace BroadcastControl.App.ViewModels;
 
 // 파일 역할:
 // 메인 화면 전체를 묶는 루트 ViewModel입니다.
-// 기능별 세부 로직은 Camera/Motor/Operation/Recording/Vlm 폴더의 ViewModel 파일 안에 partial로 나누어 둡니다.
+// 기능별 세부 로직은 Camera/Motor/Monitoring/Operation/Recording 폴더의 ViewModel 파일 안에 partial로 나누어 둡니다.
 // 이 파일은 공통 필드, 생성자, Command 선언, 공통 이벤트와 보조 타입을 담당합니다.
 
 public sealed partial class MainViewModel : INotifyPropertyChanged
@@ -49,7 +47,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private string _selectedPrimaryTarget = "\uBCF5\uD569";
     private string _currentThreatLevel = "\uB0AE\uC74C";
     // 화면 전반에서 공유하는 상태값입니다.
-    // 모드/주 탐지체/위험도는 Operation과 VLM 영역에서, 밝기/대비/녹화/연결은 Camera와 Recording 영역에서 사용합니다.
+    // 모드/주 탐지체/위험도는 Operation과 Monitoring 영역에서, 밝기/대비/녹화/연결은 Camera와 Recording 영역에서 사용합니다.
     private double _brightness = 50;
     private double _contrast = 50;
     private bool _isManualRecordingEnabled;
@@ -92,9 +90,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private const int AutomaticTrackingResendMilliseconds = 250;
     private const int VisibleLogItemLimit = 30;
     private const int StoredLogItemLimit = 100;
-    private readonly List<AnalysisItem> _analysisHistory = new();
     private readonly List<SystemLogItem> _systemLogHistory = new();
-    private string? _lastAnalysisMessage;
 
     // EO/IR 영상이 아직 들어오지 않았을 때 표시할 마지막 프레임과 기본 플레이스홀더 이미지입니다.
     // CameraViewModel.cs의 카메라 partial 코드가 이 값을 갱신해 큰 화면/작은 화면에 바인딩합니다.
@@ -112,8 +108,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         Operation = new OperationControlViewModel();
         Monitoring = new MonitoringViewModel();
         Recording = new RecordingViewModel();
-        Vlm = new VlmViewModel(NetworkSettings);
-        Mobile = new MobileWebAppViewModel();
 
         // 앱에 저장된 현재 테마를 읽어 설정 drawer와 테마 버튼 상태를 초기화합니다.
         if (Application.Current is App app)
@@ -121,7 +115,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
             _currentThemeMode = app.CurrentThemeMode;
         }
 
-        AnalysisItems = new ObservableCollection<AnalysisItem>();
         DetectionTargets = new ObservableCollection<DetectionTargetItem>();
         SystemLogs = new ObservableCollection<SystemLogItem>();
         PanMotorStatusItems = new ObservableCollection<MotorStatusItem>(CreateDefaultMotorStatusItems());
@@ -143,7 +136,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsSystemPoweredOn);
         SetThemeCommand = new RelayCommand(SetTheme);
         SetLanguageCommand = new RelayCommand(SetLanguage);
-        SaveAnalysisLogsCommand = new RelayCommand(_ => ManualAnalysisSaveRequested?.Invoke(this, EventArgs.Empty));
         SaveSystemLogsCommand = new RelayCommand(_ => ManualSystemLogSaveRequested?.Invoke(this, EventArgs.Empty));
         SwapFeedsCommand = new RelayCommand(_ => SwapFeeds());
         MoveMotorCommand = new RelayCommand(MoveMotor, _ => CanUseMotorControls);
@@ -156,11 +148,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public event PropertyChangedEventHandler? PropertyChanged;
 
-    public event EventHandler? ManualAnalysisSaveRequested;
-
     public event EventHandler? ManualSystemLogSaveRequested;
-
-    public ObservableCollection<AnalysisItem> AnalysisItems { get; }
 
     public ObservableCollection<DetectionTargetItem> DetectionTargets { get; }
 
@@ -186,10 +174,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
     public RecordingViewModel Recording { get; }
 
-    public VlmViewModel Vlm { get; }
-
-    public MobileWebAppViewModel Mobile { get; }
-
     public ICommand TogglePowerCommand { get; }
 
     public ICommand SetModeCommand { get; }
@@ -209,8 +193,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public ICommand SetThemeCommand { get; }
 
     public ICommand SetLanguageCommand { get; }
-
-    public ICommand SaveAnalysisLogsCommand { get; }
 
     public ICommand SaveSystemLogsCommand { get; }
 
@@ -288,17 +270,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         Camera.DisposeServices();
         Motor.DisposeServices();
         Recording.DisposeServices();
-        Vlm.DisposeServices();
-        Mobile.DisposeServices();
     }
-}
-
-/// <summary>
-/// 분석 로그 한 줄을 저장하는 데이터입니다. VLM 분석 내용과 생성 시각을 함께 보관합니다.
-/// </summary>
-public sealed record AnalysisItem(string Time, string Message)
-{
-    public DateTime CreatedAt { get; init; } = DateTime.Now;
 }
 
 /// <summary>

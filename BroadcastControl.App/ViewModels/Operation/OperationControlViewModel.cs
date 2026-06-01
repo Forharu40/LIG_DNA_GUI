@@ -14,12 +14,10 @@ using BroadcastControl.App.Models.Camera;
 using BroadcastControl.App.Models.Motor;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels.Camera;
-using BroadcastControl.App.ViewModels.Mobile;
 using BroadcastControl.App.ViewModels.Monitoring;
 using BroadcastControl.App.ViewModels.Motor;
 using BroadcastControl.App.ViewModels.Operation;
 using BroadcastControl.App.ViewModels.Recording;
-using BroadcastControl.App.ViewModels.Vlm;
 
 // 파일 역할:
 // 하단 조작 영역과 설정창에서 바꾸는 시스템 운영 값을 관리합니다.
@@ -114,7 +112,7 @@ public sealed partial class MainViewModel
 
     public double ManualModeOpacity => CurrentMode == "\uC218\uB3D9" ? 1.0 : 0.35;
 
-    // System 연결 표시는 모터 상태, VLM 결과, 영상 패킷 중 하나라도 주기적으로 수신되면 연결됨으로 바뀝니다.
+    // System 연결 표시는 모터 상태, 영상 패킷, YOLO 탐지 패킷 중 하나라도 주기적으로 수신되면 연결됨으로 바뀝니다.
     // 연결 전에는 Recording 기본 색상과 같은 색/투명도를 사용해 비활성 상태임을 보여줍니다.
 
 
@@ -304,7 +302,7 @@ public sealed partial class MainViewModel
 
     /// <summary>
     /// 설정 drawer의 주 탐지체 버튼에서 선택한 값을 현재 탐지 기준으로 적용합니다.
-    /// 선택값은 System Status와 YOLO 표시 필터, VLM 위험도 판단 기준에 함께 반영됩니다.
+    /// 선택값은 System Status와 YOLO 표시 필터, 위험 객체 자동 선택 기준에 함께 반영됩니다.
     /// </summary>
     private void SelectPrimaryTarget(object? parameter)
     {

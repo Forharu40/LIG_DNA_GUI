@@ -14,7 +14,6 @@ using System.Windows.Media.Imaging;
 using BroadcastControl.App.Models.Camera;
 using BroadcastControl.App.Models.Motor;
 using BroadcastControl.App.Models.Network;
-using BroadcastControl.App.Models.Vlm;
 using BroadcastControl.App.ViewModels;
 
 // 파일 역할:
@@ -357,19 +356,7 @@ public partial class MainWindow : Window
             windowStart,
             windowEnd,
             manual: false,
-            includeAnalysis: true,
             includeSystemLog: true);
-    }
-
-    private async void ViewModel_OnManualAnalysisSaveRequested(object? sender, EventArgs e)
-    {
-        var now = DateTime.Now;
-        await SaveRecordingMetadataAsync(
-            now,
-            now,
-            manual: true,
-            includeAnalysis: true,
-            includeSystemLog: false);
     }
 
     private async void ViewModel_OnManualSystemLogSaveRequested(object? sender, EventArgs e)
@@ -379,7 +366,6 @@ public partial class MainWindow : Window
             now,
             now,
             manual: true,
-            includeAnalysis: false,
             includeSystemLog: true);
     }
 
@@ -387,7 +373,6 @@ public partial class MainWindow : Window
         DateTime windowStart,
         DateTime windowEnd,
         bool manual,
-        bool includeAnalysis,
         bool includeSystemLog)
     {
         try
@@ -396,11 +381,6 @@ public partial class MainWindow : Window
             {
                 ["manual"] = manual
             };
-
-            if (includeAnalysis)
-            {
-                payload["analysisText"] = _viewModel.BuildAnalysisLogSnapshot(windowStart, windowEnd, includeAll: manual);
-            }
 
             if (includeSystemLog)
             {
@@ -415,14 +395,13 @@ public partial class MainWindow : Window
 
             if (manual)
             {
-                var targetName = includeAnalysis ? "VLM 분석 결과" : "시스템 로그";
-                _viewModel.AppendImportantLog($"{targetName}를 현재 영상 폴더의 CSV 파일로 저장했습니다.");
+                _viewModel.AppendImportantLog("시스템 로그를 현재 영상 폴더의 CSV 파일로 저장했습니다.");
             }
         }
         catch (Exception ex)
         {
             var modeText = manual ? "수동" : "자동";
-            _viewModel.AppendImportantLog($"{modeText} 로그/VLM 저장에 실패했습니다: {ex.Message}");
+            _viewModel.AppendImportantLog($"{modeText} 시스템 로그 저장에 실패했습니다: {ex.Message}");
         }
     }
 
