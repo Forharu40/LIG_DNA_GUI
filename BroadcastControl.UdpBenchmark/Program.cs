@@ -224,7 +224,9 @@ internal sealed class StreamSocket : IDisposable
 internal sealed class StreamProcessor
 {
     private const int LegacyHeaderSize = 20;
+    private const int SentinelImageHeaderSize = 15;
     private const int FragmentHeaderSize = 28;
+    private static readonly byte[] SentinelPacketMagic = "SNTL"u8.ToArray();
     private static readonly byte[] ImageFragmentMagic = "IMGF"u8.ToArray();
     private static readonly byte[] DetectionPacketMagic = "DETS"u8.ToArray();
     private static readonly byte[] StatusPacketMagic = "STAT"u8.ToArray();
@@ -294,6 +296,7 @@ internal sealed class StreamProcessor
     {
         if (packet.Length == 0 ||
             StartsWith(packet, DetectionPacketMagic) ||
+            (StartsWith(packet, SentinelPacketMagic) && packet.Length > 4 && packet[4] == 0x10) ||
             StartsWith(packet, StatusPacketMagic))
         {
             return;
@@ -398,6 +401,11 @@ internal sealed class StreamProcessor
     private static bool TryReadFragment(byte[] packet, out ImageFragmentPacket fragment)
     {
         fragment = default;
+        if (TryReadSentinelFragment(packet, out fragment))
+        {
+            return true;
+        }
+
         if (packet.Length < FragmentHeaderSize || !StartsWith(packet, ImageFragmentMagic))
         {
             return false;
@@ -414,6 +422,41 @@ internal sealed class StreamProcessor
             BinaryPrimitives.ReadUInt16BigEndian(span[26..28]),
             packet[FragmentHeaderSize..]);
         return fragment.FragmentCount > 0 && fragment.FragmentIndex < fragment.FragmentCount;
+    }
+
+    private static bool TryReadSentinelFragment(byte[] packet, out ImageFragmentPacket fragment)
+    {
+        fragment = default;
+        if (packet.Length < SentinelImageHeaderSize ||
+            !StartsWith(packet, SentinelPacketMagic) ||
+            packet[4] is not (0x01 or 0x02))
+        {
+            return false;
+        }
+
+        var span = packet.AsSpan();
+        var frameId = BinaryPrimitives.ReadUInt32LittleEndian(span[5..9]);
+        var chunkIndex = BinaryPrimitives.ReadUInt16LittleEndian(span[9..11]);
+        var totalChunks = BinaryPrimitives.ReadUInt16LittleEndian(span[11..13]);
+        var payloadSize = BinaryPrimitives.ReadUInt16LittleEndian(span[13..15]);
+        if (totalChunks == 0 ||
+            chunkIndex >= totalChunks ||
+            payloadSize == 0 ||
+            packet.Length < SentinelImageHeaderSize + payloadSize)
+        {
+            return false;
+        }
+
+        fragment = new ImageFragmentPacket(
+            0,
+            frameId,
+            0,
+            0,
+            0,
+            chunkIndex,
+            totalChunks,
+            packet[SentinelImageHeaderSize..(SentinelImageHeaderSize + payloadSize)]);
+        return true;
     }
 
     private void TrimFragmentBuffers()
@@ -541,6 +584,22 @@ internal sealed class ImageFragmentBuffer
 
     public byte[] Assemble()
     {
+        if (TotalLength == 0)
+        {
+            var outputBytes = new List<byte>();
+            foreach (var part in _parts)
+            {
+                if (part is null)
+                {
+                    return [];
+                }
+
+                outputBytes.AddRange(part);
+            }
+
+            return outputBytes.ToArray();
+        }
+
         var output = new byte[TotalLength];
         var offset = 0;
         foreach (var part in _parts)

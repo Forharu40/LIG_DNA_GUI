@@ -9,23 +9,23 @@ PC 운용통제 GUI가 받을 수 있는 UDP 패킷으로 변환해 전송하는
 
 - ROS2 EO/IR 이미지 토픽 구독
 - ROS2 YOLO detection 토픽 구독
-- 이미지를 JPEG 기반 UDP 패킷으로 변환
-- detection을 GUI용 `DETS` 패킷으로 변환
+- 이미지를 `SNTL` JPEG 청크 UDP 패킷으로 변환
+- EO detection을 GUI용 `SNTL` type `0x10` 패킷으로 변환
 - PC GUI로 EO `6000`, IR `6001` 포트 전송
 - 녹화 파일 및 기본 로그/VLM 더미 파일 생성
 - 녹화 영상 확인용 HTTP 서버 제공
 
-이 브릿지는 YOLO를 직접 실행하지 않습니다. YOLO 처리는 Jetson의 별도 ROS2 노드가 담당하고,
-브릿지는 이미 발행된 `/detections/eo`, `/detections/ir` 토픽만 구독해서 GUI로 전달합니다.
+이 브릿지는 YOLO를 직접 실행하지 않습니다. YOLO/추적 처리는 Jetson의 별도 ROS2 노드가 담당하고,
+브릿지는 이미 발행된 `/tracks/eo`, `/tracks/ir` 토픽만 구독해서 GUI로 전달합니다.
 
 ## 기본 입력 토픽
 
 | 데이터 | 기본 토픽 | 메시지 타입 |
 | --- | --- | --- |
-| EO image | `/video/eo/preprocessed` | `sensor_msgs/msg/Image` |
+| EO image | `/camera/eo` | `sensor_msgs/msg/Image` |
 | IR image | `/camera/ir` | `sensor_msgs/msg/Image` |
-| EO detection | `/detections/eo` | `sentinel_interfaces/msg/Detection2DArray` |
-| IR detection | `/detections/ir` | `sentinel_interfaces/msg/Detection2DArray` |
+| EO track/detection | `/tracks/eo` | `sentinel_interfaces/msg/TrackedDetection2DArray` |
+| IR track/detection | `/tracks/ir` | `sentinel_interfaces/msg/TrackedDetection2DArray` |
 
 EO가 동작하지 않는 실험 상태에서도 IR은 `/camera/ir`만 정상 발행되면 GUI로 전송할 수 있습니다.
 
@@ -34,14 +34,26 @@ EO가 동작하지 않는 실험 상태에서도 IR은 `/camera/ir`만 정상 �
 | 출력 | 포트 |
 | --- | --- |
 | EO image + EO detection | `6000/udp` |
-| IR image + IR detection | `6001/udp` |
+| IR image | `6001/udp` |
 | 녹화 영상 HTTP 서버 | `8090/tcp` |
+
+GUI에서 별도 수신하는 UDP 포트:
+
+| 데이터 | 포트 |
+| --- | --- |
+| VLM result | `6002/udp` |
+| Motor command | `8000/udp` |
+| Motor status | `8001/udp` |
+| Tracking recording control | `8010/udp` |
 
 주의:
 
 - Zybo -> Jetson IR 입력은 `5001/udp`를 사용합니다.
 - Jetson bridge -> PC GUI IR 출력은 `6001/udp`를 사용합니다.
 - 두 포트는 서로 다른 구간입니다.
+- VLM 결과는 영상 패킷에 묶지 않고 `6002/udp`로 분리해 GUI가 별도 스레드에서 받을 수 있게 둡니다.
+- 모터는 `8000/udp` 명령, `8001/udp` 상태 피드백을 사용합니다.
+- GUI -> Thor 모터 패킷은 10B입니다: mode, tracking, track_id, btn_mask, pan_pos, tilt_pos, scan_step, manual_step. Thor -> GUI 모터 상태 패킷은 36B입니다.
 
 ## 파일 구성
 
@@ -50,11 +62,21 @@ EO가 동작하지 않는 실험 상태에서도 IR은 `/camera/ir`만 정상 �
 | `Dockerfile` | `gui_camera_bridge` 이미지 빌드 파일 |
 | `run_camera_udp_bridge.sh` | 컨테이너 빌드/실행 스크립트 |
 | `app/camera_udp_bridge.py` | ROS2 토픽 구독 및 GUI UDP 전송 노드 |
-| `fastdds_no_shm.xml` | 실행 시 자동 생성되는 FastDDS UDP-only 설정 파일 |
+| `fastdds_no_shm.xml` | 컨테이너 간 DDS shared memory 문제를 피하기 위한 FastDDS UDP-only 설정 파일 |
 
 ## 실행
 
-PC 노트북 IP가 `192.168.1.94`일 때:
+기본 실행:
+
+```bash
+cd ~/LIG_DNA_GUI/JetsonThor.RosCameraBridge
+bash ./run_camera_udp_bridge.sh
+```
+
+`GUI_HOST`를 직접 지정하지 않으면 스크립트가 `../BroadcastControl.App/LigDnaGui.config.json`의 `PcGuiHost` 값을 읽어 GUI 송출 대상 IP로 사용합니다.
+GUI에서 GUI IP를 바꾸고 저장한 뒤 Jetson 쪽 코드에도 같은 설정 파일이 반영되어 있으면, 다음 브릿지 실행부터 새 GUI IP로 송출됩니다.
+
+특정 IP를 임시로 강제하려면:
 
 ```bash
 cd ~/LIG_DNA_GUI/JetsonThor.RosCameraBridge
@@ -65,7 +87,7 @@ GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh
 
 ```bash
 cd ~/LIG_DNA_GUI/JetsonThor.RosCameraBridge
-GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh --build
+bash ./run_camera_udp_bridge.sh --build
 ```
 
 스크립트 기본값:
@@ -75,6 +97,7 @@ CONTAINER_NAME=gui_camera_bridge
 IMAGE_NAME=gui_camera_bridge
 WORKSPACE_DIR=/home/lig/gui_camera_ws
 WORKSPACE_SETUP=/ros2_ws/install/local_setup.bash
+GUI_CONFIG_FILE=../BroadcastControl.App/LigDnaGui.config.json
 EO_GUI_PORT=6000
 IR_GUI_PORT=6001
 JETSON_RECORDING_DIR=/home/lig/Desktop/video
@@ -96,7 +119,8 @@ gui_camera_bridge 컨테이너에서는 /camera/ir header 수신 불가
 
 이 경우 FastDDS shared memory 전송 문제가 원인이 될 수 있습니다.
 현재 `run_camera_udp_bridge.sh`는 기본적으로 shared memory를 끄고 UDPv4 transport만 사용하도록
-`fastdds_no_shm.xml`을 자동 생성하고 컨테이너에 마운트합니다.
+저장소에 포함된 `fastdds_no_shm.xml`을 컨테이너에 마운트합니다.
+파일이 없으면 실행 전에 같은 내용으로 다시 생성합니다.
 
 기본 사용:
 
@@ -128,7 +152,12 @@ FASTDDS_NO_SHM=false GUI_HOST=192.168.1.94 bash ./run_camera_udp_bridge.sh
     EO_20260513_145200.mp4
     system_log_20260513_145200.txt
     vlm_analysis_20260513_145200.txt
+  Tracked/
+    Tracking_20260513_145230.mp4
 ```
+
+`Tracked` 폴더에는 GUI에서 VLM 위험 객체 tracking 상태가 켜진 동안의 별도 영상이 저장됩니다.
+파일명은 `Tracking_촬영시작날짜및시간.mp4` 형식입니다.
 
 녹화 기능을 끄고 브릿지만 실험:
 
