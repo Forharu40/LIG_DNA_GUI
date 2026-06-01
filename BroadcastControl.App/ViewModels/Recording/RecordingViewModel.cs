@@ -22,15 +22,15 @@ using BroadcastControl.App.ViewModels.Recording;
 using BroadcastControl.App.ViewModels.Vlm;
 
 // 파일 역할:
-// 녹화 화면에서 사용하는 ViewModel과 MainViewModel의 녹화/로그 관련 상태를 함께 둡니다.
-// 녹화 상태, 수동 녹화, 분석 로그 저장, 시스템 로그 저장, 녹화 목록 표시를 담당합니다.
+// 녹화 상태 표시, 수동 녹화 토글, 분석/시스템 로그 저장, Jetson 녹화 영상 목록 갱신을 관리합니다.
+// Recording 패널의 표시등과 RecordedVideosView의 목록/재생 요청이 이 파일의 속성과 함수에 연결됩니다.
 
 namespace BroadcastControl.App.ViewModels.Recording
 {
 
 /// <summary>
-/// RecordedVideosView와 녹화 패널이 직접 참조할 수 있는 녹화 전용 상태입니다.
-/// 실제 화면 공통 바인딩과 로그 저장 로직은 아래 MainViewModel partial에 있습니다.
+/// 현재 녹화 여부, 녹화 저장 경로, 화면에 보여줄 녹화 영상 목록을 보관합니다.
+/// Recording 표시등과 RecordedVideosView의 영상 목록 바인딩에 사용됩니다.
 /// </summary>
 public sealed class RecordingViewModel : ViewModelBase
 {
@@ -194,8 +194,8 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 현재 시스템 로그 목록을 Desktop의 CSV 파일로 저장합니다.
+    /// 사용자가 Recording/Log 저장 버튼을 눌렀을 때 수동으로 호출됩니다.
     /// </summary>
     private void SaveSystemLogsToDesktop()
     {

@@ -1,7 +1,4 @@
-﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-using System.Buffers.Binary;
+﻿using System.Buffers.Binary;
 using System.IO;
 using System.Linq;
 using System.Net;
@@ -15,6 +12,8 @@ using OpenCvSharp;
 
 namespace BroadcastControl.App.Services;
 
+// EO/IR 영상 UDP 포트를 열어 JPEG 청크를 조립하고, 탐지/상태/재생 메타데이터 패킷을 함께 해석합니다.
+// 조립된 프레임은 CameraView에 표시되고, 탐지 결과는 바운딩 박스와 YOLO Targets 리스트에 사용됩니다.
 public sealed class UdpEncodedVideoReceiverService : IDisposable
 {
     private const int DefaultPort = 6000;
@@ -97,8 +96,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
         try
         {
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+            // 지정 포트에 UDP 수신 소켓을 열고 큰 JPEG 프레임을 받을 수 있도록 버퍼를 넉넉하게 잡습니다.
             ListeningPort = port;
             _udpClient = new UdpClient();
             _udpClient.Client.ExclusiveAddressUse = false;
@@ -231,8 +229,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
     private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 백그라운드에서 UDP 패킷을 계속 읽고 패킷 종류별 처리 함수로 넘깁니다.
         while (!cancellationToken.IsCancellationRequested)
         {
             try
@@ -274,9 +271,7 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 : $"{remoteEndPoint.Address}:{remoteEndPoint.Port}";
             PublishDiagnosticMessage($"MEVA UDP 첫 패킷을 수신했습니다. 송신지: {sourceText}, 패킷 크기: {packet.Length} bytes");
         }
-
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 메타데이터, 탐지 결과, YOLO 상태, 영상 프래그먼트를 순서대로 판별합니다.
         if (TryExtractMetadataPacket(packet, out var segmentInfo))
         {
             _metadataPacketCount++;
@@ -463,7 +458,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     {
         try
         {
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             using var decoded = Cv2.ImDecode(encodedFrame, ImreadModes.Color);
             if (decoded.Empty())
             {
@@ -474,8 +468,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 (decoded.Width != declaredWidth || decoded.Height != declaredHeight))
             {
             }
-
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             using var falseColorFrame = _applyIrFalseColor ? CreateIrFalseColorFrame(decoded) : new Mat();
             var displaySource = _applyIrFalseColor ? falseColorFrame : decoded;
 
@@ -522,7 +514,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
                 declaredWidth > 0 ? declaredWidth : checked((ushort)decoded.Width),
                 declaredHeight > 0 ? declaredHeight : checked((ushort)decoded.Height),
                 bitmap);
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             QueueLatestFrame(receivedFrame);
             return true;
         }
@@ -1014,9 +1005,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
     private static bool TryExtractSentinelImageFragmentPacket(byte[] packet, out ImageFragmentPacket fragment)
     {
         fragment = default;
-
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
         if (!HasPacketMagic(packet, SentinelPacketMagic) || packet.Length < SentinelImageHeaderSize)
         {
             return false;
@@ -1061,8 +1049,6 @@ public sealed class UdpEncodedVideoReceiverService : IDisposable
 
         lock (_fragmentLock)
         {
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
             CleanupStaleImageFragments();
             var key = new FrameFragmentKey(fragment.StampNs, fragment.FrameIndex);
             if (!_imageFragments.TryGetValue(key, out var buffer) || !buffer.IsCompatibleWith(fragment))

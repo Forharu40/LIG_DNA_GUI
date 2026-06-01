@@ -47,7 +47,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private string _currentMode = "\uC790\uB3D9";
     private string _selectedPrimaryTarget = "\uBCF5\uD569";
     private string _currentThreatLevel = "\uB0AE\uC74C";
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // 화면 전반에서 공유하는 상태값입니다.
+    // 모드/주 탐지체/위험도는 Operation과 VLM 영역에서, 밝기/대비/녹화/연결은 Camera와 Recording 영역에서 사용합니다.
     private double _brightness = 50;
     private double _contrast = 50;
     private bool _isManualRecordingEnabled;
@@ -95,8 +96,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private readonly List<SystemLogItem> _systemLogHistory = new();
     private string? _lastAnalysisMessage;
 
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // EO/IR 영상이 아직 들어오지 않았을 때 표시할 마지막 프레임과 기본 플레이스홀더 이미지입니다.
+    // CameraViewModel.cs의 카메라 partial 코드가 이 값을 갱신해 큰 화면/작은 화면에 바인딩합니다.
     private ImageSource? _eoFrame;
     private ImageSource? _irFrame;
     private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame(string.Empty, Color.FromRgb(51, 94, 160));
@@ -114,7 +115,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
         Vlm = new VlmViewModel();
         Mobile = new MobileWebAppViewModel();
 
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 앱에 저장된 현재 테마를 읽어 설정 drawer와 테마 버튼 상태를 초기화합니다.
         if (Application.Current is App app)
         {
             _currentThemeMode = app.CurrentThemeMode;
@@ -130,14 +131,14 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
         PrimaryTargets = new ObservableCollection<PrimaryTargetOption>(CreatePrimaryTargetOptions());
 
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 전원, 모드, 주 탐지체, 카메라 밝기/대비처럼 전체 화면에서 공통으로 쓰는 명령입니다.
         TogglePowerCommand = new RelayCommand(_ => TogglePower());
         SetModeCommand = new RelayCommand(SetMode, _ => IsSystemPoweredOn);
         ToggleSettingsCommand = new RelayCommand(_ => IsSettingsOpen = !IsSettingsOpen);
         SelectPrimaryTargetCommand = new RelayCommand(SelectPrimaryTarget, _ => IsSystemPoweredOn);
         ResetBrightnessCommand = new RelayCommand(_ => Brightness = 50, _ => IsSystemPoweredOn);
         ResetContrastCommand = new RelayCommand(_ => Contrast = 50, _ => IsSystemPoweredOn);
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 카메라 줌, 녹화, 테마/언어, 모터 조작처럼 기능 패널별 버튼과 연결되는 명령입니다.
         ResetZoomCommand = new RelayCommand(_ => ZoomLevel = 1.0, _ => CanUseZoomControls);
         ToggleManualRecordingCommand = new RelayCommand(_ => ToggleManualRecording(), _ => IsSystemPoweredOn);
         SetThemeCommand = new RelayCommand(SetTheme);
@@ -260,8 +261,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 
 
     /// <summary>
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 필드 값이 실제로 바뀐 경우에만 값을 저장하고 PropertyChanged를 발생시킵니다.
+    /// ViewModelBase를 상속하지 않는 MainViewModel에서 WPF Binding 갱신을 공통 처리하기 위해 사용합니다.
     /// </summary>
     private bool SetProperty<T>(ref T storage, T value, [CallerMemberName] string? propertyName = null)
     {
@@ -282,7 +283,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
 }
 
 /// <summary>
-/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+/// 분석 로그 한 줄을 저장하는 데이터입니다. VLM 분석 내용과 생성 시각을 함께 보관합니다.
 /// </summary>
 public sealed record AnalysisItem(string Time, string Message)
 {
@@ -290,7 +291,7 @@ public sealed record AnalysisItem(string Time, string Message)
 }
 
 /// <summary>
-/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+/// 시스템 로그 한 줄을 저장하는 데이터입니다. GUI 동작, 통신 오류, 모터 명령 결과를 기록합니다.
 /// </summary>
 public sealed record SystemLogItem(string Time, string Message)
 {

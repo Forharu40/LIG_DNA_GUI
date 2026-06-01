@@ -22,15 +22,15 @@ using BroadcastControl.App.ViewModels.Recording;
 using BroadcastControl.App.ViewModels.Vlm;
 
 // 파일 역할:
-// VLM/YOLO 분석 화면에서 사용하는 ViewModel과 MainViewModel의 탐지/위험도 상태를 함께 둡니다.
-// 객체 ID, 객체 분류, 정확도, 위험도, VLM 분석 결과, 추적 대상 선택 로직을 담당합니다.
+// YOLO 탐지 결과와 VLM 위험도 판단 결과를 화면에서 사용할 형태로 정리합니다.
+// 객체 ID, 객체 분류, 정확도, 위험도, 분석 문장, 위험 객체 우선순위, 추적할 track_id 선택 로직이 이 파일에 있습니다.
 
 namespace BroadcastControl.App.ViewModels.Vlm
 {
 
 /// <summary>
-/// VlmPanelView가 직접 참조할 수 있는 VLM 분석 상태입니다.
-/// 화면 전체에 연결된 탐지/위험도 바인딩은 아래 MainViewModel partial에서 유지합니다.
+/// 최신 VLM 분석 문장, 현재 위험도, 분석 이력 목록을 보관합니다.
+/// VlmPanelView의 분석 결과 패널과 모바일 위험 알림 내용 구성에 사용됩니다.
 /// </summary>
 public sealed class VlmViewModel : ViewModelBase
 {
@@ -110,9 +110,8 @@ public sealed partial class MainViewModel
 
     public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // YOLO 탐지 결과 중 위험도가 높은 객체를 추려 자동 추적 후보를 고릅니다.
+        // 같은 위험도라면 현재 큰 화면에서 먼저 들어온 객체 순서를 유지해 track id를 정합니다.
         var highThreatCandidates = detections
             .Select((detection, index) => new TrackingCandidate(
                 detection.ObjectId,

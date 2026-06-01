@@ -2,6 +2,8 @@
 
 namespace BroadcastControl.App.Services;
 
+// ViewModel이 직접 UDP 구현을 알지 않도록 감싸는 모터 명령 서비스입니다.
+// 네트워크 설정 변경 시 endpoint를 바꾸고, 실제 전송은 UdpMotorControlService에 위임합니다.
 public sealed class MotorCommandService : IMotorCommandService
 {
     private readonly UdpMotorControlService _udpMotorControlService;

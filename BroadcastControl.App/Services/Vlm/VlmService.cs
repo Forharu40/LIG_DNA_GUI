@@ -2,6 +2,8 @@
 
 namespace BroadcastControl.App.Services;
 
+// VLM 결과 수신기를 ViewModel에서 쓰기 쉬운 서비스로 감싼 클래스입니다.
+// UDP 수신기의 ResultReceived/ReceiverError 이벤트를 그대로 전달합니다.
 public sealed class VlmService : IVlmService
 {
     private readonly UdpVlmResultReceiverService _receiverService;

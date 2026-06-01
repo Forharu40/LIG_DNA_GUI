@@ -1,5 +1,7 @@
-﻿namespace BroadcastControl.App.Services;
+namespace BroadcastControl.App.Services;
 
+// 모바일 위험 알림 기능을 ViewModel에 제공하는 래퍼 서비스입니다.
+// HTTP/SSE 서버 구현은 MobileAlertHubService에 위임합니다.
 public sealed class MobileAlertService : IMobileAlertService
 {
     private readonly MobileAlertHubService _hubService;

@@ -3,6 +3,8 @@ using System.Net.Sockets;
 
 namespace BroadcastControl.App.Services;
 
+// 지정한 포트에서 원시 UDP 바이트 배열을 수신하는 공통 서비스입니다.
+// 특정 패킷 구조를 모르는 범용 수신기로, 필요한 계층에서 PacketReceived 이벤트를 파싱합니다.
 public sealed class UdpReceiverService : IUdpReceiverService
 {
     private readonly UdpClient _udpClient;

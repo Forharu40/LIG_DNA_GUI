@@ -1,5 +1,3 @@
-﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 using System.Net;
 using System.Net.Sockets;
 using System.Text;
@@ -8,6 +6,8 @@ using BroadcastControl.App.Models.Vlm;
 
 namespace BroadcastControl.App.Services;
 
+// VLM 분석 결과 UDP 포트(기본 6003)를 열고 JSON 또는 일반 텍스트 결과를 VlmResultPacket으로 변환합니다.
+// 객체별 위험도 맵은 위험 객체 우선순위 계산과 모바일 알림 생성에 사용됩니다.
 public sealed class UdpVlmResultReceiverService : IDisposable
 {
     private const int DefaultPort = 6003;
@@ -35,7 +35,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
             return;
         }
 
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 백그라운드 수신 루프를 시작해 VLM 결과가 도착할 때마다 ResultReceived 이벤트를 발생시킵니다.
         _cancellationTokenSource = new CancellationTokenSource();
         _receiveTask = Task.Run(() => ReceiveLoopAsync(_cancellationTokenSource.Token));
     }
@@ -50,7 +50,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
         }
         catch (AggregateException)
         {
-            // The receive loop exits through cancellation or socket disposal during shutdown.
+            // 앱 종료 중 수신 루프가 소켓 해제로 끝나는 경우입니다.
         }
 
         _cancellationTokenSource?.Dispose();
@@ -86,8 +86,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
 
     private static VlmResultPacket ParsePacket(byte[] buffer)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // Jetson이 보내는 VLMR 헤더 또는 JSON 본문을 해석해 위험도와 분석 문장을 추출합니다.
         var text = DecodeText(buffer);
         if (string.IsNullOrWhiteSpace(text))
         {
@@ -100,7 +99,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
             {
                 using var document = JsonDocument.Parse(text);
                 var root = document.RootElement;
-                // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+                // 여러 버전의 필드명을 허용해 Jetson VLM 메시지 포맷 변경에 대응합니다.
                 var threatLevel = ReadString(root, "threatLevel", "riskLevel", "risk", "threat", "level") ?? string.Empty;
                 var analysisMessage =
                     ReadString(root, "analysisMessage", "vlmAnalysis", "analysis", "message", "result") ?? text;
@@ -125,7 +124,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
         var offset = 0;
         if (buffer.Length >= 4 && Encoding.ASCII.GetString(buffer, 0, 4) == "VLMR")
         {
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+            // "VLMR" magic이 붙은 패킷은 헤더 4바이트를 건너뛰고 UTF-8 본문만 읽습니다.
             offset = 4;
         }
 
@@ -177,7 +176,7 @@ public sealed class UdpVlmResultReceiverService : IDisposable
 
     private static IReadOnlyDictionary<int, string> ReadObjectThreatLevels(JsonElement root)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // detections/tracks/objects 배열에서 object_id 또는 track_id별 위험도 문자열을 모읍니다.
         foreach (var name in new[] { "objectThreats", "object_threats", "trackThreats", "track_threats", "detections", "tracks", "objects" })
         {
             if (!root.TryGetProperty(name, out var value) || value.ValueKind != JsonValueKind.Array)

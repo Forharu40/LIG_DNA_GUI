@@ -6,8 +6,8 @@ using BroadcastControl.App.Models.Motor;
 namespace BroadcastControl.App.Services;
 
 /// <summary>
-/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-/// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+/// GUI 모터 명령을 Jetson gui_bridge가 받는 UDP 패킷으로 전송합니다.
+/// 모터 방향키/각도/속도 패킷과 위험 객체 추적 녹화 보조 패킷을 같은 서비스에서 관리합니다.
 /// </summary>
 public sealed class UdpMotorControlService : IDisposable
 {
@@ -142,7 +142,7 @@ public sealed class UdpMotorControlService : IDisposable
         }
         catch
         {
-            // Tracking recording is auxiliary. Motor command success should not depend on this packet.
+            // 추적 녹화 패킷은 보조 기능이므로 실패해도 모터 명령 성공 여부에는 영향을 주지 않습니다.
         }
     }
 

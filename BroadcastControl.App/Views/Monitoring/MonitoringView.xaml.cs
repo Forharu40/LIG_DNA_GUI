@@ -17,8 +17,8 @@ using BroadcastControl.App.Models.Vlm;
 using BroadcastControl.App.ViewModels;
 
 // 파일 역할:
-// MonitoringView의 코드비하인드입니다.
-// 시스템 상태, YOLO 리스트, 로그 표시와 관련된 화면 이벤트를 MainWindow 쪽 처리 흐름에 연결합니다.
+// 상단 Recording/System 상태와 YOLO 타겟 리스트의 UI 이벤트를 외부로 전달합니다.
+// 녹화 목록 열기, 설정 열기, 탐지 객체 선택 이벤트를 MainWindow 처리 흐름에 연결합니다.
 
 namespace BroadcastControl.App.Views.Monitoring
 {

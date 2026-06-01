@@ -2,6 +2,8 @@
 
 namespace BroadcastControl.App.Services;
 
+// 원시 UDP 바이트 배열을 지정한 host:port로 보내는 공통 송신 서비스입니다.
+// 전송 실패 메시지를 out error로 돌려 UI 로그에 표시할 수 있게 합니다.
 public sealed class UdpSenderService : IUdpSenderService
 {
     private readonly UdpClient _udpClient = new();

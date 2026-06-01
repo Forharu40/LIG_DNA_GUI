@@ -22,15 +22,15 @@ using BroadcastControl.App.ViewModels.Recording;
 using BroadcastControl.App.ViewModels.Vlm;
 
 // 파일 역할:
-// 하단 조작/설정 영역에서 사용하는 ViewModel과 MainViewModel의 시스템 운영 상태를 함께 둡니다.
-// 전원, Scan/Manual 모드, Tracking, 테마, 언어, 주 탐지체, System 연결 표시를 담당합니다.
+// 하단 조작 영역과 설정창에서 바꾸는 시스템 운영 값을 관리합니다.
+// Scan/Manual 모드 전환, Tracking 사용 여부, EO/IR 주 화면 선택, 테마/언어 변경, 네트워크 설정 저장 후 통신 서비스 재설정을 담당합니다.
 
 namespace BroadcastControl.App.ViewModels.Operation
 {
 
 /// <summary>
-/// OperationControlView가 직접 참조할 수 있는 운영 상태입니다.
-/// 기존 화면 바인딩과 명령은 아래 MainViewModel partial에서 유지합니다.
+/// Scan/Manual 모드, Tracking 활성 여부, 선택된 track_id, EO/IR 주 화면 상태를 보관합니다.
+/// OperationControlView의 모드 버튼과 SettingsDrawerView의 설정 버튼 바인딩에 사용됩니다.
 /// </summary>
 public sealed class OperationControlViewModel : ViewModelBase
 {
@@ -73,7 +73,7 @@ public sealed partial class MainViewModel
 {
     public bool IsEoPrimary => _isEoPrimary;
 
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // 전원 버튼에는 종료 동작만 연결되어 있어 현재 언어에 맞는 종료 문구를 표시합니다.
     public string PowerButtonText => Text["PowerExit"];
 
     public string CurrentMode
@@ -109,14 +109,13 @@ public sealed partial class MainViewModel
 
     public string CurrentModeText => $"{Text["CameraMode"]}: {TranslateMode(CurrentMode)}";
 
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // Scan/Manual 선택 버튼에서 현재 모드를 더 진하게 보이게 하는 투명도 값입니다.
     public double AutoModeOpacity => CurrentMode == "\uC790\uB3D9" ? 1.0 : 0.35;
 
     public double ManualModeOpacity => CurrentMode == "\uC218\uB3D9" ? 1.0 : 0.35;
 
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // System 연결 표시는 모터 상태, VLM 결과, 영상 패킷 중 하나라도 주기적으로 수신되면 연결됨으로 바뀝니다.
+    // 연결 전에는 Recording 기본 색상과 같은 색/투명도를 사용해 비활성 상태임을 보여줍니다.
 
 
     public bool IsJetsonConnected
@@ -200,8 +199,8 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>
-     /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+     /// Scan/Manual 버튼에서 전달된 문자열을 현재 카메라 제어 모드로 적용합니다.
+    /// 모드가 바뀌면 녹화, 모터 조작 가능 여부, 추적 명령 상태를 함께 갱신합니다.
      /// </summary>
     private void SetMode(object? parameter)
     {
@@ -226,7 +225,7 @@ public sealed partial class MainViewModel
         {
             if (IsManualRecordingEnabled)
             {
-                // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+                // Manual 모드에서 벗어나면 사용자가 켜 둔 수동 녹화를 자동으로 해제합니다.
                 IsManualRecordingEnabled = false;
             }
         }
@@ -304,8 +303,8 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 설정 drawer의 주 탐지체 버튼에서 선택한 값을 현재 탐지 기준으로 적용합니다.
+    /// 선택값은 System Status와 YOLO 표시 필터, VLM 위험도 판단 기준에 함께 반영됩니다.
     /// </summary>
     private void SelectPrimaryTarget(object? parameter)
     {

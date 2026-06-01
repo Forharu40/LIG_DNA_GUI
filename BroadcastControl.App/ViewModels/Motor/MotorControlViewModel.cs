@@ -22,15 +22,15 @@ using BroadcastControl.App.ViewModels.Recording;
 using BroadcastControl.App.ViewModels.Vlm;
 
 // 파일 역할:
-// 모터 제어 화면에서 사용하는 ViewModel과 MainViewModel의 모터 관련 상태/명령을 함께 둡니다.
-// Pan/Tilt 표시, 방향키, 각도 입력, Motor Speed, UDP 모터 명령 패킷 생성을 담당합니다.
+// MotorControlView의 Pan/Tilt 위치 표시와 모터 조작 명령을 관리합니다.
+// 방향키 입력, 각도 직접 입력, Motor Speed 변경, Jetson으로 보내는 11바이트 UDP 커맨드 패킷 생성 함수가 이 파일에 있습니다.
 
 namespace BroadcastControl.App.ViewModels.Motor
 {
 
 /// <summary>
-/// MotorControlView가 직접 참조할 수 있는 모터 전용 상태입니다.
-/// 실제 WPF 화면 바인딩과 명령 호환 로직은 아래 MainViewModel partial에 있습니다.
+/// 모터의 현재 Pan/Tilt 각도, 목표 raw 위치, Scan/Manual 속도, 눌린 방향키 상태를 보관합니다.
+/// MotorControlView의 위치 표시, 방향키 조작, Motor Speed 버튼 바인딩에 사용됩니다.
 /// </summary>
 public sealed class MotorControlViewModel : ViewModelBase
 {
@@ -203,8 +203,8 @@ public sealed partial class MainViewModel
 
     public void UpdateMotorStatus(MotorStatusSnapshot snapshot)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // Jetson에서 받은 pan/tilt raw 위치를 GUI 표시용 각도와 상태 항목으로 변환합니다.
+        // 이후 수동 방향키나 각도 입력은 GUI 추정값이 아니라 이 피드백 위치를 기준으로 이어집니다.
         UpdateMotorStatusItems(PanMotorStatusItems, snapshot.Pan);
         _panMotorFeedbackRaw = ClampMotorRaw((int)Math.Min(snapshot.Pan.PresentPosition, (uint)MotorRawMaximum));
         _panMotorPositionDegrees = DynamixelPositionToDegrees(snapshot.Pan.PresentPosition);
@@ -243,8 +243,8 @@ public sealed partial class MainViewModel
 
     public void UpdateManualButtonState(MotorButtonMask buttons)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 수동 모드에서 방향키가 눌리거나 떼어졌을 때 현재 버튼 마스크를 모터 명령 위치에 반영합니다.
+        // 자동/scan 모드에서는 사용자가 누른 방향키가 모터 명령으로 나가지 않도록 무시합니다.
         if (!IsManualMode)
         {
             return;
@@ -458,7 +458,7 @@ public sealed partial class MainViewModel
             SyncMotorRawFromFeedback();
         }
 
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 현재 GUI 모드, 추적 ID, stream 선택, 방향키, pan/tilt raw 값을 11바이트 UDP 패킷으로 전송합니다.
         return _motorControlService.TrySendMotorCommandPacket(
             mode: forcedMode ?? (IsManualMode ? (byte)1 : (byte)0),
             tracking: IsTrackingModeEnabled ? (byte)1 : (byte)0,
@@ -530,8 +530,8 @@ public sealed partial class MainViewModel
 
     private static int MotorSpeedToStepDelta(int motorSpeed)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // UI에서 선택한 Motor Speed 값을 Jetson이 사용하는 step 범위 1~10으로 제한합니다.
+        // 실제 각도 변화량은 Jetson 모터 제어 쪽에서 1 step당 약 0.08도로 해석합니다.
         return Math.Clamp(motorSpeed, 1, 10);
     }
 

@@ -22,15 +22,15 @@ using BroadcastControl.App.ViewModels.Recording;
 using BroadcastControl.App.ViewModels.Vlm;
 
 // 파일 역할:
-// 카메라 기능에서 직접 사용하는 ViewModel과 MainViewModel의 카메라 관련 상태/명령을 함께 둡니다.
-// EO/IR 영상 프레임, 큰 화면/작은 화면 전환, 줌, 팬, 회전, 밝기/대비 표시 로직을 담당합니다.
+// CameraView에서 표시하는 EO/IR 영상 프레임과 영상 조작 상태를 관리합니다.
+// 큰 화면/보조 화면 전환, 마우스 휠 줌, 드래그 팬, 회전 버튼, 밝기/대비 슬라이더가 이 파일의 속성과 함수에 연결됩니다.
 
 namespace BroadcastControl.App.ViewModels.Camera
 {
 
 /// <summary>
-/// CameraView가 직접 참조할 수 있는 카메라 전용 상태입니다.
-/// 현재는 단순 상태 보관용이며, 실제 화면 바인딩 호환 로직은 아래 MainViewModel partial에 있습니다.
+/// EO/IR 수신 프레임, 줌 배율, 밝기, 대비 값을 보관합니다.
+/// CameraView의 Image와 슬라이더 바인딩에서 직접 읽고 갱신하는 카메라 상태입니다.
 /// </summary>
 public sealed class CameraViewModel : ViewModelBase
 {
@@ -119,7 +119,7 @@ public sealed partial class MainViewModel
         get => _brightness;
         set
         {
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+            // 밝기 슬라이더 값이 바뀌면 표시용 텍스트도 함께 갱신합니다.
             if (SetProperty(ref _brightness, value))
             {
                 OnPropertyChanged(nameof(BrightnessText));
@@ -134,7 +134,7 @@ public sealed partial class MainViewModel
         get => _contrast;
         set
         {
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+            // 대비 슬라이더 값이 바뀌면 표시용 텍스트도 함께 갱신합니다.
             if (SetProperty(ref _contrast, value))
             {
                 OnPropertyChanged(nameof(ContrastText));
@@ -149,11 +149,11 @@ public sealed partial class MainViewModel
         get => _zoomLevel;
         set
         {
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+            // 전자 줌은 1배부터 4배까지만 허용해 화면이 과도하게 확대되지 않도록 합니다.
             var clamped = Math.Clamp(value, 1.0, 4.0);
             if (SetProperty(ref _zoomLevel, clamped))
             {
-                // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+                // 1배로 돌아오면 팬 위치를 원점으로 되돌려 다음 확대가 중앙에서 시작되게 합니다.
                 if (_zoomLevel <= 1.0)
                 {
                     _zoomPanX = 0;
@@ -195,7 +195,7 @@ public sealed partial class MainViewModel
             }
 
             var normalized = (_zoomPanX + maxPan) / (maxPan * 2);
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+            // WPF 좌표계는 왼쪽이 0이므로 pan 값을 미니맵 왼쪽 좌표로 변환합니다.
             return (1.0 - normalized) * (MiniMapWidth - MiniMapViewportWidth);
         }
     }
@@ -211,7 +211,7 @@ public sealed partial class MainViewModel
             }
 
             var normalized = (_zoomPanY + maxPan) / (maxPan * 2);
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+            // WPF 좌표계는 위쪽이 0이므로 pan 값을 미니맵 위쪽 좌표로 변환합니다.
             return (1.0 - normalized) * (MiniMapHeight - MiniMapViewportHeight);
         }
     }
@@ -226,9 +226,8 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// IR UDP 수신 서비스가 새 프레임을 디코딩했을 때 호출됩니다.
+    /// 큰 화면/작은 화면 중 어디에 IR이 표시되는지에 따라 바인딩 이미지를 다시 갱신합니다.
     /// </summary>
     public void UpdateIrFrame(ImageSource? frame)
     {
@@ -281,8 +280,8 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 사용자가 확대된 카메라 화면을 드래그할 때 호출됩니다.
+    /// 확대 배율 안에서만 이동하도록 pan 값을 제한하고 미니맵 위치를 갱신합니다.
     /// </summary>
     public void PanZoom(double deltaX, double deltaY)
     {
@@ -300,8 +299,8 @@ public sealed partial class MainViewModel
     }
 
     /// <summary>
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 마우스 휠 입력으로 전자 줌 배율을 0.1 단위로 조정합니다.
+    /// 시스템이 꺼져 있거나 휠 이동량이 없으면 아무 작업도 하지 않습니다.
     /// </summary>
     public void AdjustZoomByWheel(double wheelSteps)
     {
@@ -310,7 +309,7 @@ public sealed partial class MainViewModel
             return;
         }
 
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 휠 한 칸을 줌 배율 0.1 변화로 변환합니다.
         ZoomLevel += wheelSteps * 0.1;
     }
 
@@ -374,8 +373,8 @@ public sealed partial class MainViewModel
     private double GetMaxPanY() => (_viewportHeight * (ZoomLevel - 1)) / 2;
 
     /// <summary>
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    /// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    /// 줌 배율이나 pan 값이 바뀐 뒤 미니맵 사각형의 크기와 위치 바인딩을 갱신합니다.
+    /// CameraView의 미니맵이 현재 큰 화면에서 보고 있는 영역을 따라가게 합니다.
     /// </summary>
     private void UpdateMiniMapViewport()
     {
@@ -387,7 +386,7 @@ public sealed partial class MainViewModel
 
     private static ImageSource CreateCameraPlaceholderFrame(string label, Color accentColor)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 카메라 영상이 아직 없을 때 보여줄 어두운 배경과 안내 텍스트 이미지를 직접 그립니다.
         var group = new DrawingGroup();
         using (var dc = group.Open())
         {

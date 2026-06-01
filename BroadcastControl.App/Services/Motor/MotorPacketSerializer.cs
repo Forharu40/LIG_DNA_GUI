@@ -3,6 +3,8 @@ using BroadcastControl.App.Models.Motor;
 
 namespace BroadcastControl.App.Services;
 
+// MotorControlViewModel의 모드, tracking, track_id, 방향키, Pan/Tilt raw값, 속도 값을
+// Jetson gui_bridge가 해석하는 고정 길이 UDP 커맨드 패킷으로 직렬화합니다.
 public static class MotorPacketSerializer
 {
     public const int CommandPacketSize = 10;

@@ -1,5 +1,3 @@
-﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 using System.Buffers.Binary;
 using System.Net;
 using System.Net.Sockets;
@@ -7,6 +5,8 @@ using BroadcastControl.App.Models.Motor;
 
 namespace BroadcastControl.App.Services;
 
+// Jetson에서 8001 UDP로 보내는 모터 상태 패킷을 수신해 Pan/Tilt 상태 모델로 변환합니다.
+// 수신된 현재 위치 raw값은 MotorControlViewModel에서 각도 표시와 다음 조작 기준값으로 사용됩니다.
 public sealed class UdpMotorStatusReceiverService : IDisposable
 {
     private const int DefaultPort = 8001;
@@ -38,8 +38,7 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
             return;
         }
 
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 백그라운드 수신 루프를 시작해 UI 스레드를 막지 않고 모터 상태를 계속 받습니다.
         _cancellationTokenSource = new CancellationTokenSource();
         _receiveTask = Task.Run(() => ReceiveLoopAsync(_cancellationTokenSource.Token));
     }
@@ -54,15 +53,14 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
         }
         catch (AggregateException)
         {
-            // The receive loop exits through cancellation or socket disposal during shutdown.
+            // 앱 종료 중 소켓 해제로 수신 루프가 끝나는 경우라 별도 처리가 필요하지 않습니다.
         }
         _cancellationTokenSource?.Dispose();
     }
 
     private async Task ReceiveLoopAsync(CancellationToken cancellationToken)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // UDP 패킷을 기다리다가 정상 패킷이면 StatusReceived 이벤트로 ViewModel에 전달합니다.
         while (!cancellationToken.IsCancellationRequested)
         {
             try
@@ -96,8 +94,7 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
             return false;
         }
 
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 현재 18바이트 포맷과 이전 32바이트 포맷을 모두 지원해 Jetson 코드 버전 차이를 흡수합니다.
         var receivedAt = DateTime.Now;
         var isLegacyPacket = buffer.Length >= LegacySnapshotSize || buffer.Length == LegacyPacketSize;
         var packetSize = isLegacyPacket ? LegacyPacketSize : CurrentPacketSize;
@@ -118,8 +115,7 @@ public sealed class UdpMotorStatusReceiverService : IDisposable
 
     private static MotorStatusPacket ParseCurrentPacket(ReadOnlySpan<byte> buffer, DateTime receivedAt)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 새 포맷은 moving, pwm/current, velocity, position, voltage, temperature, error 순서로 들어옵니다.
         var presentPosition = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(10, 4));
         var presentVelocity = BinaryPrimitives.ReadUInt32LittleEndian(buffer.Slice(6, 4));
         return new MotorStatusPacket(

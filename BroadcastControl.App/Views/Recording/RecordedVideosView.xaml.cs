@@ -18,8 +18,8 @@ using BroadcastControl.App.Models.Vlm;
 using BroadcastControl.App.ViewModels;
 
 // 파일 역할:
-// RecordedVideosView의 코드비하인드입니다.
-// 녹화 영상 목록 조회, 폴더 이동, 재생/일시정지, 영상 확대/이동 UI 이벤트를 처리합니다.
+// Jetson 녹화 HTTP 서버에서 영상 목록을 읽고 로컬 캐시로 내려받아 재생합니다.
+// 폴더 이동, 재생/일시정지, 재생 위치 슬라이더, 영상 확대/이동 UI 이벤트를 처리합니다.
 
 namespace BroadcastControl.App.Views.Recording
 {

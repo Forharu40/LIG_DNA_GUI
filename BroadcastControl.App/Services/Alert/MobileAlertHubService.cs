@@ -1,6 +1,4 @@
-﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-using System.Collections.Concurrent;
+﻿using System.Collections.Concurrent;
 using System.IO;
 using System.Net;
 using System.Net.Sockets;
@@ -10,6 +8,8 @@ using BroadcastControl.App.Models.Mobile;
 
 namespace BroadcastControl.App.Services;
 
+// 모바일 브라우저에서 볼 수 있는 위험 알림 웹 서버입니다.
+// /events SSE로 새 VLM 경고를 실시간 전송하고, /evidence/{id}.png로 위험 객체 캡처 이미지를 제공합니다.
 public sealed class MobileAlertHubService : IDisposable
 {
     private const int DefaultPort = 8088;
@@ -54,7 +54,7 @@ public sealed class MobileAlertHubService : IDisposable
 
         try
         {
-            // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+            // 모든 네트워크 인터페이스에서 모바일 접속을 받을 수 있도록 지정 포트에 HTTP 서버를 엽니다.
             Port = port;
             _listener = new TcpListener(IPAddress.Any, port);
             _listener.Start();
@@ -71,8 +71,7 @@ public sealed class MobileAlertHubService : IDisposable
 
     public async Task PublishAlertAsync(string title, string vlmAnalysis, string detectionSummary, string threatLevel, byte[]? evidencePng)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // VLM이 위험 객체를 판단하면 최신 알림을 저장하고 접속 중인 모바일 SSE 클라이언트에 즉시 푸시합니다.
         var id = DateTimeOffset.UtcNow.ToUnixTimeMilliseconds().ToString(System.Globalization.CultureInfo.InvariantCulture);
         var evidenceUrl = string.Empty;
         if (evidencePng is { Length: > 0 })
@@ -152,8 +151,7 @@ public sealed class MobileAlertHubService : IDisposable
 
     private async Task AcceptLoopAsync(CancellationToken cancellationToken)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 새 모바일 브라우저 연결을 받아 각 요청을 독립 Task에서 처리합니다.
         while (!cancellationToken.IsCancellationRequested && _listener is not null)
         {
             TcpClient? client = null;
@@ -176,8 +174,7 @@ public sealed class MobileAlertHubService : IDisposable
 
     private async Task HandleClientAsync(TcpClient tcpClient, CancellationToken cancellationToken)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // HTTP 경로에 따라 모바일 앱 HTML, 최신 알림 JSON, 증거 이미지, SSE 스트림을 나누어 응답합니다.
         using var client = tcpClient;
         try
         {
@@ -232,8 +229,7 @@ public sealed class MobileAlertHubService : IDisposable
 
     private async Task HandleSseClientAsync(TcpClient client, NetworkStream stream, CancellationToken cancellationToken)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 연결을 유지한 채 alert 이벤트를 계속 보내 모바일 화면이 자동 갱신되도록 합니다.
         var writer = new StreamWriter(stream, new UTF8Encoding(false), leaveOpen: true)
         {
             AutoFlush = true

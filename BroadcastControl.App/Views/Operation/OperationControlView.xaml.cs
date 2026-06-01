@@ -4,8 +4,8 @@ using System.Globalization;
 using BroadcastControl.App.Models.Network;
 
 // 파일 역할:
-// OperationControlView의 코드비하인드입니다.
-// 하단 조작 패널의 모드 전환, 네트워크 설정 입력, 저장 버튼 이벤트를 연결합니다.
+// 하단 조작 패널에서 Scan/Manual 모드 버튼과 네트워크 설정 저장 버튼을 연결합니다.
+// GUI IP와 Jetson IP 입력 컨트롤을 MainWindow가 읽고 저장할 수 있도록 접근자를 제공합니다.
 
 namespace BroadcastControl.App.Views.Operation
 {

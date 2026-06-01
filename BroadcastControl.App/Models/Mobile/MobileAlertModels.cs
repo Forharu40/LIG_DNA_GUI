@@ -1,7 +1,7 @@
-﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 namespace BroadcastControl.App.Models.Mobile;
 
+// 모바일 경고 웹 페이지와 SSE 이벤트로 전달되는 위험 객체 알림 데이터입니다.
+// VLM 분석 문장, YOLO 탐지 요약, 위험도, 증거 이미지 URL을 한 묶음으로 보냅니다.
 public sealed record MobileAlertEvent(
     string Id,
     string CreatedAt,

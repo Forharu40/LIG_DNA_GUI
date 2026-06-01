@@ -1,5 +1,3 @@
-﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 using System.IO;
 using System.Windows;
 using System.Windows.Media;
@@ -9,6 +7,8 @@ using OpenCvSharp;
 
 namespace BroadcastControl.App.Services;
 
+// GUI의 카메라 표시 영역을 주기적으로 캡처해 Desktop에 AVI 파일로 저장합니다.
+// Jetson 자동 녹화와 별개로 사용자가 GUI에서 보는 화면 자체를 수동 녹화할 때 사용됩니다.
 public sealed class ViewportRecordingService : IDisposable
 {
     private readonly DispatcherTimer _timer;
@@ -36,8 +36,7 @@ public sealed class ViewportRecordingService : IDisposable
 
     public string StartRecordingToDesktop(FrameworkElement target)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 이미 녹화 중이면 같은 파일 경로를 반환해 중복 VideoWriter 생성을 막습니다.
         if (_isRecording && !string.IsNullOrWhiteSpace(_recordingPath))
         {
             return _recordingPath;
@@ -88,8 +87,7 @@ public sealed class ViewportRecordingService : IDisposable
 
     private void CaptureAndWriteFrame()
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // WPF 요소를 RenderTargetBitmap으로 캡처한 뒤 OpenCV Mat으로 변환해 AVI 프레임으로 저장합니다.
         if (!_isRecording || _target is null || string.IsNullOrWhiteSpace(_recordingPath))
         {
             return;
@@ -156,8 +154,7 @@ public sealed class ViewportRecordingService : IDisposable
 
     private void EnsureVideoWriter(int width, int height)
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // OpenCV 백엔드/코덱 조합을 순서대로 시도해 현장 PC에 설치된 코덱 차이를 흡수합니다.
         if (_writer is not null || string.IsNullOrWhiteSpace(_recordingPath))
         {
             return;

@@ -18,8 +18,8 @@ using BroadcastControl.App.Models.Vlm;
 using BroadcastControl.App.ViewModels;
 
 // 파일 역할:
-// CameraView의 코드비하인드입니다.
-// 영상 클릭, 바운딩 박스 선택, 줌/회전 이벤트처럼 XAML 화면 요소와 직접 맞닿는 UI 이벤트만 처리합니다.
+// EO/IR 영상 영역에서 발생하는 마우스 입력을 처리합니다.
+// 큰 화면 클릭으로 YOLO 객체를 선택하고, 휠/드래그 입력을 전자 줌과 화면 이동 명령으로 변환합니다.
 
 namespace BroadcastControl.App.Views.Camera
 {

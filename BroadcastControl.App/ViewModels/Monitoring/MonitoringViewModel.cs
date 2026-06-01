@@ -2,14 +2,14 @@
 using BroadcastControl.App.ViewModels;
 
 // 파일 역할:
-// 모니터링 화면에서 독립적으로 표시할 상태를 보관합니다.
-// 시스템 로그, YOLO 타겟 요약, 위험도와 System 연결 상태를 View에 전달합니다.
+// MonitoringView의 System Status와 YOLO Targets 리스트에 표시할 요약 데이터를 보관합니다.
+// 시스템 로그, 객체 ID/분류/정확도/위험도 목록, System 연결 상태 문구를 화면 바인딩으로 전달합니다.
 
 namespace BroadcastControl.App.ViewModels.Monitoring;
 
 /// <summary>
-/// MonitoringView 전용 표시 상태입니다.
-/// MainViewModel에서 갱신한 시스템 상태를 모니터링 화면이 읽기 좋은 형태로 보관합니다.
+/// System Status 패널과 YOLO Targets 리스트가 읽는 상태입니다.
+/// MainViewModel에서 갱신한 위험도, 주 탐지체, 연결 상태, 로그 목록을 모니터링 화면 형식으로 보관합니다.
 /// </summary>
 public sealed class MonitoringViewModel : ViewModelBase
 {

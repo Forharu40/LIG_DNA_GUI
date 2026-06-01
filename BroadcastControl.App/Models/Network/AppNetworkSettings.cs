@@ -1,6 +1,3 @@
-﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 using System.IO;
 using System.Net;
 using System.Net.NetworkInformation;
@@ -9,10 +6,11 @@ using System.Text.Json;
 
 namespace BroadcastControl.App.Models.Network;
 
+// GUI와 Jetson 사이의 IP/포트 설정을 JSON 파일과 환경 변수에서 읽고 저장합니다.
+// SettingsDrawerView의 Network 영역에서 수정한 GUI IP와 Jetson IP가 이 모델을 통해 각 UDP 서비스에 반영됩니다.
 public sealed class AppNetworkSettings
 {
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // 실행 파일 폴더에 저장되는 사용자 네트워크 설정 파일 이름입니다.
     private const string SettingsFileName = "LigDnaGui.config.json";
 
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -20,34 +18,43 @@ public sealed class AppNetworkSettings
         WriteIndented = true
     };
 
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // GUI가 UDP 명령을 보낼 Jetson 주소입니다.
     public string JetsonHost { get; set; } = "192.168.3.143";
 
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // Jetson 브릿지가 EO/IR 영상과 탐지 결과를 송출해야 하는 GUI PC 주소입니다.
     public string PcGuiHost { get; set; } = "192.168.1.94";
 
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // Jetson 녹화 HTTP 서버가 파일 목록을 읽는 기본 저장 위치입니다.
     public string JetsonRecordingDir { get; set; } = "/home/lig/Desktop/video";
 
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+    // Jetson에서 GUI로 들어오는 EO 영상 UDP 포트입니다.
     public int EoUdpPort { get; set; } = 6000;
 
+    // Jetson에서 GUI로 들어오는 IR 영상 UDP 포트입니다.
     public int IrUdpPort { get; set; } = 6001;
 
+    // Jetson에서 GUI로 들어오는 EO/IR 탐지 결과 UDP 포트입니다.
     public int DetectionUdpPort { get; set; } = 6002;
 
+    // VLM 분석 결과 JSON을 수신하는 UDP 포트입니다.
     public int VlmResultPort { get; set; } = 6003;
 
+    // GUI가 Jetson gui_bridge로 11바이트 모터 커맨드 패킷을 보내는 포트입니다.
     public int MotorControlPort { get; set; } = 8000;
 
+    // 위험 객체 추적 녹화 시작/중지 신호를 보내는 보조 제어 포트입니다.
     public int TrackingRecordingControlPort { get; set; } = 8010;
 
+    // Jetson에서 GUI로 모터 상태 패킷을 송신하는 포트입니다.
     public int MotorStatusPort { get; set; } = 8001;
 
+    // 모바일 위험 알림 HTTP/SSE 서버 포트입니다.
     public int MobileAlertPort { get; set; } = 8088;
 
+    // Jetson 녹화 영상 목록과 파일을 제공하는 HTTP 서버 포트입니다.
     public int RecordingHttpPort { get; set; } = 8090;
 
+    // Jetson 자동 녹화 파일이 몇 초 단위로 분할되는지 표시하기 위한 설정입니다.
     public int RecordingSegmentSeconds { get; set; } = 60;
 
     public string RecordedVideoUrl { get; set; } = "http://192.168.3.143:8090/";
@@ -56,8 +63,7 @@ public sealed class AppNetworkSettings
 
     public static AppNetworkSettings Load()
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 설정 파일이 있으면 읽고, 없거나 손상된 경우 기본값으로 시작합니다.
         AppNetworkSettings settings;
         try
         {
@@ -84,7 +90,7 @@ public sealed class AppNetworkSettings
 
     public void Save()
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 저장 전 IP 문자열과 포트 범위를 정리해 다음 실행 때도 유효한 값만 사용합니다.
         Normalize();
         var directory = Path.GetDirectoryName(SettingsPath);
         if (!string.IsNullOrWhiteSpace(directory))
@@ -97,7 +103,7 @@ public sealed class AppNetworkSettings
 
     public static IReadOnlyList<string> GetLocalIpv4Addresses()
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 네트워크 설정 드롭다운에 보여줄 실제 사용 가능한 GUI PC IPv4 주소 목록을 찾습니다.
         return NetworkInterface.GetAllNetworkInterfaces()
             .Where(adapter => adapter.OperationalStatus == OperationalStatus.Up)
             .SelectMany(adapter => adapter.GetIPProperties().UnicastAddresses)
@@ -130,8 +136,7 @@ public sealed class AppNetworkSettings
 
     private void Normalize()
     {
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-        // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+        // 비어 있는 IP/경로는 기본값으로 되돌리고, 포트는 1~65535 범위 안으로 보정합니다.
         JetsonHost = Clean(JetsonHost, "192.168.3.143");
         PcGuiHost = Clean(PcGuiHost, "192.168.1.94");
         JetsonRecordingDir = Clean(JetsonRecordingDir, "/home/lig/Desktop/video");
@@ -185,5 +190,4 @@ public sealed class AppNetworkSettings
         var value = Environment.GetEnvironmentVariable(name);
         return int.TryParse(value, out var parsed) && parsed is > 0 and <= 65535 ? parsed : fallback;
     }
-
 }

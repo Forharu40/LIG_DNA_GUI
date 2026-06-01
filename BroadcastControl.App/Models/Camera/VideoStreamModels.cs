@@ -1,9 +1,9 @@
-﻿// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
 using System.Windows.Media.Imaging;
 
 namespace BroadcastControl.App.Models.Camera;
 
+// Jetson에서 받은 JPEG 영상 패킷을 한 프레임으로 조립한 결과입니다.
+// CameraView의 EO/IR 영상 표시와 탐지 박스 좌표 매칭에 사용됩니다.
 public readonly record struct ReceivedVideoFrame(
     ulong StampNs,
     uint FrameIndex,
@@ -11,8 +11,8 @@ public readonly record struct ReceivedVideoFrame(
     ushort Height,
     BitmapSource Bitmap);
 
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+// YOLO/추적 패킷에서 객체 하나를 파싱한 결과입니다.
+// 바운딩 박스 그리기, YOLO Targets 리스트, 클릭한 객체의 track_id 선택에 사용됩니다.
 public readonly record struct DetectionInfo(
     string ClassName,
     float Score,
@@ -23,12 +23,11 @@ public readonly record struct DetectionInfo(
     int ObjectId,
     string ThreatLevel = "")
 {
-    // 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
     public string LabelText => $"{ClassName} object{ObjectId} ({Score:0.00})";
 }
 
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+// 탐지 결과가 어떤 영상 스트림에서 왔는지 구분합니다.
+// EO/IR이 같은 탐지 포트로 들어와도 큰 화면 기준 객체 선택을 할 수 있게 해줍니다.
 public enum DetectionStream
 {
     Unknown = 0,
@@ -36,6 +35,8 @@ public enum DetectionStream
     Ir = 2
 }
 
+// 한 프레임에 포함된 YOLO/추적 객체 목록입니다.
+// CameraView의 바운딩 박스 렌더링과 VlmViewModel의 위험 객체 우선순위 계산에 사용됩니다.
 public readonly record struct DetectionPacket(
     ulong StampNs,
     uint FrameId,
@@ -45,8 +46,8 @@ public readonly record struct DetectionPacket(
     DetectionStream Stream = DetectionStream.Unknown,
     int ActiveTrackId = 0xFF);
 
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+// Jetson 쪽 YOLO 처리 상태를 나타내는 패킷입니다.
+// 모델 로드 여부, confidence 기준, 마지막 오류를 GUI 상태 로그에 표시할 때 사용합니다.
 public readonly record struct YoloStatusPacket(
     bool Enabled,
     bool ModelLoaded,
@@ -56,8 +57,8 @@ public readonly record struct YoloStatusPacket(
     ulong StampNs,
     uint FrameId);
 
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
-// 화면 상태와 사용자 동작 처리 흐름을 설명하는 주석입니다.
+// MEVA 같은 재생 영상의 현재 구간 정보를 나타냅니다.
+// 영상 구간이 바뀌거나 반복 재생될 때 시스템 로그 메시지를 만들기 위해 사용합니다.
 public readonly record struct PlaybackSegmentInfo(
     uint ClipIndex,
     uint ClipCount,
