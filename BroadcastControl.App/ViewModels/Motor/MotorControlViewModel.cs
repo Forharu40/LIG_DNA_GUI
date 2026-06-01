@@ -37,8 +37,8 @@ public sealed class MotorControlViewModel : ViewModelBase
     private double _tiltDegrees;
     private ushort _targetPanRaw;
     private ushort _targetTiltRaw;
-    private int _scanStep = 8;
-    private int _manualStep = 8;
+    private int _scanStep = 5;
+    private int _manualStep = 5;
     private MotorButtonMask _activeButtons;
 
     public MotorControlViewModel()
@@ -178,9 +178,9 @@ public sealed partial class MainViewModel
         ? (IsTrackingModeEnabled ? 1.0 : 0.42)
         : 0.32;
 
-    public string PanMotorPositionText => (_panMotorPositionDegrees - 180).ToString("0.0", CultureInfo.InvariantCulture);
+    public string PanMotorPositionText => _panMotorPositionDegrees.ToString("0.0", CultureInfo.InvariantCulture);
 
-    public string TiltMotorPositionText => (_tiltMotorPositionDegrees - 90).ToString("0.0", CultureInfo.InvariantCulture);
+    public string TiltMotorPositionText => _tiltMotorPositionDegrees.ToString("0.0", CultureInfo.InvariantCulture);
 
     public bool IsMotorDetailsOpen
     {
@@ -206,7 +206,8 @@ public sealed partial class MainViewModel
 
     public void InitializeMotorControlState()
     {
-        if (!TrySendMotorCommandPacket(out var modeError))
+        SetMotorPosition(0, 0);
+        if (!TrySendMotorCommandPacket(out var modeError, syncFromFeedback: false, forcedMode: 1))
         {
             AppendImportantLog($"초기 모터 제어 패킷 전송에 실패했습니다: {modeError}");
             return;
@@ -225,8 +226,8 @@ public sealed partial class MainViewModel
 
     public void SetMotorPosition(double panDegrees, double tiltDegrees)
     {
-        _motorPan = NormalizeMotorDegrees(panDegrees, MotorPanLimitDegrees);
-        _motorTilt = NormalizeMotorDegrees(tiltDegrees, MotorTiltLimitDegrees);
+        _motorPan = NormalizeMotorDegrees(panDegrees);
+        _motorTilt = NormalizeMotorDegrees(tiltDegrees);
         _motorPanRaw = DegreesToDynamixelPosition(_motorPan);
         _motorTiltRaw = DegreesToDynamixelPosition(_motorTilt);
         _panMotorPositionDegrees = _motorPan;
@@ -246,7 +247,7 @@ public sealed partial class MainViewModel
         _panMotorFeedbackRaw = ClampMotorRaw((int)Math.Min(snapshot.Pan.PresentPosition, (uint)MotorRawMaximum));
         _panMotorPositionDegrees = DynamixelPositionToDegrees(snapshot.Pan.PresentPosition);
         _motorPanRaw = _panMotorFeedbackRaw.Value;
-        _motorPan = NormalizeMotorDegrees(_panMotorPositionDegrees, MotorPanLimitDegrees);
+        _motorPan = NormalizeMotorDegrees(_panMotorPositionDegrees);
         OnPropertyChanged(nameof(PanMotorPositionText));
         OnPropertyChanged(nameof(MotorPanText));
         if (snapshot.Tilt is { } tilt)
@@ -255,7 +256,7 @@ public sealed partial class MainViewModel
             _tiltMotorFeedbackRaw = ClampMotorRaw((int)Math.Min(tilt.PresentPosition, (uint)MotorRawMaximum));
             _tiltMotorPositionDegrees = DynamixelPositionToDegrees(tilt.PresentPosition);
             _motorTiltRaw = _tiltMotorFeedbackRaw.Value;
-            _motorTilt = NormalizeMotorDegrees(_tiltMotorPositionDegrees, MotorTiltLimitDegrees);
+            _motorTilt = NormalizeMotorDegrees(_tiltMotorPositionDegrees);
             OnPropertyChanged(nameof(TiltMotorPositionText));
             OnPropertyChanged(nameof(MotorTiltText));
         }
@@ -321,12 +322,12 @@ public sealed partial class MainViewModel
         if (!double.TryParse(MotorTargetPanText, NumberStyles.Float, CultureInfo.InvariantCulture, out var panDegrees) ||
             !double.TryParse(MotorTargetTiltText, NumberStyles.Float, CultureInfo.InvariantCulture, out var tiltDegrees))
         {
-            AppendImportantLog("모터 각도 입력값을 확인하세요. 예: 0, 45.5, 360");
+            AppendImportantLog("모터 각도 입력값을 확인하세요. 예: -180, 0, 45.5, 180");
             return;
         }
 
-        panDegrees = NormalizeMotorDegrees(panDegrees, MotorPanLimitDegrees);
-        tiltDegrees = NormalizeMotorDegrees(tiltDegrees, MotorTiltLimitDegrees);
+        panDegrees = NormalizeMotorDegrees(panDegrees);
+        tiltDegrees = NormalizeMotorDegrees(tiltDegrees);
 
         _motorPanRaw = DegreesToDynamixelPosition(panDegrees);
         _motorTiltRaw = DegreesToDynamixelPosition(tiltDegrees);
@@ -462,20 +463,21 @@ public sealed partial class MainViewModel
         return names.Select(name => new MotorStatusItem(name, "-")).ToArray();
     }
 
-    private static double NormalizeMotorDegrees(double degrees, double limit)
+    private static double NormalizeMotorDegrees(double degrees)
     {
         var rounded = Math.Round(degrees, 1, MidpointRounding.AwayFromZero);
-        return Math.Clamp(rounded, 0, limit);
+        return Math.Clamp(rounded, MotorMinimumDegrees, MotorMaximumDegrees);
     }
 
     private static double DynamixelPositionToDegrees(uint position)
     {
-        return Math.Min(position, (uint)MotorRawMaximum) / MotorRawResolution * 360.0;
+        return (Math.Min(position, (uint)MotorRawMaximum) / MotorRawResolution * 360.0) + MotorMinimumDegrees;
     }
 
     private static ushort DegreesToDynamixelPosition(double degrees)
     {
-        var position = (int)Math.Round(Math.Clamp(degrees, 0, 360) / 360.0 * MotorRawResolution, MidpointRounding.AwayFromZero);
+        var normalizedDegrees = Math.Clamp(degrees, MotorMinimumDegrees, MotorMaximumDegrees) - MotorMinimumDegrees;
+        var position = (int)Math.Round(normalizedDegrees / 360.0 * MotorRawResolution, MidpointRounding.AwayFromZero);
         return ClampMotorRaw(position);
     }
 
@@ -540,11 +542,11 @@ public sealed partial class MainViewModel
         }
 
         _motorPanRaw = panRaw;
-        _motorPan = NormalizeMotorDegrees(DynamixelPositionToDegrees(panRaw), MotorPanLimitDegrees);
+        _motorPan = NormalizeMotorDegrees(DynamixelPositionToDegrees(panRaw));
         if (_tiltMotorFeedbackRaw is { } tiltRaw)
         {
             _motorTiltRaw = tiltRaw;
-            _motorTilt = NormalizeMotorDegrees(DynamixelPositionToDegrees(tiltRaw), MotorTiltLimitDegrees);
+            _motorTilt = NormalizeMotorDegrees(DynamixelPositionToDegrees(tiltRaw));
         }
 
         return true;
@@ -576,8 +578,8 @@ public sealed partial class MainViewModel
     {
         if ((buttons & MotorButtonMask.Center) == MotorButtonMask.Center)
         {
-            _motorPanRaw = 0;
-            _motorTiltRaw = 0;
+            _motorPanRaw = DegreesToDynamixelPosition(0);
+            _motorTiltRaw = DegreesToDynamixelPosition(0);
         }
         else
         {

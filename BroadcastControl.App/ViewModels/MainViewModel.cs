@@ -43,7 +43,7 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private bool _isEoPrimary = true;
     private bool _isSettingsOpen;
     private bool _isSystemPoweredOn = true;
-    private string _currentMode = "\uC790\uB3D9";
+    private string _currentMode = "\uC218\uB3D9";
     private string _selectedPrimaryTarget = "\uBCF5\uD569";
     private string _currentThreatLevel = "\uB0AE\uC74C";
     // 화면 전반에서 공유하는 상태값입니다.
@@ -77,16 +77,16 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private string _motorTargetPanText = string.Empty;
     private string _motorTargetTiltText = string.Empty;
     private bool _hasTrackedTarget;
-    private bool _isTrackingModeEnabled = true;
+    private bool _isTrackingModeEnabled;
     private int _yoloObjectId = -1;
     private bool _isUserSelectedTrackId;
     private DateTime _lastAutomaticTrackingPacketSentAt = DateTime.MinValue;
-    private const double MotorPanLimitDegrees = 360;
-    private const double MotorTiltLimitDegrees = 360;
+    private const double MotorMinimumDegrees = -180;
+    private const double MotorMaximumDegrees = 180;
     private const int MotorRawMinimum = 0;
     private const int MotorRawMaximum = 4095;
     private const double MotorRawResolution = 4096.0;
-    private const int DefaultMotorAngleSize = 8;
+    private const int DefaultMotorAngleSize = 5;
     private const int AutomaticTrackingResendMilliseconds = 250;
     private const int VisibleLogItemLimit = 30;
     private const int StoredLogItemLimit = 100;
