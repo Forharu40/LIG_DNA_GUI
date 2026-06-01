@@ -6,8 +6,8 @@ using System.Text.Json;
 
 namespace BroadcastControl.App.Models.Network;
 
-// GUI와 Jetson 사이에서 사용하는 IP, 포트, 녹화 경로 설정을 JSON 파일과 환경 변수에서 읽고 저장합니다.
-// Network 설정 화면에서 GUI IP나 Jetson IP를 바꾸면 이 모델 값이 갱신되고, 다음 실행 때 같은 설정을 다시 사용합니다.
+// GUI와 Jetson 사이에서 사용하는 IP, 포트, 녹화 경로 설정을 JSON 파일에서 읽고 저장합니다.
+// IP와 포트 값의 실제 원본은 LigDnaGui.config.json입니다.
 public sealed class AppNetworkSettings
 {
     // 실행 파일 폴더에 저장되는 네트워크 설정 파일 이름입니다.
@@ -18,75 +18,59 @@ public sealed class AppNetworkSettings
         WriteIndented = true
     };
 
-    // GUI가 UDP 명령 패킷을 보낼 Jetson 주소입니다.
-    public string JetsonHost { get; set; } = "192.168.3.143";
+    public string JetsonHost { get; set; } = string.Empty;
 
-    // Jetson 브릿지가 EO/IR 영상, YOLO 탐지 결과, 모터 상태를 송출할 GUI PC 주소입니다.
-    public string PcGuiHost { get; set; } = "192.168.1.94";
+    public string PcGuiHost { get; set; } = string.Empty;
 
-    // Jetson 녹화 HTTP 서버가 파일 목록을 읽는 영상 저장 폴더입니다.
-    public string JetsonRecordingDir { get; set; } = "/home/lig/Desktop/video";
+    public string JetsonRecordingDir { get; set; } = string.Empty;
 
-    // Jetson에서 GUI로 들어오는 EO 영상 UDP 포트입니다.
-    public int EoUdpPort { get; set; } = 6000;
+    public int EoUdpPort { get; set; }
 
-    // Jetson에서 GUI로 들어오는 IR 영상 UDP 포트입니다.
-    public int IrUdpPort { get; set; } = 6001;
+    public int IrUdpPort { get; set; }
 
-    // Jetson에서 GUI로 들어오는 EO/IR YOLO 탐지 결과 UDP 포트입니다.
-    public int DetectionUdpPort { get; set; } = 6002;
+    public int DetectionUdpPort { get; set; }
 
-    // GUI가 Jetson gui_bridge로 11바이트 모터 커맨드 패킷을 보내는 UDP 포트입니다.
-    public int MotorControlPort { get; set; } = 8000;
+    public int MotorControlPort { get; set; }
 
-    // 위험 객체 추적 녹화 시작/중지 신호를 보내는 보조 제어 포트입니다.
-    public int TrackingRecordingControlPort { get; set; } = 8010;
+    public int TrackingRecordingControlPort { get; set; }
 
-    // Jetson에서 GUI로 모터 상태 패킷을 송신하는 UDP 포트입니다.
-    public int MotorStatusPort { get; set; } = 8001;
+    public int MotorStatusPort { get; set; }
 
-    // Jetson 녹화 영상 목록과 파일을 제공하는 HTTP 서버 포트입니다.
-    public int RecordingHttpPort { get; set; } = 8090;
+    public int RecordingHttpPort { get; set; }
 
-    // Jetson 자동 녹화 파일을 몇 초 단위로 분할하는지 나타내는 설정입니다.
-    public int RecordingSegmentSeconds { get; set; } = 60;
+    public int RecordingSegmentSeconds { get; set; }
 
-    // GUI가 녹화 영상 목록을 요청할 HTTP 주소입니다.
-    public string RecordedVideoUrl { get; set; } = "http://192.168.3.143:8090/";
+    public string RecordedVideoUrl { get; set; } = string.Empty;
 
     public static string SettingsPath => Path.Combine(AppContext.BaseDirectory, SettingsFileName);
 
     public static AppNetworkSettings Load()
     {
-        // 설정 파일이 있으면 읽고, 없거나 손상된 경우 기본값으로 시작합니다.
-        AppNetworkSettings settings;
-        try
+        if (!File.Exists(SettingsPath))
         {
-            if (File.Exists(SettingsPath))
-            {
-                var json = File.ReadAllText(SettingsPath);
-                settings = JsonSerializer.Deserialize<AppNetworkSettings>(json, JsonOptions) ?? new AppNetworkSettings();
-            }
-            else
-            {
-                settings = new AppNetworkSettings();
-            }
-        }
-        catch
-        {
-            settings = new AppNetworkSettings();
+            throw new FileNotFoundException($"네트워크 설정 파일을 찾을 수 없습니다: {SettingsPath}", SettingsPath);
         }
 
-        settings.ApplyEnvironmentOverrides();
-        settings.Normalize();
-        settings.SaveIfMissing();
-        return settings;
+        try
+        {
+            var json = File.ReadAllText(SettingsPath);
+            var settings = JsonSerializer.Deserialize<AppNetworkSettings>(json, JsonOptions)
+                ?? throw new InvalidOperationException($"네트워크 설정 파일을 읽을 수 없습니다: {SettingsPath}");
+
+            settings.Normalize();
+            settings.ValidateRequiredSettings();
+            return settings;
+        }
+        catch (JsonException ex)
+        {
+            throw new InvalidOperationException($"네트워크 설정 JSON 형식이 올바르지 않습니다: {SettingsPath}", ex);
+        }
     }
 
     public void Save()
     {
-        // 저장 전 IP 문자열과 포트 범위를 정리해서 다음 실행 때도 유효한 값만 사용합니다.
         Normalize();
+        ValidateRequiredSettings();
         var directory = Path.GetDirectoryName(SettingsPath);
         if (!string.IsNullOrWhiteSpace(directory))
         {
@@ -111,70 +95,68 @@ public sealed class AppNetworkSettings
             .ToList();
     }
 
-    private void ApplyEnvironmentOverrides()
-    {
-        JetsonHost = GetEnvironment("JETSON_HOST", JetsonHost);
-        PcGuiHost = GetEnvironment("JETSON_GUI_HOST", PcGuiHost);
-        JetsonRecordingDir = GetEnvironment("JETSON_RECORDING_DIR", JetsonRecordingDir);
-        RecordedVideoUrl = GetEnvironment("JETSON_VIDEO_URL", RecordedVideoUrl);
-        EoUdpPort = GetIntEnvironment("EO_GUI_PORT", EoUdpPort);
-        IrUdpPort = GetIntEnvironment("IR_GUI_PORT", IrUdpPort);
-        DetectionUdpPort = GetIntEnvironment("DETECTION_GUI_PORT", DetectionUdpPort);
-        MotorControlPort = GetIntEnvironment("MOTOR_CONTROL_PORT", MotorControlPort);
-        TrackingRecordingControlPort = GetIntEnvironment("TRACKING_RECORDING_CONTROL_PORT", TrackingRecordingControlPort);
-        MotorStatusPort = GetIntEnvironment("MOTOR_STATUS_PORT", MotorStatusPort);
-        RecordingHttpPort = GetIntEnvironment("RECORDING_HTTP_PORT", RecordingHttpPort);
-        RecordingSegmentSeconds = GetIntEnvironment("RECORDING_SEGMENT_SECONDS", RecordingSegmentSeconds);
-    }
-
     private void Normalize()
     {
-        // 빈 IP/경로는 기본값으로 되돌리고, 포트는 1~65535 범위 안으로 보정합니다.
-        JetsonHost = Clean(JetsonHost, "192.168.3.143");
-        PcGuiHost = Clean(PcGuiHost, "192.168.1.94");
-        JetsonRecordingDir = Clean(JetsonRecordingDir, "/home/lig/Desktop/video");
-        EoUdpPort = ClampPort(EoUdpPort, 6000);
-        IrUdpPort = ClampPort(IrUdpPort, 6001);
-        DetectionUdpPort = ClampPort(DetectionUdpPort, 6002);
-        MotorControlPort = ClampPort(MotorControlPort, 8000);
-        TrackingRecordingControlPort = ClampPort(TrackingRecordingControlPort, 8010);
-        MotorStatusPort = ClampPort(MotorStatusPort, 8001);
-        RecordingHttpPort = ClampPort(RecordingHttpPort, 8090);
-        RecordingSegmentSeconds = Math.Clamp(RecordingSegmentSeconds, 10, 3600);
-        RecordedVideoUrl = Clean(RecordedVideoUrl, $"http://{JetsonHost}:{RecordingHttpPort}/");
-        if (!RecordedVideoUrl.EndsWith("/", StringComparison.Ordinal))
+        JetsonHost = Clean(JetsonHost);
+        PcGuiHost = Clean(PcGuiHost);
+        JetsonRecordingDir = Clean(JetsonRecordingDir);
+        RecordedVideoUrl = Clean(RecordedVideoUrl);
+        if (string.IsNullOrWhiteSpace(RecordedVideoUrl) &&
+            !string.IsNullOrWhiteSpace(JetsonHost) &&
+            IsValidPort(RecordingHttpPort))
+        {
+            RecordedVideoUrl = $"http://{JetsonHost}:{RecordingHttpPort}/";
+        }
+        else if (!string.IsNullOrWhiteSpace(RecordedVideoUrl) &&
+                 !RecordedVideoUrl.EndsWith("/", StringComparison.Ordinal))
         {
             RecordedVideoUrl += "/";
         }
     }
 
-    private void SaveIfMissing()
+    private void ValidateRequiredSettings()
     {
-        if (!File.Exists(SettingsPath))
+        RequireText(JetsonHost, nameof(JetsonHost));
+        RequireText(PcGuiHost, nameof(PcGuiHost));
+        RequireText(JetsonRecordingDir, nameof(JetsonRecordingDir));
+        RequireText(RecordedVideoUrl, nameof(RecordedVideoUrl));
+        RequirePort(EoUdpPort, nameof(EoUdpPort));
+        RequirePort(IrUdpPort, nameof(IrUdpPort));
+        RequirePort(DetectionUdpPort, nameof(DetectionUdpPort));
+        RequirePort(MotorControlPort, nameof(MotorControlPort));
+        RequirePort(TrackingRecordingControlPort, nameof(TrackingRecordingControlPort));
+        RequirePort(MotorStatusPort, nameof(MotorStatusPort));
+        RequirePort(RecordingHttpPort, nameof(RecordingHttpPort));
+
+        if (RecordingSegmentSeconds is < 10 or > 3600)
         {
-            Save();
+            throw new InvalidOperationException($"{SettingsFileName}의 {nameof(RecordingSegmentSeconds)} 값은 10~3600 사이여야 합니다.");
         }
     }
 
-    private static string Clean(string? value, string fallback)
+    private static void RequireText(string value, string propertyName)
     {
-        return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            throw new InvalidOperationException($"{SettingsFileName}에 {propertyName} 값이 필요합니다.");
+        }
     }
 
-    private static int ClampPort(int port, int fallback)
+    private static void RequirePort(int port, string propertyName)
     {
-        return port is > 0 and <= 65535 ? port : fallback;
+        if (!IsValidPort(port))
+        {
+            throw new InvalidOperationException($"{SettingsFileName}의 {propertyName} 값은 1~65535 사이여야 합니다.");
+        }
     }
 
-    private static string GetEnvironment(string name, string fallback)
+    private static bool IsValidPort(int port)
     {
-        var value = Environment.GetEnvironmentVariable(name);
-        return string.IsNullOrWhiteSpace(value) ? fallback : value.Trim();
+        return port is > 0 and <= 65535;
     }
 
-    private static int GetIntEnvironment(string name, int fallback)
+    private static string Clean(string? value)
     {
-        var value = Environment.GetEnvironmentVariable(name);
-        return int.TryParse(value, out var parsed) && parsed is > 0 and <= 65535 ? parsed : fallback;
+        return string.IsNullOrWhiteSpace(value) ? string.Empty : value.Trim();
     }
 }
