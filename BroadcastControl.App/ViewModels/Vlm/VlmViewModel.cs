@@ -12,6 +12,7 @@ using System.Windows.Media.Imaging;
 using BroadcastControl.App.Infrastructure;
 using BroadcastControl.App.Models.Camera;
 using BroadcastControl.App.Models.Motor;
+using BroadcastControl.App.Models.Network;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels.Camera;
 using BroadcastControl.App.ViewModels.Mobile;
@@ -37,6 +38,18 @@ public sealed class VlmViewModel : ViewModelBase
     private string _latestAnalysis = string.Empty;
     private string _latestThreatLevel = "Low";
 
+    public VlmViewModel()
+        : this(AppNetworkSettings.Load())
+    {
+    }
+
+    public VlmViewModel(AppNetworkSettings settings)
+    {
+        ResultReceiverService = new UdpVlmResultReceiverService(settings.VlmResultPort);
+    }
+
+    public UdpVlmResultReceiverService ResultReceiverService { get; }
+
     public ObservableCollection<string> AnalysisHistory { get; } = new();
 
     public string LatestAnalysis
@@ -49,6 +62,17 @@ public sealed class VlmViewModel : ViewModelBase
     {
         get => _latestThreatLevel;
         set => SetProperty(ref _latestThreatLevel, value);
+    }
+
+    public void StartResultReceiver(Action<string> appendLog)
+    {
+        ResultReceiverService.Start();
+        appendLog($"VLM 결과 수신 대기 포트: {ResultReceiverService.Port}");
+    }
+
+    public void DisposeServices()
+    {
+        ResultReceiverService.Dispose();
     }
 }
 }

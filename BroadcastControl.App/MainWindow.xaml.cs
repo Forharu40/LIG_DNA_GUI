@@ -42,16 +42,16 @@ public partial class MainWindow : Window
     private static readonly TimeSpan MobileAlertCooldown = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan JetsonConnectionHoldTime = TimeSpan.FromSeconds(10);
     private static readonly HttpClient RecordedVideoHttpClient = new();
-    private readonly AppNetworkSettings _networkSettings;
     private readonly MainViewModel _viewModel;
-    private readonly UdpEncodedVideoReceiverService _eoUdpCaptureService;
-    private readonly UdpEncodedVideoReceiverService _irUdpCaptureService;
-    private readonly UdpEncodedVideoReceiverService _detectionUdpReceiverService;
-    private readonly ViewportRecordingService _viewportRecordingService;
-    private readonly UdpMotorControlService _motorControlService;
-    private readonly UdpMotorStatusReceiverService _motorStatusReceiverService;
-    private readonly UdpVlmResultReceiverService _vlmResultReceiverService;
-    private readonly MobileAlertHubService _mobileAlertHubService;
+    private AppNetworkSettings _networkSettings => _viewModel.NetworkSettings;
+    private UdpEncodedVideoReceiverService _eoUdpCaptureService => _viewModel.Camera.EoCaptureService;
+    private UdpEncodedVideoReceiverService _irUdpCaptureService => _viewModel.Camera.IrCaptureService;
+    private UdpEncodedVideoReceiverService _detectionUdpReceiverService => _viewModel.Camera.DetectionReceiverService;
+    private ViewportRecordingService _viewportRecordingService => _viewModel.Recording.ViewportRecordingService;
+    private UdpMotorControlService _motorControlService => _viewModel.Motor.CommandService;
+    private UdpMotorStatusReceiverService _motorStatusReceiverService => _viewModel.Motor.StatusReceiverService;
+    private UdpVlmResultReceiverService _vlmResultReceiverService => _viewModel.Vlm.ResultReceiverService;
+    private MobileAlertHubService _mobileAlertHubService => _viewModel.Mobile.AlertHubService;
     private readonly DispatcherTimer _motorHoldTimer;
     private readonly DispatcherTimer _recordedVideoPositionTimer;
     private readonly DispatcherTimer _recordingMetadataTimer;
@@ -151,19 +151,7 @@ public partial class MainWindow : Window
     {
         InitializeComponent();
 
-        _networkSettings = AppNetworkSettings.Load();
-        _motorControlService = new UdpMotorControlService(
-            _networkSettings.JetsonHost,
-            _networkSettings.MotorControlPort,
-            _networkSettings.TrackingRecordingControlPort);
-        _viewModel = new MainViewModel(_motorControlService);
-        _eoUdpCaptureService = new UdpEncodedVideoReceiverService();
-        _irUdpCaptureService = new UdpEncodedVideoReceiverService(applyIrFalseColor: true);
-        _detectionUdpReceiverService = new UdpEncodedVideoReceiverService();
-        _viewportRecordingService = new ViewportRecordingService();
-        _motorStatusReceiverService = new UdpMotorStatusReceiverService(_networkSettings.MotorStatusPort);
-        _vlmResultReceiverService = new UdpVlmResultReceiverService(_networkSettings.VlmResultPort);
-        _mobileAlertHubService = new MobileAlertHubService();
+        _viewModel = new MainViewModel();
         _motorHoldTimer = new DispatcherTimer
         {
             Interval = TimeSpan.FromMilliseconds(50)

@@ -37,6 +37,8 @@ public sealed class RecordingViewModel : ViewModelBase
     private bool _isRecording;
     private string _recordingDirectory = string.Empty;
 
+    public ViewportRecordingService ViewportRecordingService { get; } = new();
+
     public ObservableCollection<string> RecordedVideos { get; } = new();
 
     public bool IsRecording
@@ -49,6 +51,11 @@ public sealed class RecordingViewModel : ViewModelBase
     {
         get => _recordingDirectory;
         set => SetProperty(ref _recordingDirectory, value);
+    }
+
+    public void DisposeServices()
+    {
+        ViewportRecordingService.Dispose();
     }
 }
 }

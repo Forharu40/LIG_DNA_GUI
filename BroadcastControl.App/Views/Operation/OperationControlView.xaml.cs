@@ -56,10 +56,7 @@ public partial class MainWindow : Window
         _networkSettings.PcGuiHost = OperationActiveView.PcGuiHostComboBoxElement.Text;
         _networkSettings.RecordedVideoUrl = $"http://{_networkSettings.JetsonHost.Trim()}:{_networkSettings.RecordingHttpPort.ToString(CultureInfo.InvariantCulture)}/";
         _networkSettings.Save();
-        _motorControlService.ConfigureEndpoint(
-            _networkSettings.JetsonHost,
-            _networkSettings.MotorControlPort,
-            _networkSettings.TrackingRecordingControlPort);
+        _viewModel.Motor.ConfigureNetwork(_networkSettings);
 
         _viewModel.AppendImportantLog($"네트워크 설정을 저장하고 즉시 적용했습니다: Jetson {_networkSettings.JetsonHost}, GUI {_networkSettings.PcGuiHost}");
         MessageBox.Show(

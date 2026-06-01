@@ -11,6 +11,7 @@ using System.Windows.Media.Imaging;
 using BroadcastControl.App.Infrastructure;
 using BroadcastControl.App.Models.Camera;
 using BroadcastControl.App.Models.Motor;
+using BroadcastControl.App.Models.Network;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels.Camera;
 using BroadcastControl.App.ViewModels.Mobile;
@@ -82,7 +83,6 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private int _yoloObjectId = -1;
     private bool _isUserSelectedTrackId;
     private DateTime _lastAutomaticTrackingPacketSentAt = DateTime.MinValue;
-    private readonly UdpMotorControlService _motorControlService;
     private const double MotorPanLimitDegrees = 360;
     private const double MotorTiltLimitDegrees = 360;
     private const int MotorRawMinimum = 0;
@@ -103,16 +103,16 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private readonly ImageSource _eoPlaceholderFrame = CreateCameraPlaceholderFrame(string.Empty, Color.FromRgb(51, 94, 160));
     private readonly ImageSource _irPlaceholderFrame = CreateCameraPlaceholderFrame(string.Empty, Color.FromRgb(192, 109, 40));
 
-    public MainViewModel(UdpMotorControlService? motorControlService = null)
+    public MainViewModel(AppNetworkSettings? networkSettings = null)
     {
-        _motorControlService = motorControlService ?? new UdpMotorControlService();
+        NetworkSettings = networkSettings ?? AppNetworkSettings.Load();
         Text = new LocalizedTextProvider(() => _uiLanguage);
         Camera = new CameraViewModel();
-        Motor = new MotorControlViewModel();
+        Motor = new MotorControlViewModel(NetworkSettings);
         Operation = new OperationControlViewModel();
         Monitoring = new MonitoringViewModel();
         Recording = new RecordingViewModel();
-        Vlm = new VlmViewModel();
+        Vlm = new VlmViewModel(NetworkSettings);
         Mobile = new MobileWebAppViewModel();
 
         // 앱에 저장된 현재 테마를 읽어 설정 drawer와 테마 버튼 상태를 초기화합니다.
@@ -173,6 +173,8 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     public ObservableCollection<PrimaryTargetOption> PrimaryTargets { get; }
 
     public LocalizedTextProvider Text { get; }
+
+    public AppNetworkSettings NetworkSettings { get; }
 
     public CameraViewModel Camera { get; }
 
@@ -279,6 +281,15 @@ public sealed partial class MainViewModel : INotifyPropertyChanged
     private void OnPropertyChanged([CallerMemberName] string? propertyName = null)
     {
         PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));
+    }
+
+    public void DisposeFeatureServices()
+    {
+        Camera.DisposeServices();
+        Motor.DisposeServices();
+        Recording.DisposeServices();
+        Vlm.DisposeServices();
+        Mobile.DisposeServices();
     }
 }
 

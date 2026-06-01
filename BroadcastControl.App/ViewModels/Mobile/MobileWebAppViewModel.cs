@@ -1,4 +1,6 @@
-﻿using BroadcastControl.App.ViewModels;
+using BroadcastControl.App.Models.Network;
+using BroadcastControl.App.Services;
+using BroadcastControl.App.ViewModels;
 
 // 파일 역할:
 // VLM이 위험 객체를 판단했을 때 모바일 브라우저로 보낼 경고 화면 상태를 관리합니다.
@@ -16,6 +18,8 @@ public sealed class MobileWebAppViewModel : ViewModelBase
     private int _alertServerPort = 8088;
     private string _latestEvidenceUrl = string.Empty;
 
+    public MobileAlertHubService AlertHubService { get; } = new();
+
     public bool IsAlertServerRunning
     {
         get => _isAlertServerRunning;
@@ -32,5 +36,26 @@ public sealed class MobileWebAppViewModel : ViewModelBase
     {
         get => _latestEvidenceUrl;
         set => SetProperty(ref _latestEvidenceUrl, value);
+    }
+
+    public bool StartAlertServer(AppNetworkSettings settings, Action<string> appendLog)
+    {
+        AlertServerPort = settings.MobileAlertPort;
+        IsAlertServerRunning = AlertHubService.Start(settings.MobileAlertPort);
+        if (IsAlertServerRunning)
+        {
+            appendLog($"모바일 위험 알림 앱이 시작되었습니다: {AlertHubService.AccessHintUrls}");
+        }
+        else
+        {
+            appendLog($"모바일 위험 알림 앱 시작에 실패했습니다. 포트 {settings.MobileAlertPort}를 확인하세요.");
+        }
+
+        return IsAlertServerRunning;
+    }
+
+    public void DisposeServices()
+    {
+        AlertHubService.Dispose();
     }
 }

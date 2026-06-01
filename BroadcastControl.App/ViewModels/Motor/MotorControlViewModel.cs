@@ -12,6 +12,7 @@ using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using BroadcastControl.App.Infrastructure;
 using BroadcastControl.App.Models.Camera;
+using BroadcastControl.App.Models.Network;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels.Camera;
 using BroadcastControl.App.ViewModels.Mobile;
@@ -41,6 +42,24 @@ public sealed class MotorControlViewModel : ViewModelBase
     private int _scanStep = 8;
     private int _manualStep = 8;
     private MotorButtonMask _activeButtons;
+
+    public MotorControlViewModel()
+        : this(AppNetworkSettings.Load())
+    {
+    }
+
+    public MotorControlViewModel(AppNetworkSettings settings)
+    {
+        CommandService = new UdpMotorControlService(
+            settings.JetsonHost,
+            settings.MotorControlPort,
+            settings.TrackingRecordingControlPort);
+        StatusReceiverService = new UdpMotorStatusReceiverService(settings.MotorStatusPort);
+    }
+
+    public UdpMotorControlService CommandService { get; }
+
+    public UdpMotorStatusReceiverService StatusReceiverService { get; }
 
     public double PanDegrees
     {
@@ -82,6 +101,26 @@ public sealed class MotorControlViewModel : ViewModelBase
     {
         get => _activeButtons;
         set => SetProperty(ref _activeButtons, value);
+    }
+
+    public void ConfigureNetwork(AppNetworkSettings settings)
+    {
+        CommandService.ConfigureEndpoint(
+            settings.JetsonHost,
+            settings.MotorControlPort,
+            settings.TrackingRecordingControlPort);
+    }
+
+    public void StartStatusReceiver(Action<string> appendLog)
+    {
+        StatusReceiverService.Start();
+        appendLog($"모터 상태 수신 대기 포트: {StatusReceiverService.Port}");
+    }
+
+    public void DisposeServices()
+    {
+        CommandService.Dispose();
+        StatusReceiverService.Dispose();
     }
 }
 }
@@ -459,7 +498,7 @@ public sealed partial class MainViewModel
         }
 
         // 현재 GUI 모드, 추적 ID, stream 선택, 방향키, pan/tilt raw 값을 11바이트 UDP 패킷으로 전송합니다.
-        return _motorControlService.TrySendMotorCommandPacket(
+        return Motor.CommandService.TrySendMotorCommandPacket(
             mode: forcedMode ?? (IsManualMode ? (byte)1 : (byte)0),
             tracking: IsTrackingModeEnabled ? (byte)1 : (byte)0,
             trackId: EncodeTrackId(),

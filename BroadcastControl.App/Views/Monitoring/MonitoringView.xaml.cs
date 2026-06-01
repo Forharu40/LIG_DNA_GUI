@@ -71,10 +71,8 @@ public partial class MainWindow : Window
         _irUdpCaptureService.SetBrightness(_viewModel.Brightness);
         _irUdpCaptureService.SetContrast(_viewModel.Contrast);
         _viewModel.InitializeMotorControlState();
-        _motorStatusReceiverService.Start();
-        _viewModel.AppendImportantLog($"모터 상태 수신 대기 포트: {_motorStatusReceiverService.Port}");
-        _vlmResultReceiverService.Start();
-        _viewModel.AppendImportantLog($"VLM 결과 수신 대기 포트: {_vlmResultReceiverService.Port}");
+        _viewModel.Motor.StartStatusReceiver(_viewModel.AppendImportantLog);
+        _viewModel.Vlm.StartResultReceiver(_viewModel.AppendImportantLog);
 
         _viewModel.UpdateViewportSize(CameraActiveView.CameraViewportElement.ActualWidth, CameraActiveView.CameraViewportElement.ActualHeight);
         UpdateRecordingViewportState();
@@ -88,39 +86,8 @@ public partial class MainWindow : Window
         LoadNetworkSettingsEditor();
         AnimateSettingsDrawer(_viewModel.IsSettingsOpen, animate: false);
 
-        if (_eoUdpCaptureService.Start(_networkSettings.EoUdpPort))
-        {
-        }
-        else
-        {
-            _viewModel.AppendImportantLog($"Failed to start the EO UDP stream receiver on port {_networkSettings.EoUdpPort}.");
-        }
-
-        if (_irUdpCaptureService.Start(_networkSettings.IrUdpPort))
-        {
-        }
-        else
-        {
-            _viewModel.AppendImportantLog($"Failed to start the IR UDP stream receiver on port {_networkSettings.IrUdpPort}.");
-        }
-
-        if (_detectionUdpReceiverService.Start(_networkSettings.DetectionUdpPort))
-        {
-            _viewModel.AppendImportantLog($"EO/IR 탐지 결과 수신 대기 포트: {_networkSettings.DetectionUdpPort}");
-        }
-        else
-        {
-            _viewModel.AppendImportantLog($"EO/IR 탐지 결과 수신 포트 {_networkSettings.DetectionUdpPort}를 열지 못했습니다.");
-        }
-
-        if (_mobileAlertHubService.Start(_networkSettings.MobileAlertPort))
-        {
-            _viewModel.AppendImportantLog($"모바일 위험 알림 앱이 시작되었습니다: {_mobileAlertHubService.AccessHintUrls}");
-        }
-        else
-        {
-            _viewModel.AppendImportantLog($"모바일 위험 알림 앱 시작에 실패했습니다. 포트 {_networkSettings.MobileAlertPort}를 확인하세요.");
-        }
+        _viewModel.Camera.StartNetworkReceivers(_networkSettings, _viewModel.AppendImportantLog);
+        _viewModel.Mobile.StartAlertServer(_networkSettings, _viewModel.AppendImportantLog);
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
@@ -442,14 +409,7 @@ public partial class MainWindow : Window
         _motorStatusReceiverService.ReceiverError -= OnMotorStatusReceiverError;
         _vlmResultReceiverService.ResultReceived -= OnVlmResultReceived;
         _vlmResultReceiverService.ReceiverError -= OnVlmResultReceiverError;
-        _mobileAlertHubService.Dispose();
-        _viewportRecordingService.Dispose();
-        _eoUdpCaptureService.Dispose();
-        _irUdpCaptureService.Dispose();
-        _detectionUdpReceiverService.Dispose();
-        _motorStatusReceiverService.Dispose();
-        _vlmResultReceiverService.Dispose();
-        _motorControlService.Dispose();
+        _viewModel.DisposeFeatureServices();
     }
 }
 }

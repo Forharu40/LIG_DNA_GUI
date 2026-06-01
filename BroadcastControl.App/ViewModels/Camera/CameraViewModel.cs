@@ -12,6 +12,7 @@ using System.Windows.Media.Imaging;
 using BroadcastControl.App.Infrastructure;
 using BroadcastControl.App.Models.Camera;
 using BroadcastControl.App.Models.Motor;
+using BroadcastControl.App.Models.Network;
 using BroadcastControl.App.Services;
 using BroadcastControl.App.ViewModels.Camera;
 using BroadcastControl.App.ViewModels.Mobile;
@@ -39,6 +40,12 @@ public sealed class CameraViewModel : ViewModelBase
     private double _zoomLevel = 1.0;
     private double _brightness = 50;
     private double _contrast = 50;
+
+    public UdpEncodedVideoReceiverService EoCaptureService { get; } = new();
+
+    public UdpEncodedVideoReceiverService IrCaptureService { get; } = new(applyIrFalseColor: true);
+
+    public UdpEncodedVideoReceiverService DetectionReceiverService { get; } = new();
 
     public ImageSource? EoFrame
     {
@@ -68,6 +75,46 @@ public sealed class CameraViewModel : ViewModelBase
     {
         get => _contrast;
         set => SetProperty(ref _contrast, value);
+    }
+
+    public bool StartNetworkReceivers(AppNetworkSettings settings, Action<string> appendLog)
+    {
+        EoCaptureService.SetBrightness(Brightness);
+        EoCaptureService.SetContrast(Contrast);
+        IrCaptureService.SetBrightness(Brightness);
+        IrCaptureService.SetContrast(Contrast);
+
+        var started = true;
+        if (!EoCaptureService.Start(settings.EoUdpPort))
+        {
+            appendLog($"Failed to start the EO UDP stream receiver on port {settings.EoUdpPort}.");
+            started = false;
+        }
+
+        if (!IrCaptureService.Start(settings.IrUdpPort))
+        {
+            appendLog($"Failed to start the IR UDP stream receiver on port {settings.IrUdpPort}.");
+            started = false;
+        }
+
+        if (DetectionReceiverService.Start(settings.DetectionUdpPort))
+        {
+            appendLog($"EO/IR 탐지 결과 수신 대기 포트: {settings.DetectionUdpPort}");
+        }
+        else
+        {
+            appendLog($"EO/IR 탐지 결과 수신 포트 {settings.DetectionUdpPort}를 열지 못했습니다.");
+            started = false;
+        }
+
+        return started;
+    }
+
+    public void DisposeServices()
+    {
+        EoCaptureService.Dispose();
+        IrCaptureService.Dispose();
+        DetectionReceiverService.Dispose();
     }
 }
 }
