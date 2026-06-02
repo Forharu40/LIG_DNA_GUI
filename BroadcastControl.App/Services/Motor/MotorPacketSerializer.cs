@@ -5,9 +5,10 @@ namespace BroadcastControl.App.Services;
 
 // MotorControlViewModel의 모드, tracking, track_id, 방향키, Pan/Tilt raw값, 속도 값을
 // Jetson gui_bridge가 해석하는 고정 길이 UDP 커맨드 패킷으로 직렬화합니다.
+// 패킷 형태는 JunhoLeeee/gui_modify의 11바이트 GUI -> Jetson 모터 패킷 규격에 맞춥니다.
 public static class MotorPacketSerializer
 {
-    public const int CommandPacketSize = 10;
+    public const int CommandPacketSize = 11;
 
     public static byte[] CreateCommandPacket(
         byte mode,
@@ -23,11 +24,12 @@ public static class MotorPacketSerializer
         packet[0] = mode;
         packet[1] = tracking;
         packet[2] = trackId;
-        packet[3] = EncodeButtonMask(btnMask);
-        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(4, 2), panPos);
-        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(6, 2), tiltPos);
-        packet[8] = EncodeStepSize(scanStep);
-        packet[9] = EncodeStepSize(manualStep);
+        packet[3] = 0;
+        packet[4] = EncodeButtonMask(btnMask);
+        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(5, 2), panPos);
+        BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(7, 2), tiltPos);
+        packet[9] = EncodeStepSize(scanStep);
+        packet[10] = EncodeStepSize(manualStep);
         return packet;
     }
 
