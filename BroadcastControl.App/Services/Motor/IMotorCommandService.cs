@@ -16,11 +16,11 @@ public interface IMotorCommandService : IDisposable
         byte mode,
         byte tracking,
         byte trackId,
+        bool isEoPrimary,
         MotorButtonMask btnMask,
         ushort panPos,
         ushort tiltPos,
         byte scanStep,
         byte manualStep,
-        bool isEoPrimary,
         out string? error);
 }

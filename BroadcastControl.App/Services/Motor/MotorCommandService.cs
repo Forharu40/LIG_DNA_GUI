@@ -1,4 +1,4 @@
-﻿using BroadcastControl.App.Models.Motor;
+using BroadcastControl.App.Models.Motor;
 
 namespace BroadcastControl.App.Services;
 
@@ -26,24 +26,24 @@ public sealed class MotorCommandService : IMotorCommandService
         byte mode,
         byte tracking,
         byte trackId,
+        bool isEoPrimary,
         MotorButtonMask btnMask,
         ushort panPos,
         ushort tiltPos,
         byte scanStep,
         byte manualStep,
-        bool isEoPrimary,
         out string? error)
     {
         return _udpMotorControlService.TrySendMotorCommandPacket(
             mode,
             tracking,
             trackId,
+            isEoPrimary,
             btnMask,
             panPos,
             tiltPos,
             scanStep,
             manualStep,
-            isEoPrimary,
             out error);
     }
 

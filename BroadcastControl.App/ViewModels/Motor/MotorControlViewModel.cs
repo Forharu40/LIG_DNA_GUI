@@ -502,13 +502,13 @@ public sealed partial class MainViewModel
             mode: forcedMode ?? (IsManualMode ? (byte)1 : (byte)0),
             tracking: IsTrackingModeEnabled ? (byte)1 : (byte)0,
             trackId: EncodeTrackId(),
+            isEoPrimary: IsEoPrimary,
             btnMask: buttons,
             panPos: _motorPanRaw,
             tiltPos: _motorTiltRaw,
             scanStep: (byte)MotorSpeedToStepDelta(AutoMotorAngleSize),
             manualStep: (byte)MotorSpeedToStepDelta(ManualMotorAngleSize),
-            isEoPrimary: IsEoPrimary,
-            out error);
+            error: out error);
     }
 
     private byte EncodeTrackId()
