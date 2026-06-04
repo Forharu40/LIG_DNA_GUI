@@ -14,6 +14,7 @@ public static class MotorPacketSerializer
         byte mode,
         byte tracking,
         byte trackId,
+        bool isEoPrimary,
         MotorButtonMask btnMask,
         ushort panPos,
         ushort tiltPos,
@@ -24,7 +25,7 @@ public static class MotorPacketSerializer
         packet[0] = mode;
         packet[1] = tracking;
         packet[2] = trackId;
-        packet[3] = 0;
+        packet[3] = isEoPrimary ? (byte)0 : (byte)1;
         packet[4] = EncodeButtonMask(btnMask);
         BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(5, 2), panPos);
         BinaryPrimitives.WriteUInt16LittleEndian(packet.AsSpan(7, 2), tiltPos);

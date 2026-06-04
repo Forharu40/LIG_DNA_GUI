@@ -502,13 +502,13 @@ public sealed partial class MainViewModel
             mode: forcedMode ?? (IsManualMode ? (byte)1 : (byte)0),
             tracking: IsTrackingModeEnabled ? (byte)1 : (byte)0,
             trackId: EncodeTrackId(),
+            isEoPrimary: IsEoPrimary,
             btnMask: buttons,
             panPos: _motorPanRaw,
             tiltPos: _motorTiltRaw,
             scanStep: (byte)MotorSpeedToStepDelta(AutoMotorAngleSize),
             manualStep: (byte)MotorSpeedToStepDelta(ManualMotorAngleSize),
-            isEoPrimary: IsEoPrimary,
-            out error);
+            error: out error);
     }
 
     private byte EncodeTrackId()
@@ -520,11 +520,12 @@ public sealed partial class MainViewModel
 
         if (_isUserSelectedTrackId && _yoloObjectId is >= 0 and <= 254)
         {
-            return 0xFF;
-            //return (byte)_yoloObjectId;
+            return (byte)_yoloObjectId;
         }
 
-        return 0xFF;
+        return _yoloObjectId is >= 0 and <= 254
+            ? (byte)_yoloObjectId
+            : (byte)0xFF;
     }
 
     private bool ShouldSendTrackingToZybo =>

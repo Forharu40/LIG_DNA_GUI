@@ -1,4 +1,4 @@
-﻿using System.Buffers.Binary;
+using System.Buffers.Binary;
 using System.IO;
 using System.Net.Sockets;
 using BroadcastControl.App.Models.Motor;
@@ -66,18 +66,19 @@ public sealed class UdpMotorControlService : IDisposable
         byte mode,
         byte tracking,
         byte trackId,
+        bool isEoPrimary,
         MotorButtonMask btnMask,
         ushort panPos,
         ushort tiltPos,
         byte scanStep,
         byte manualStep,
-        bool isEoPrimary,
         out string? error)
     {
         var packet = MotorPacketSerializer.CreateCommandPacket(
             mode,
             tracking,
             trackId,
+            isEoPrimary,
             btnMask,
             panPos,
             tiltPos,
