@@ -520,11 +520,12 @@ public sealed partial class MainViewModel
 
         if (_isUserSelectedTrackId && _yoloObjectId is >= 0 and <= 254)
         {
-            return 0xFF;
-            //return (byte)_yoloObjectId;
+            return (byte)_yoloObjectId;
         }
 
-        return 0xFF;
+        return _yoloObjectId is >= 0 and <= 254
+            ? (byte)_yoloObjectId
+            : (byte)0xFF;
     }
 
     private bool ShouldSendTrackingToZybo =>
