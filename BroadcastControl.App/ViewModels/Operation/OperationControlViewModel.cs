@@ -260,6 +260,12 @@ public sealed partial class MainViewModel
         {
             AppendImportantLog($"추적 모드 전송에 실패했습니다: {modeError}");
         }
+        else
+        {
+            AppendImportantLog(IsTrackingModeEnabled
+                ? "추적 모드가 켜졌습니다."
+                : "추적 모드가 꺼졌습니다.");
+        }
     }
 
     private void SetTheme(object? parameter)

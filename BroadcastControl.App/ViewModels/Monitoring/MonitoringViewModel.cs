@@ -100,7 +100,7 @@ public sealed partial class MainViewModel
 
     public void UpdateDetectionSummary(IReadOnlyList<DetectionInfo> detections)
     {
-        // 큰 화면의 YOLO 탐지 결과 중 가장 위험도가 높은 객체를 시스템 위험도와 자동 추적 대상으로 사용합니다.
+        // 큰 화면의 YOLO 탐지 결과 중 위험도가 높은 객체를 자동 추적 후보로 사용합니다.
         CurrentThreatLevel = detections
             .OrderByDescending(detection => GetThreatWeight(detection.ThreatLevel))
             .Select(detection => NormalizeThreatLevel(detection.ThreatLevel))
@@ -145,12 +145,12 @@ public sealed partial class MainViewModel
 
         if (targetChanged && hasTrackedTarget)
         {
-            AppendImportantLog($"큰 화면 위험 객체 추적 ID 선택: object {yoloObjectId}");
+            AppendImportantLog($"자동 추적 후보 ID 선택: object {yoloObjectId}");
         }
 
         if (!TrySendMotorCommandPacket(out var modeError))
         {
-            AppendImportantLog($"자동 모드 상태 전송에 실패했습니다: {modeError}");
+            AppendImportantLog($"자동 추적 상태 전송에 실패했습니다: {modeError}");
             return;
         }
 
@@ -162,26 +162,29 @@ public sealed partial class MainViewModel
 
     public void SelectYoloObject(int objectId, string threatLevel)
     {
-        // 사용자가 큰 화면이나 YOLO Targets 리스트에서 객체를 선택하면 해당 객체 ID를 추적 대상으로 전송합니다.
+        // 사용자가 큰 화면이나 YOLO Targets 리스트에서 객체를 선택하면 위험도와 상관없이 해당 객체를 추적 대상으로 선택합니다.
         if (!IsSystemPoweredOn || objectId < 0)
         {
             return;
         }
 
-        var isHighThreat = IsHighThreatLevel(threatLevel);
+        var normalizedThreatLevel = NormalizeThreatLevel(threatLevel);
         _hasTrackedTarget = true;
         _yoloObjectId = objectId;
         _isUserSelectedTrackId = true;
 
         if (!TrySendMotorCommandPacket(out var error))
         {
-            AppendImportantLog($"YOLO 객체 ID 전송에 실패했습니다: {error}");
+            AppendImportantLog($"YOLO 객체 추적 ID 전송에 실패했습니다: {error}");
             return;
         }
 
-        AppendImportantLog(isHighThreat
-            ? $"위험 객체 추적 ID 전송: object {objectId}"
-            : $"선택한 객체가 위험 등급 높음이 아니므로 tracking=0으로 전송했습니다: object {objectId}");
+        var trackingState = IsTrackingModeEnabled ? "tracking=1" : "tracking=0";
+        var trackingNote = IsTrackingModeEnabled
+            ? "추적 모드가 켜져 있어 선택 객체를 추적 대상으로 전송했습니다."
+            : "추적 모드가 꺼져 있어 객체 ID는 저장했지만 추적 요청은 비활성 상태로 전송했습니다.";
+        AppendImportantLog(
+            $"YOLO 객체 선택: object {objectId}, 위험도 {TranslateThreatLevel(normalizedThreatLevel)}, {trackingState}. {trackingNote}");
     }
 }
 }

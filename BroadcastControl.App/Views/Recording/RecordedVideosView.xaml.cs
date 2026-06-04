@@ -102,7 +102,7 @@ public partial class MainWindow : Window
 
             var filePath = _viewportRecordingService.StartRecordingToDesktop(CameraActiveView.CameraPanelElement);
             _isViewportRecordingActive = true;
-            _viewModel.AppendImportantLog($"Recording started: {filePath}");
+            _viewModel.AppendImportantLog($"화면 녹화를 시작했습니다: {filePath}");
             return;
         }
 
@@ -117,15 +117,15 @@ public partial class MainWindow : Window
         {
             if (System.IO.File.Exists(savedPath))
             {
-                _viewModel.AppendImportantLog($"Video saved: {savedPath} ({_viewportRecordingService.RecordedFrameCount} frames)");
+                _viewModel.AppendImportantLog($"화면 녹화 영상을 저장했습니다: {savedPath} ({_viewportRecordingService.RecordedFrameCount} frames)");
             }
             else if (!string.IsNullOrWhiteSpace(_viewportRecordingService.LastRecordingErrorMessage))
             {
-                _viewModel.AppendImportantLog($"Video save failed: {_viewportRecordingService.LastRecordingErrorMessage}");
+                _viewModel.AppendImportantLog($"화면 녹화 영상 저장에 실패했습니다: {_viewportRecordingService.LastRecordingErrorMessage}");
             }
             else
             {
-                _viewModel.AppendImportantLog($"Video file was not created: {savedPath} ({_viewportRecordingService.RecordedFrameCount} frames)");
+                _viewModel.AppendImportantLog($"화면 녹화 파일이 생성되지 않았습니다: {savedPath} ({_viewportRecordingService.RecordedFrameCount} frames)");
             }
         }
     }

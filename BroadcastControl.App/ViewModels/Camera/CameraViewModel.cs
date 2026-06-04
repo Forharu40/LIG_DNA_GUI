@@ -85,13 +85,13 @@ public sealed class CameraViewModel : ViewModelBase
         var started = true;
         if (!EoCaptureService.Start(settings.EoUdpPort))
         {
-            appendLog($"Failed to start the EO UDP stream receiver on port {settings.EoUdpPort}.");
+            appendLog($"EO 영상 수신 포트 {settings.EoUdpPort}를 열지 못했습니다.");
             started = false;
         }
 
         if (!IrCaptureService.Start(settings.IrUdpPort))
         {
-            appendLog($"Failed to start the IR UDP stream receiver on port {settings.IrUdpPort}.");
+            appendLog($"IR 영상 수신 포트 {settings.IrUdpPort}를 열지 못했습니다.");
             started = false;
         }
 
