@@ -12,9 +12,9 @@ public enum MotorButtonMask : byte
     // Pan을 왼쪽으로 이동시키는 명령입니다.
     Left = 0x01,
     // Tilt를 위로 이동시키는 명령입니다.
-    Up = 0x04,
+    Up = 0x08,
     // Tilt를 아래로 이동시키는 명령입니다.
-    Down = 0x08,
+    Down = 0x04,
     // 모터 중심 위치 이동이 필요할 때 사용하는 예비 명령입니다.
     Center = 0x10
 }
